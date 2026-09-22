@@ -13,81 +13,81 @@ from google.cloud import storage
 
 
 def get_blob_name(prefix: str, relative_path: str) -> str:
-    """Normalize target GCS blob name from prefix and relative path."""
-    clean_prefix = prefix.strip("/")
-    clean_rel = relative_path.lstrip("/")
-    if clean_prefix:
-        return f"{clean_prefix}/{clean_rel}"
-    return clean_rel
+  """Normalize target GCS blob name from prefix and relative path."""
+  clean_prefix = prefix.strip("/")
+  clean_rel = relative_path.lstrip("/")
+  if clean_prefix:
+    return f"{clean_prefix}/{clean_rel}"
+  return clean_rel
 
 
 def infer_content_type(file_path: Path | str) -> str:
-    """Determine HTTP Content-Type for OKF files."""
-    path = Path(file_path)
-    if path.suffix == ".md":
-        return "text/markdown; charset=utf-8"
-    if path.suffix in (".yaml", ".yml"):
-        return "text/yaml; charset=utf-8"
-    if path.suffix == ".json":
-        return "application/json; charset=utf-8"
-    guessed, _ = mimetypes.guess_type(str(path))
-    return guessed or "application/octet-stream"
+  """Determine HTTP Content-Type for OKF files."""
+  path = Path(file_path)
+  if path.suffix == ".md":
+    return "text/markdown; charset=utf-8"
+  if path.suffix in (".yaml", ".yml"):
+    return "text/yaml; charset=utf-8"
+  if path.suffix == ".json":
+    return "application/json; charset=utf-8"
+  guessed, _ = mimetypes.guess_type(str(path))
+  return guessed or "application/octet-stream"
 
 
 class GCSExporter:
-    """Manages the upload and synchronization of OKF bundles to Google Cloud Storage."""
+  """Manages the upload and synchronization of OKF bundles to Google Cloud Storage."""
 
-    def __init__(self, bucket_name: str, client: storage.Client | None = None) -> None:
-        self.bucket_name = bucket_name
-        self._client = client
+  def __init__(self, bucket_name: str, client: storage.Client | None = None) -> None:
+    self.bucket_name = bucket_name
+    self._client = client
 
-    @property
-    def client(self) -> storage.Client:
-        if self._client is None:
-            self._client = storage.Client()
-        return self._client
+  @property
+  def client(self) -> storage.Client:
+    if self._client is None:
+      self._client = storage.Client()
+    return self._client
 
-    def export_bundle(
-        self,
-        bundle_dir: Path | str,
-        prefix: str = "okf-bundles/phenol-plant",
-        dry_run: bool = False,
-    ) -> dict[str, Any]:
-        """Upload all bundle files from bundle_dir to gs://<bucket_name>/<prefix>/."""
-        root = Path(bundle_dir)
-        if not root.exists():
-            raise FileNotFoundError(f"Bundle directory does not exist: {root}")
+  def export_bundle(
+      self,
+      bundle_dir: Path | str,
+      prefix: str = "okf-bundles/phenol-plant",
+      dry_run: bool = False,
+  ) -> dict[str, Any]:
+    """Upload all bundle files from bundle_dir to gs://<bucket_name>/<prefix>/."""
+    root = Path(bundle_dir)
+    if not root.exists():
+      raise FileNotFoundError(f"Bundle directory does not exist: {root}")
 
-        files_to_upload: list[tuple[Path, str, str]] = []
-        total_bytes = 0
+    files_to_upload: list[tuple[Path, str, str]] = []
+    total_bytes = 0
 
-        for file_path in root.rglob("*"):
-            if file_path.is_file():
-                rel_path = str(file_path.relative_to(root))
-                blob_name = get_blob_name(prefix, rel_path)
-                content_type = infer_content_type(file_path)
-                file_size = file_path.stat().st_size
-                total_bytes += file_size
-                files_to_upload.append((file_path, blob_name, content_type))
+    for file_path in root.rglob("*"):
+      if file_path.is_file():
+        rel_path = str(file_path.relative_to(root))
+        blob_name = get_blob_name(prefix, rel_path)
+        content_type = infer_content_type(file_path)
+        file_size = file_path.stat().st_size
+        total_bytes += file_size
+        files_to_upload.append((file_path, blob_name, content_type))
 
-        uploaded_uris: list[str] = []
+    uploaded_uris: list[str] = []
 
-        if not dry_run:
-            bucket = self.client.bucket(self.bucket_name)
-            for local_path, blob_name, c_type in files_to_upload:
-                blob = bucket.blob(blob_name)
-                blob.upload_from_filename(str(local_path), content_type=c_type)
-                uploaded_uris.append(f"gs://{self.bucket_name}/{blob_name}")
-        else:
-            for _, blob_name, _ in files_to_upload:
-                uploaded_uris.append(f"gs://{self.bucket_name}/{blob_name}")
+    if not dry_run:
+      bucket = self.client.bucket(self.bucket_name)
+      for local_path, blob_name, c_type in files_to_upload:
+        blob = bucket.blob(blob_name)
+        blob.upload_from_filename(str(local_path), content_type=c_type)
+        uploaded_uris.append(f"gs://{self.bucket_name}/{blob_name}")
+    else:
+      for _, blob_name, _ in files_to_upload:
+        uploaded_uris.append(f"gs://{self.bucket_name}/{blob_name}")
 
-        return {
-            "bucket": self.bucket_name,
-            "prefix": prefix,
-            "dry_run": dry_run,
-            "files_count": len(files_to_upload),
-            "total_bytes": total_bytes,
-            "destination_root_uri": f"gs://{self.bucket_name}/{prefix.strip('/')}",
-            "uploaded_uris": uploaded_uris,
-        }
+    return {
+        "bucket": self.bucket_name,
+        "prefix": prefix,
+        "dry_run": dry_run,
+        "files_count": len(files_to_upload),
+        "total_bytes": total_bytes,
+        "destination_root_uri": f"gs://{self.bucket_name}/{prefix.strip('/')}",
+        "uploaded_uris": uploaded_uris,
+    }

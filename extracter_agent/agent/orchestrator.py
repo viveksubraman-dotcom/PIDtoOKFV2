@@ -13,8 +13,8 @@ from extracter_agent.agent.guardrails import before_agent_callback
 from extracter_agent.config import get_config
 from extracter_agent.tools.gcs_tools import export_bundle_to_gcs_tool
 from extracter_agent.tools.okf_tools import (
-    build_okf_indexes_and_validate_tool,
-    generate_equipment_okf_tool,
+  build_okf_indexes_and_validate_tool,
+  generate_equipment_okf_tool,
 )
 from extracter_agent.tools.pdf_tools import process_raw_pdf_tool
 
@@ -36,21 +36,21 @@ Operational Rules:
 
 
 def create_extracter_agent() -> Agent:
-    """Factory to construct the ADK Root Extracter Agent."""
-    cfg = get_config()
-    return Agent(
-        name="extracter_orchestrator",
-        description="Autonomous chemical engineering knowledge extraction and OKF bundle publishing agent.",
-        model=cfg.gemini_model,
-        instruction=ORCHESTRATOR_INSTRUCTIONS,
-        tools=[
-            process_raw_pdf_tool,
-            generate_equipment_okf_tool,
-            build_okf_indexes_and_validate_tool,
-            export_bundle_to_gcs_tool,
-        ],
-        before_agent_callback=before_agent_callback,
-    )
+  """Factory to construct the ADK Root Extracter Agent."""
+  cfg = get_config()
+  return Agent(
+      name="extracter_orchestrator",
+      description="Autonomous chemical engineering knowledge extraction and OKF bundle publishing agent.",
+      model=cfg.gemini_model,
+      instruction=ORCHESTRATOR_INSTRUCTIONS,
+      tools=[
+          process_raw_pdf_tool,
+          generate_equipment_okf_tool,
+          build_okf_indexes_and_validate_tool,
+          export_bundle_to_gcs_tool,
+      ],
+      before_agent_callback=before_agent_callback,
+  )
 
 
 # Module-level instances for ADK runner and deployment

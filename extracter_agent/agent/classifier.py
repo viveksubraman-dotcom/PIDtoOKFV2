@@ -32,53 +32,51 @@ You MUST provide your reasoning and extract any explicit entity tags or raw PDF 
 
 
 class CognitiveClassifier:
-    """Cognitive intent classifier powered by Vertex AI / Gemini."""
+  """Cognitive intent classifier powered by Vertex AI / Gemini."""
 
-    def __init__(self, client: genai.Client | None = None) -> None:
-        cfg = get_config()
-        self.model_name = cfg.gemini_model
-        self._client = client
+  def __init__(self, client: genai.Client | None = None) -> None:
+    cfg = get_config()
+    self.model_name = cfg.gemini_model
+    self._client = client
 
-    @property
-    def client(self) -> genai.Client:
-        if self._client is None:
-            # Initialized with Vertex AI or standard Gemini API depending on environment
-            cfg = get_config()
-            if os.getenv("GOOGLE_GENAI_USE_VERTEXAI", "").lower() in ("true", "1"):
-                self._client = genai.Client(
-                    vertexai=True,
-                    project=cfg.google_cloud_project,
-                    location=cfg.google_cloud_location,
-                )
-            else:
-                self._client = genai.Client()
-        return self._client
+  @property
+  def client(self) -> genai.Client:
+    if self._client is None:
+      # Initialized with Vertex AI or standard Gemini API depending on environment
+      cfg = get_config()
+      if os.getenv("GOOGLE_GENAI_USE_VERTEXAI", "").lower() in ("true", "1"):
+        self._client = genai.Client(
+            vertexai=True,
+            project=cfg.google_cloud_project,
+            location=cfg.google_cloud_location,
+        )
+      else:
+        self._client = genai.Client()
+    return self._client
 
-    def classify_intent(self, prompt: str) -> IntentClassificationResult:
-        """Classify the user prompt into a canonical intent using model-driven reasoning."""
-        try:
-            response = self.client.models.generate_content(
-                model=self.model_name,
-                contents=prompt,
-                config=types.GenerateContentConfig(
-                    system_instruction=INTENT_SYSTEM_PROMPT,
-                    response_mime_type="application/json",
-                    response_schema=IntentClassificationResult,
-                    temperature=0.0,
-                ),
-            )
-            if response.parsed and isinstance(
-                response.parsed, IntentClassificationResult
-            ):
-                return response.parsed
-            # Fallback to manual parsing if structured object is in text
-            return IntentClassificationResult.model_validate_json(response.text)
-        except Exception as e:
-            # If external API is unreachable in local test sandbox, return cognitive OTHERS with explanation
-            return IntentClassificationResult(
-                intent=IntentCategory.OTHERS,
-                confidence=0.0,
-                reasoning=f"Model reasoning invocation unavailable: {e}",
-                target_entities=[],
-                raw_sources=[],
-            )
+  def classify_intent(self, prompt: str) -> IntentClassificationResult:
+    """Classify the user prompt into a canonical intent using model-driven reasoning."""
+    try:
+      response = self.client.models.generate_content(
+          model=self.model_name,
+          contents=prompt,
+          config=types.GenerateContentConfig(
+              system_instruction=INTENT_SYSTEM_PROMPT,
+              response_mime_type="application/json",
+              response_schema=IntentClassificationResult,
+              temperature=0.0,
+          ),
+      )
+      if response.parsed and isinstance(response.parsed, IntentClassificationResult):
+        return response.parsed
+      # Fallback to manual parsing if structured object is in text
+      return IntentClassificationResult.model_validate_json(response.text)
+    except Exception as e:
+      # If external API is unreachable in local test sandbox, return cognitive OTHERS with explanation
+      return IntentClassificationResult(
+          intent=IntentCategory.OTHERS,
+          confidence=0.0,
+          reasoning=f"Model reasoning invocation unavailable: {e}",
+          target_entities=[],
+          raw_sources=[],
+      )
