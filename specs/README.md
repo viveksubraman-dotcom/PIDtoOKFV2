@@ -43,13 +43,13 @@ All work in this repository is governed by the rules codified in [`_agents/rules
 ## Active Specifications Registry
 
 ### 1. Baseline Specifications ([`specs/baseline/`](./baseline/))
-- Reverse-engineered models, API contracts, and system invariants reflecting current brownfield subsystems.
+- [`BASELINE-20260922-EXTRACTER-AGENT-SYSTEM`](./baseline/system-overview.md): Full baseline architecture, immutable reference data sources, environment parameters, and core invariants.
 
 ### 2. Feature Specifications ([`specs/features/`](./features/))
-- Approved feature designs, architectural delta proposals, and implementation step plans.
+- [`SPEC-20260922-OKF-EXTRACTER-AGENT`](./features/SPEC-20260922-OKF-EXTRACTER-AGENT.md): Autonomous OKF Extracter Agent on Google ADK, Gemini Enterprise Agent Platform, PDF processing, and GCS publication.
 
 ### 3. Plan Progress Reports ([`specs/plan/`](./plan/))
-- Living milestone execution logs, test pass rates, benchmark latency metrics, and next actions.
+- [`PROGRESS_REPORT_20260922`](./plan/PROGRESS_REPORT_20260922.md): Implementation milestone tracking, unit & property-based test verification, and CodeMender security audit.
 
 ---
 

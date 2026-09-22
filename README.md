@@ -64,6 +64,7 @@ Workloads in this project are strictly decoupled across two runtime environments
 │       ├── architecture_diagram/  # Technical architecture diagrams & standalone HTML assets
 │       ├── codemender/            # Pre-build SAST vulnerability discovery, triage, and patching
 │       └── gcp_cost_estimator/    # Live GCP Billing API cost estimation & BoM calculation
+├── reference/                     # Immutable read-only reference materials (raw/ and wiki/)
 ├── specs/                         # Single Source of Truth for specifications (SDD)
 │   ├── README.md                  # Specifications index and SDD registry
 │   ├── templates/                 # Reusable SDD templates (sdd-template.md)

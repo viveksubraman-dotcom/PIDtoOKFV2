@@ -17,3 +17,7 @@ Under the **Spec-Driven Development (SDD)** standard ([`_agents/rules/spec_drive
 
 ## Document Naming Convention
 - `PROGRESS_REPORT_<YYYYMMDD>.md` (e.g. `PROGRESS_REPORT_20260920.md`)
+
+## Active Progress Reports
+- [`PROGRESS_REPORT_20260922.md`](./PROGRESS_REPORT_20260922.md): Implementation milestone tracking, unit & property-based test verification, and CodeMender security audit.
+
