@@ -7,6 +7,7 @@ from extracter_agent.models.domain import (
     HazardEntity,
     HazopNode,
     InstrumentEntity,
+    InstrumentLoop,
 )
 from extracter_agent.models.intent import (
     IntentCategory,
@@ -27,6 +28,7 @@ __all__ = [
     "HazardEntity",
     "HazopNode",
     "InstrumentEntity",
+    "InstrumentLoop",
     "IntentCategory",
     "IntentClassificationResult",
     "OKFActor",
