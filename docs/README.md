@@ -16,6 +16,11 @@ This repository maintains a strict boundary between specification documents and 
 - **Markdown Architecture Document:** `docs/<topic>-architecture.md`
 - **Interactive Standalone HTML/SVG Asset:** `docs/<topic>-architecture.html`
 - **Focus:** System topology, Cloud Run proxies, Gemini Enterprise Agent Platform runtime integration, data flows, and security zones.
+- **Published Deliverables:**
+  - [Data Ingestion Architecture Document (`docs/data-ingestion-architecture.md`)](./data-ingestion-architecture.md)
+  - [Interactive Standalone Data Ingestion Diagram (`docs/data-ingestion-architecture.html`)](./data-ingestion-architecture.html)
+  - [Multi-Source OKF Extraction Step-by-Step Architecture (`docs/multi-source-extraction-architecture.md`)](./multi-source-extraction-architecture.md)
+  - [Interactive Standalone Multi-Source Diagram Asset (`docs/multi-source-extraction-architecture.html`)](./multi-source-extraction-architecture.html)
 
 ### 2. Static Security & SAST Audit Reports ([`codemender`](../_agents/skills/codemender/SKILL.md))
 - **Vulnerability Discovery Report:** `docs/codemender-01-vulnerability-scan-report.md` (`cm find`)

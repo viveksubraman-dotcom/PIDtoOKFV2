@@ -12,6 +12,8 @@ from typing import Any
 from extracter_agent.models.domain import (
     EquipmentEntity,
     HazardEntity,
+    derive_canonical_equipment_tag,
+    is_nozzle_mark_only,
     sanitize_tag_filename,
 )
 from extracter_agent.okf.document import OKFDocument
@@ -31,7 +33,7 @@ def synthesize_equipment_concept(
 ) -> OKFDocument:
     """Synthesize an EquipmentEntity into an OKF v0.2 Concept document."""
     now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-    safe_tag = sanitize_tag_filename(entity.tag)
+    safe_tag = derive_canonical_equipment_tag(entity.tag, entity.sources)
     concept_rel_path = f"equipment/{safe_tag}.md"
     resource_uri = f"gs://{gcs_bucket}/{gcs_prefix}/{concept_rel_path}"
 
@@ -149,9 +151,13 @@ def synthesize_equipment_concept(
             loc = inst.location or "—"
             rng = inst.setpoint_or_range or "—"
             alarm = inst.interlock_or_alarm or "—"
-            safe_inst_tag = sanitize_tag_filename(inst.tag)
+            if is_nozzle_mark_only(inst.tag):
+                tag_cell = inst.tag
+            else:
+                safe_inst_tag = sanitize_tag_filename(inst.tag)
+                tag_cell = f"[{inst.tag}](/instruments/{safe_inst_tag}.md)"
             body_lines.append(
-                f"| [{inst.tag}](/instruments/{safe_inst_tag}.md) | {inst.service} | {inst.instrument_type} | {loc} | {rng} | {alarm} | {inst.source} |"
+                f"| {tag_cell} | {inst.service} | {inst.instrument_type} | {loc} | {rng} | {alarm} | {inst.source} |"
             )
         body_lines.append("")
 

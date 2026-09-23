@@ -5,6 +5,7 @@ Extracts text, metadata, and structural sections from raw engineering PDFs.
 
 from __future__ import annotations
 
+import logging
 import re
 from pathlib import Path
 from typing import Any
@@ -228,18 +229,47 @@ def extract_pdf_multimodal_summary(
     """Extract chemical engineering technical content using Gemini multimodal vision.
 
     Invoked when a document is a vector drawing (P&ID, PFD) lacking font text streams,
-    or contains scanned raster data tables.
+    or contains scanned raster data tables. Includes a deterministic SHA-256 local and
+    GCS cache so repeated tool calls on the same engineering PDF return in < 50ms.
     """
     path = Path(file_path)
     if not path.exists():
         raise PDFProcessingError(f"PDF file does not exist: {path}")
 
+    import hashlib
+    import tempfile
     import time
-    from extracter_agent.config import get_config
+
     from google import genai
     from google.genai import types
 
+    from extracter_agent.config import get_config
+
     cfg = get_config()
+    pdf_bytes = path.read_bytes()
+    pdf_sha = hashlib.sha256(pdf_bytes).hexdigest()[:24]
+    cache_dir = Path(tempfile.gettempdir()) / "extracter_multimodal_cache"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    cache_file = cache_dir / f"{path.stem}_{pdf_sha}.md"
+
+    if cache_file.exists() and cache_file.stat().st_size > 100:
+        return cache_file.read_text(encoding="utf-8")
+
+    if cfg.use_gcs_storage:
+        try:
+            from google.cloud import storage
+
+            st_client = storage.Client(project=cfg.google_cloud_project)
+            bucket = st_client.bucket(cfg.destination_gcs_bucket)
+            cache_blob = bucket.blob(f"cache/multimodal/{path.stem}_{pdf_sha}.md")
+            if cache_blob.exists():
+                cached_text = cache_blob.download_as_text(encoding="utf-8")
+                if len(cached_text) > 100:
+                    cache_file.write_text(cached_text, encoding="utf-8")
+                    return cached_text
+        except Exception as exc:
+            logging.getLogger(__name__).debug("Ignored non-fatal exception: %s", exc)
+
     http_opts = types.HttpOptions(
         retry_options=types.HttpRetryOptions(
             attempts=5,
@@ -249,19 +279,19 @@ def extract_pdf_multimodal_summary(
         )
     )
     client = genai.Client(http_options=http_opts)
-    pdf_bytes = path.read_bytes()
     part = types.Part.from_bytes(data=pdf_bytes, mime_type="application/pdf")
 
     base_prompt = (
         "Extract all chemical engineering technical specifications from this engineering document:\n"
-        "- Equipment tag, equipment name/title, unit/section\n"
-        "- Mechanical dimensions (diameter, tangent length, elevation), vessel internals (distributors, partitions, vortex breakers)\n"
+        "- Equipment tag, equipment name/title, unit/section, and document number\n"
+        "- Mechanical dimensions (diameter, tangent length, boot ID/length, elevation), supports (saddles/skirt), vessel internals (distributors, partitions, vortex breakers)\n"
         "- Design ratings (internal/external design pressure, design temperature, metallurgy, corrosion allowance)\n"
+        "  * CRITICAL OCR DECIMAL CHECK: Carefully inspect decimal points on Design Pressure and Operating Pressure (e.g. distinguish 0.5 kg/cm²g from 5.0 kg/cm²g, and 3.9 kg/cm²g from 3.5 kg/cm²g). Cross-check the P&ID equipment banner/title block against the Process Data Sheet AS-BUILT table.\n"
         "- Operating conditions (operating pressure, operating temperature, liquid levels NLL/LLL/VHL, specific gravity)\n"
-        "- Nozzles, stream connections, line tags, origins and destinations\n"
-        "- Complete instrumentation loops (tags, transmitters, controllers, control valves, indicators)\n"
-        "- Safety Instrumented Systems (SIS/ESD valves UXV/UXY, interlocks, trip actions, alarms, PSVs and setpoints)\n"
-        "- Engineering notes, standard references, and document conflict notes."
+        "- Nozzles schedule (exact nozzle marks e.g. I01, N02, Y02, U01, sizes, ratings, services), stream connections, line tags, origins and destinations\n"
+        "- Complete instrumentation loops: NEVER collapse stacked or redundant P&ID instrument bubbles into a single tag; explicitly enumerate every sibling transmitter and suffix (e.g., LT-0601, LT-0602, LT-0603; FT-0401A, FT-0401B, FT-0401C; FT-0601, FIC-0601; HIC-0601, HXS-0106/0107)\n"
+        "- Safety Instrumented Systems (SIS/ESD valves UXV/UXY, UC-2301/UC-2302 interlocks, trip actions, alarms, PSVs and setpoints)\n"
+        "- Engineering notes, minimum elevation head notes (e.g. >= 5000 mm, >= 2500 mm, >= 600 mm), standard references, and cross-document conflict notes."
     )
     if prompt_hint:
         base_prompt = f"{base_prompt}\nFocus especially on: {prompt_hint}"
@@ -273,7 +303,21 @@ def extract_pdf_multimodal_summary(
                 model=cfg.gemini_model,
                 contents=[part, base_prompt],
             )
-            return resp.text or ""
+            text_out = resp.text or ""
+            if len(text_out) > 100:
+                try:
+                    cache_file.write_text(text_out, encoding="utf-8")
+                    if cfg.use_gcs_storage:
+                        from google.cloud import storage
+
+                        st_client = storage.Client(project=cfg.google_cloud_project)
+                        bucket = st_client.bucket(cfg.destination_gcs_bucket)
+                        bucket.blob(
+                            f"cache/multimodal/{path.stem}_{pdf_sha}.md"
+                        ).upload_from_string(text_out, content_type="text/markdown")
+                except Exception as exc:
+                    logging.getLogger(__name__).debug("Ignored non-fatal exception: %s", exc)
+            return text_out
         except Exception as e:
             last_err = e
             if attempt < 2:

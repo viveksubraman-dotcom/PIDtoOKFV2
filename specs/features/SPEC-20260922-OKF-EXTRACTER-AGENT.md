@@ -508,12 +508,34 @@ In chemical engineering facilities, instrumentation is inextricably bound to equ
   - Property tests verifying that multimodal text preserves equipment tag candidates and engineering units.
 - **Completion Criteria:** Live multi-source evaluation successfully discovers, reads, reconciles, and synthesizes OKF v0.2 equipment concepts citing multiple raw documents.
 
+### Step 14: Autonomous Domain Slug Derivation, Multimodal Caching, Link Sanitization & Parallel Evaluation
+- **Implementation:**
+  1. **Deterministic Domain Slug Taxonomy (`extracter_agent/models/domain.py` & `extracter_agent/tools/okf_tools.py`):**
+     - Implement `derive_canonical_equipment_tag(tag, source_files)` that resolves equipment filenames from the authoritative `14780-8120-PS-<TAG>_` document code in `source_files` (e.g., `PS-E2307` $\rightarrow$ `E-2307`, `PS-P2302` $\rightarrow$ `P-2302`, `PS-E2302AB` $\rightarrow$ `E-2302AB`), falling back to `sanitize_tag_filename(tag)`.
+     - Implement `derive_canonical_concept_id(concept_id, concept_type, title, sources, entity_metadata)` that autonomously derives canonical paths from raw metadata:
+       - `hazards/`: strips redundant suffixes (`-process-hazard`, `-hazard-profile`, `-hazard`, `-solution`) and parenthetical concentrations (`(98%)`, `(dmba)`).
+       - `instruments/`: enforces `<subsystem>-<unit>` naming (`sis-cdn`, `psv-cdn`, `control-valves-cdn`, `cause-and-effect-cdn`, `sampling-cdn`, etc.).
+       - `hazop/`: routes HAZOP methodology, risk-matrix, and study-info concepts to `hazop/methodology`, `hazop/risk-matrix`, `hazop/study-info-cdn`.
+  2. **Instrument Link Sanitization & Zero-Fabrication Nozzle Rule (`extracter_agent/okf/synthesizer.py` & `extracter_agent/agent/orchestrator.py`):**
+     - Sanitize all `/instruments/{safe_tag}.md` links using `sanitize_tag_filename` after stripping parenthetical nozzle remarks (`(Y02)`).
+     - Render datasheet nozzle marks (`Nozzle Y02 (LT)`) as plain text when no P&ID loop tag exists, and enforce the negative constraint that non-P&ID units (`Unit 21 ALKY`, `Unit 22 OXI`) never fabricate `LT-<vessel>` or `PSV-<vessel>` loop numbers.
+  3. **Two-Tier Multimodal PDF Cache & Context Deduplication (`extracter_agent/pdf/processor.py` & `extracter_agent/tools/pdf_tools.py`):**
+     - Persist `extract_pdf_multimodal_summary` output keyed by SHA-256 hash in `/tmp/extracter_multimodal_cache/` and `gs://.../cache/multimodal/`.
+     - Enhance multimodal prompt with decimal verification (`0.5` vs `5.0 kg/cm²g`, `3.9` vs `3.5 kg/cm²g`) and stacked/redundant P&ID bubble expansion (`LT-0601/0602/0603`, `FT-0401A/B/C`).
+     - Attach `multimodal_text` at most once per PDF in `process_raw_pdf_tool` rather than duplicating across every empty page.
+  4. **Master Plant Catalog Indexer & Parallel GCS Exporter (`extracter_agent/okf/indexer.py` & `extracter_agent/gcs/exporter.py`):**
+     - Upgrade `generate_bundle_indexes` to compile a Golden-Wiki-grade root `index.md` with unit breakdown, equipment design/safeguard matrix, chemical hazard runaway matrix, instrument/SIS register, and cross-document `⚠️ CONFLICT` register.
+     - Upgrade `export_bundle_to_gcs` with `ThreadPoolExecutor(max_workers=16)` and unchanged-blob skipping.
+  5. **Dataset Intent Alignment & Parallel Evaluation Runner (`evals/builders/build_wiki_eval_dataset.py` & `evals/run_live_vertex_eval.py`):**
+     - Align `expected_intent` (`GENERATE_OKF_CONCEPT` for OKF v0.2 synthesis prompts, `BUILD_OKF_BUNDLE` for `index.md`/`log.md`) while keeping prompts 100% free of `concept_id` hints.
+     - Add `--concurrency N` async worker pool and source-grounded concept matching to `run_live_vertex_eval.py`.
+- **Unit & Property-Based Tests (PBT):**
+  - Unit tests verifying `derive_canonical_equipment_tag`, `derive_canonical_concept_id`, multimodal cache hit/miss, context deduplication, and master `index.md` generation.
+  - Property-Based Tests (`hypothesis`) verifying idempotence (`f(f(x)) == f(x)`), whitespace/parenthesis-free `/instruments/...` Markdown links across fuzzed strings, and $\le 1$ multimodal payload occurrence across arbitrary page arrays.
+- **Completion Criteria:** 100% `pytest` pass rate, 0 Ruff/Bandit issues, repaired bundle synced to GCS, redeployed `agent_runtime`, and resumed parallel evaluation.
+
 ---
 
 ## 8. Plan Progress Tracking & Living Spec Synchronization
 - All milestones, verification metrics, and test results will be continuously recorded under `specs/plan/`.
 - If any data model or interface evolves during implementation, this specification will be updated synchronously to prevent spec drift.
-
-
-
-

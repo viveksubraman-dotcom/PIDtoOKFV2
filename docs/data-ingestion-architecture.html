@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Data Ingestion Architecture - Extracter Agent</title>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background: #020617;
+      color: #fff;
+      font-family: 'JetBrains Mono', monospace;
+      min-height: 100vh;
+      padding: 2rem;
+    }
+
+    .container {
+      margin: 0 auto;
+      max-width: 1200px;
+    }
+
+    .header {
+      margin-bottom: 2rem;
+    }
+
+    .header-row {
+      align-items: center;
+      display: flex;
+      gap: 1rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .pulse-dot {
+      animation: pulse 2s infinite;
+      background: #22d3ee;
+      border-radius: 50%;
+      height: 12px;
+      width: 12px;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    h1 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      letter-spacing: -0.025em;
+    }
+
+    .subtitle {
+      color: #94a3b8;
+      font-size: 0.875rem;
+      margin-left: 1.75rem;
+    }
+
+    .diagram-container {
+      background: rgba(15, 23, 42, 0.5);
+      border: 1px solid #1e293b;
+      border-radius: 1rem;
+      overflow-x: auto;
+      padding: 1.5rem;
+    }
+
+    svg {
+      display: block;
+      min-width: 960px;
+      width: 100%;
+    }
+
+    .cards {
+      display: grid;
+      gap: 1rem;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      margin-top: 2rem;
+    }
+
+    .card {
+      background: rgba(15, 23, 42, 0.5);
+      border: 1px solid #1e293b;
+      border-radius: 0.75rem;
+      padding: 1.25rem;
+    }
+
+    .card-header {
+      align-items: center;
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .card-dot {
+      border-radius: 50%;
+      height: 8px;
+      width: 8px;
+    }
+
+    .card-dot.cyan { background: #22d3ee; }
+    .card-dot.emerald { background: #34d399; }
+    .card-dot.violet { background: #a78bfa; }
+    .card-dot.amber { background: #fbbf24; }
+    .card-dot.rose { background: #fb7185; }
+
+    .card h3 {
+      font-size: 0.875rem;
+      font-weight: 600;
+    }
+
+    .card ul {
+      color: #94a3b8;
+      font-size: 0.75rem;
+      list-style: none;
+    }
+
+    .card li {
+      margin-bottom: 0.375rem;
+      line-height: 1.4;
+    }
+
+    .card li strong {
+      color: #e2e8f0;
+    }
+
+    .footer {
+      color: #475569;
+      font-size: 0.75rem;
+      margin-top: 1.5rem;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <div class="header-row">
+        <div class="pulse-dot"></div>
+        <h1>Data Ingestion & OKF v0.2 Synthesis Architecture</h1>
+      </div>
+      <p class="subtitle">Extracter Agent • Dual-Stream PDF/Drawing Pipeline • Cognitive Precedence Engine • Google ADK & Gemini 2.5 Pro</p>
+    </div>
+
+    <!-- Main Diagram -->
+    <div class="diagram-container">
+      <svg viewBox="0 0 1000 870">
+        <!-- Definitions -->
+        <defs>
+          <marker id="arrow-cyan" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+            <polygon points="0 0, 8 3, 0 6" fill="#22d3ee" />
+          </marker>
+          <marker id="arrow-emerald" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+            <polygon points="0 0, 8 3, 0 6" fill="#34d399" />
+          </marker>
+          <marker id="arrow-violet" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+            <polygon points="0 0, 8 3, 0 6" fill="#a78bfa" />
+          </marker>
+          <marker id="arrow-amber" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+            <polygon points="0 0, 8 3, 0 6" fill="#fbbf24" />
+          </marker>
+          <marker id="arrow-rose" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+            <polygon points="0 0, 8 3, 0 6" fill="#fb7185" />
+          </marker>
+          <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+            <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#1e293b" stroke-width="0.5"/>
+          </pattern>
+        </defs>
+
+        <!-- Background Grid -->
+        <rect width="100%" height="100%" fill="url(#grid)" />
+
+        <!-- =================================================================
+             ARROWS & DATA FLOW CHANNELS (Rendered early for Z-order behind boxes)
+             ================================================================= -->
+
+        <!-- Ingestion Discovery Flow from Raw Sources to Discovery Tool -->
+        <line x1="115" y1="150" x2="115" y2="255" stroke="#fbbf24" stroke-width="1.5" marker-end="url(#arrow-amber)"/>
+        <text x="125" y="200" fill="#fbbf24" font-size="8">Catalog Scan</text>
+
+        <!-- P&ID / PFD Drawings to Vector Heuristic Gate -->
+        <line x1="275" y1="150" x2="315" y2="255" stroke="#fbbf24" stroke-width="1.5" marker-end="url(#arrow-amber)"/>
+        <line x1="440" y1="150" x2="335" y2="255" stroke="#fbbf24" stroke-width="1.5" marker-end="url(#arrow-amber)"/>
+
+        <!-- Stream Separation from Heuristic Gate -->
+        <!-- Vector route (Stream B: Gemini Multimodal Part) -->
+        <line x1="395" y1="288" x2="645" y2="288" stroke="#22d3ee" stroke-width="1.5" marker-end="url(#arrow-cyan)"/>
+        <text x="520" y="280" fill="#22d3ee" font-size="8" text-anchor="middle">Vector = True (0 /Font)</text>
+
+        <!-- Text route (Stream A: PyPDF Extractor) -->
+        <line x1="355" y1="320" x2="495" y2="320" stroke="#34d399" stroke-width="1.5" marker-end="url(#arrow-emerald)"/>
+        <text x="425" y="340" fill="#34d399" font-size="8" text-anchor="middle">Native Text</text>
+
+        <!-- Ingestion Layers flow down into Orchestrator Tool Registry -->
+        <line x1="520" y1="320" x2="800" y2="430" stroke="#34d399" stroke-width="1.5" stroke-dasharray="4,4" marker-end="url(#arrow-emerald)"/>
+        <line x1="735" y1="320" x2="850" y2="430" stroke="#22d3ee" stroke-width="1.5" marker-end="url(#arrow-cyan)"/>
+        <text x="810" y="375" fill="#22d3ee" font-size="8">types.Part Vision</text>
+
+        <!-- Orchestrator Model Armor Security Check -->
+        <line x1="200" y1="472" x2="240" y2="472" stroke="#fb7185" stroke-width="1.5" marker-end="url(#arrow-rose)"/>
+        <text x="220" y="462" fill="#fb7185" font-size="8" text-anchor="middle">Pre-flight</text>
+
+        <!-- Orchestrator to Precedence Engine & Tool Registry -->
+        <line x1="460" y1="472" x2="500" y2="472" stroke="#34d399" stroke-width="1.5" marker-end="url(#arrow-emerald)"/>
+        <line x1="690" y1="472" x2="730" y2="472" stroke="#34d399" stroke-width="1.5" marker-end="url(#arrow-emerald)"/>
+
+        <!-- Orchestrator Synthesis flow to OKF Synthesizer -->
+        <path d="M 350 515 L 350 570 Q 350 625 230 660" fill="none" stroke="#a78bfa" stroke-width="1.5" marker-end="url(#arrow-violet)"/>
+        <text x="310" y="580" fill="#a78bfa" font-size="8">Canonical Trajectory</text>
+
+        <!-- OKF Synthesis Internal Pipeline: Synthesizer -> Safe Dumper -> Validator -> Index -> GCS -->
+        <line x1="230" y1="660" x2="265" y2="660" stroke="#a78bfa" stroke-width="1.5" marker-end="url(#arrow-violet)"/>
+        <line x1="445" y1="660" x2="480" y2="660" stroke="#a78bfa" stroke-width="1.5" marker-end="url(#arrow-violet)"/>
+        <line x1="660" y1="660" x2="695" y2="660" stroke="#a78bfa" stroke-width="1.5" marker-end="url(#arrow-violet)"/>
+        <line x1="835" y1="660" x2="865" y2="660" stroke="#fbbf24" stroke-width="1.5" marker-end="url(#arrow-amber)"/>
+
+        <!-- =================================================================
+             TIER 1: IMMUTABLE RAW DATA SOURCES (Amber Group)
+             ================================================================= -->
+        <rect x="30" y="40" width="940" height="135" rx="10" fill="rgba(120, 53, 15, 0.08)" stroke="#fbbf24" stroke-width="1.2" stroke-dasharray="6,4"/>
+        <text x="45" y="60" fill="#fbbf24" font-size="11" font-weight="700">1. IMMUTABLE SOURCE CORPUS (reference/raw/) • Zero-Write Authoritative Repository</text>
+
+        <!-- Datasheet -->
+        <rect x="50" y="80" width="130" height="70" rx="6" fill="#0f172a" />
+        <rect x="50" y="80" width="130" height="70" rx="6" fill="rgba(120, 53, 15, 0.35)" stroke="#fbbf24" stroke-width="1.5"/>
+        <text x="115" y="102" fill="white" font-size="11" font-weight="600" text-anchor="middle">Data Sheets</text>
+        <text x="115" y="118" fill="#fbbf24" font-size="8" text-anchor="middle">reference/raw/datasheet</text>
+        <text x="115" y="132" fill="#94a3b8" font-size="8" text-anchor="middle">Priority 1 • Design Specs</text>
+
+        <!-- P&ID -->
+        <rect x="200" y="80" width="150" height="70" rx="6" fill="#0f172a" />
+        <rect x="200" y="80" width="150" height="70" rx="6" fill="rgba(120, 53, 15, 0.35)" stroke="#fbbf24" stroke-width="1.5"/>
+        <text x="275" y="102" fill="white" font-size="11" font-weight="600" text-anchor="middle">P&ID Diagrams</text>
+        <text x="275" y="118" fill="#fbbf24" font-size="8" text-anchor="middle">reference/raw/pid</text>
+        <text x="275" y="132" fill="#94a3b8" font-size="8" text-anchor="middle">Priority 2 • Vector Strokes</text>
+
+        <!-- PFD -->
+        <rect x="370" y="80" width="140" height="70" rx="6" fill="#0f172a" />
+        <rect x="370" y="80" width="140" height="70" rx="6" fill="rgba(120, 53, 15, 0.35)" stroke="#fbbf24" stroke-width="1.5"/>
+        <text x="440" y="102" fill="white" font-size="11" font-weight="600" text-anchor="middle">PFD Flowsheets</text>
+        <text x="440" y="118" fill="#fbbf24" font-size="8" text-anchor="middle">reference/raw/pfd</text>
+        <text x="440" y="132" fill="#94a3b8" font-size="8" text-anchor="middle">Priority 3 • Stream H&MB</text>
+
+        <!-- SDS -->
+        <rect x="530" y="80" width="130" height="70" rx="6" fill="#0f172a" />
+        <rect x="530" y="80" width="130" height="70" rx="6" fill="rgba(120, 53, 15, 0.35)" stroke="#fbbf24" stroke-width="1.5"/>
+        <text x="595" y="102" fill="white" font-size="11" font-weight="600" text-anchor="middle">Safety Data (SDS)</text>
+        <text x="595" y="118" fill="#fbbf24" font-size="8" text-anchor="middle">reference/raw/sds</text>
+        <text x="595" y="132" fill="#94a3b8" font-size="8" text-anchor="middle">Priority 5 • Chemical Haz</text>
+
+        <!-- Manuals -->
+        <rect x="680" y="80" width="140" height="70" rx="6" fill="#0f172a" />
+        <rect x="680" y="80" width="140" height="70" rx="6" fill="rgba(120, 53, 15, 0.35)" stroke="#fbbf24" stroke-width="1.5"/>
+        <text x="750" y="102" fill="white" font-size="11" font-weight="600" text-anchor="middle">Operating Manuals</text>
+        <text x="750" y="118" fill="#fbbf24" font-size="8" text-anchor="middle">reference/raw/manual</text>
+        <text x="750" y="132" fill="#94a3b8" font-size="8" text-anchor="middle">Priority 4 • Operations</text>
+
+        <!-- Standards -->
+        <rect x="840" y="80" width="115" height="70" rx="6" fill="#0f172a" />
+        <rect x="840" y="80" width="115" height="70" rx="6" fill="rgba(120, 53, 15, 0.35)" stroke="#fbbf24" stroke-width="1.5"/>
+        <text x="897" y="102" fill="white" font-size="11" font-weight="600" text-anchor="middle">Standards</text>
+        <text x="897" y="118" fill="#fbbf24" font-size="8" text-anchor="middle">reference/raw/std</text>
+        <text x="897" y="132" fill="#94a3b8" font-size="8" text-anchor="middle">Priority 6 • Codes</text>
+
+        <!-- =================================================================
+             TIER 2: DUAL-STREAM INGESTION & PARSING ENGINE (Cyan Group)
+             ================================================================= -->
+        <rect x="30" y="210" width="940" height="145" rx="10" fill="rgba(8, 51, 68, 0.1)" stroke="#22d3ee" stroke-width="1.2" stroke-dasharray="6,4"/>
+        <text x="45" y="230" fill="#22d3ee" font-size="11" font-weight="700">2. DUAL-STREAM INGESTION & PARSING PIPELINE (extracter_agent/pdf/processor.py)</text>
+
+        <!-- Discovery Cataloger -->
+        <rect x="50" y="255" width="150" height="75" rx="6" fill="#0f172a" />
+        <rect x="50" y="255" width="150" height="75" rx="6" fill="rgba(8, 51, 68, 0.4)" stroke="#22d3ee" stroke-width="1.5"/>
+        <text x="125" y="278" fill="white" font-size="11" font-weight="600" text-anchor="middle">Catalog Scanner</text>
+        <text x="125" y="295" fill="#94a3b8" font-size="8" text-anchor="middle">discover_raw_documents()</text>
+        <text x="125" y="310" fill="#22d3ee" font-size="8" text-anchor="middle">224 Target Documents</text>
+
+        <!-- Heuristic Gate -->
+        <rect x="230" y="255" width="165" height="75" rx="6" fill="#0f172a" />
+        <rect x="230" y="255" width="165" height="75" rx="6" fill="rgba(8, 51, 68, 0.4)" stroke="#22d3ee" stroke-width="1.5"/>
+        <text x="312" y="278" fill="white" font-size="11" font-weight="600" text-anchor="middle">Vector Drawing Gate</text>
+        <text x="312" y="295" fill="#94a3b8" font-size="8" text-anchor="middle">is_vector_drawing()</text>
+        <text x="312" y="310" fill="#fb7185" font-size="8" text-anchor="middle">Strokes &gt; 50 | /Font == 0</text>
+
+        <!-- Stream A: PyPDF Parser -->
+        <rect x="425" y="255" width="185" height="75" rx="6" fill="#0f172a" />
+        <rect x="425" y="255" width="185" height="75" rx="6" fill="rgba(6, 78, 59, 0.4)" stroke="#34d399" stroke-width="1.5"/>
+        <text x="517" y="278" fill="white" font-size="11" font-weight="600" text-anchor="middle">Stream A: Layout Text</text>
+        <text x="517" y="295" fill="#94a3b8" font-size="8" text-anchor="middle">pypdf.PdfReader.extract_text</text>
+        <text x="517" y="310" fill="#34d399" font-size="8" text-anchor="middle">Tables, Columns, Metadata</text>
+
+        <!-- Stream B: GenAI Multimodal Part -->
+        <rect x="640" y="255" width="195" height="75" rx="6" fill="#0f172a" />
+        <rect x="640" y="255" width="195" height="75" rx="6" fill="rgba(8, 51, 68, 0.4)" stroke="#22d3ee" stroke-width="1.5"/>
+        <text x="737" y="278" fill="white" font-size="11" font-weight="600" text-anchor="middle">Stream B: Multimodal Part</text>
+        <text x="737" y="295" fill="#94a3b8" font-size="8" text-anchor="middle">types.Part.from_bytes()</text>
+        <text x="737" y="310" fill="#22d3ee" font-size="8" text-anchor="middle">AutoCAD Visual Inspection</text>
+
+        <!-- Normalizer & Windowing -->
+        <rect x="860" y="255" width="95" height="75" rx="6" fill="#0f172a" />
+        <rect x="860" y="255" width="95" height="75" rx="6" fill="rgba(8, 51, 68, 0.4)" stroke="#22d3ee" stroke-width="1.5"/>
+        <text x="907" y="278" fill="white" font-size="10" font-weight="600" text-anchor="middle">Windowing</text>
+        <text x="907" y="295" fill="#94a3b8" font-size="8" text-anchor="middle">Token limits</text>
+        <text x="907" y="310" fill="#22d3ee" font-size="8" text-anchor="middle">SHA-256 Hash</text>
+
+        <!-- =================================================================
+             TIER 3: GOOGLE ADK REASONING & PRECEDENCE ENGINE (Emerald Group)
+             ================================================================= -->
+        <rect x="30" y="390" width="940" height="160" rx="10" fill="rgba(6, 78, 59, 0.1)" stroke="#34d399" stroke-width="1.2" stroke-dasharray="6,4"/>
+        <text x="45" y="410" fill="#34d399" font-size="11" font-weight="700">3. AUTONOMOUS REASONING &amp; PRECEDENCE RECONCILIATION (extracter_agent/agent/)</text>
+
+        <!-- Security Guardrails -->
+        <rect x="50" y="430" width="150" height="85" rx="6" fill="#0f172a" />
+        <rect x="50" y="430" width="150" height="85" rx="6" fill="rgba(136, 19, 55, 0.4)" stroke="#fb7185" stroke-width="1.5"/>
+        <text x="125" y="455" fill="white" font-size="11" font-weight="600" text-anchor="middle">Model Armor</text>
+        <text x="125" y="472" fill="#fb7185" font-size="8" text-anchor="middle">before_agent_callback</text>
+        <text x="125" y="488" fill="#94a3b8" font-size="8" text-anchor="middle">Prompt Injection Guard</text>
+        <text x="125" y="502" fill="#94a3b8" font-size="8" text-anchor="middle">Data Exfiltration Guard</text>
+
+        <!-- Orchestrator LLM -->
+        <rect x="240" y="425" width="220" height="95" rx="6" fill="#0f172a" />
+        <rect x="240" y="425" width="220" height="95" rx="6" fill="rgba(6, 78, 59, 0.4)" stroke="#34d399" stroke-width="1.8"/>
+        <text x="350" y="450" fill="white" font-size="12" font-weight="700" text-anchor="middle">ADK Orchestrator Agent</text>
+        <text x="350" y="468" fill="#34d399" font-size="9" text-anchor="middle">Gemini 2.5 Pro (Temperature 0.1)</text>
+        <text x="350" y="484" fill="#94a3b8" font-size="8" text-anchor="middle">6-Step Autonomous Protocol Trajectory</text>
+        <text x="350" y="498" fill="#94a3b8" font-size="8" text-anchor="middle">Zero-Keyword Cognitive Routing</text>
+        <text x="350" y="512" fill="#22d3ee" font-size="8" text-anchor="middle">agent_runtime / Gemini Enterprise</text>
+
+        <!-- Conflict Precedence Engine -->
+        <rect x="500" y="430" width="190" height="85" rx="6" fill="#0f172a" />
+        <rect x="500" y="430" width="190" height="85" rx="6" fill="rgba(120, 53, 15, 0.3)" stroke="#fbbf24" stroke-width="1.5"/>
+        <text x="595" y="452" fill="white" font-size="11" font-weight="600" text-anchor="middle">Precedence Engine</text>
+        <text x="595" y="468" fill="#fbbf24" font-size="8" text-anchor="middle">1. Data Sheet &gt; 2. P&amp;ID Loop</text>
+        <text x="595" y="482" fill="#fbbf24" font-size="8" text-anchor="middle">3. PFD &gt; 4. Manual &gt; 5. SDS</text>
+        <text x="595" y="498" fill="#94a3b8" font-size="8" text-anchor="middle">Deterministic Field Arbitration</text>
+
+        <!-- Tool Registry -->
+        <rect x="730" y="425" width="225" height="95" rx="6" fill="#0f172a" />
+        <rect x="730" y="425" width="225" height="95" rx="6" fill="rgba(76, 29, 149, 0.4)" stroke="#a78bfa" stroke-width="1.5"/>
+        <text x="842" y="448" fill="white" font-size="11" font-weight="600" text-anchor="middle">FunctionTool Registry (7 Tools)</text>
+        <text x="842" y="465" fill="#a78bfa" font-size="8" text-anchor="middle">• find_raw_documents_tool</text>
+        <text x="842" y="478" fill="#a78bfa" font-size="8" text-anchor="middle">• read_raw_document / batch_read</text>
+        <text x="842" y="491" fill="#a78bfa" font-size="8" text-anchor="middle">• generate_okf_equipment / concept</text>
+        <text x="842" y="504" fill="#a78bfa" font-size="8" text-anchor="middle">• validate_bundle / publish_to_gcs</text>
+
+        <!-- =================================================================
+             TIER 4: OKF v0.2 SYNTHESIS, VALIDATION & PUBLISHING (Violet Group)
+             ================================================================= -->
+        <rect x="30" y="585" width="940" height="150" rx="10" fill="rgba(76, 29, 149, 0.1)" stroke="#a78bfa" stroke-width="1.2" stroke-dasharray="6,4"/>
+        <text x="45" y="605" fill="#a78bfa" font-size="11" font-weight="700">4. OKF v0.2 SYNTHESIS, VALIDATION &amp; PUBLISHING (extracter_agent/okf/ &amp; gcs/)</text>
+
+        <!-- Entity Synthesizer -->
+        <rect x="50" y="625" width="180" height="85" rx="6" fill="#0f172a" />
+        <rect x="50" y="625" width="180" height="85" rx="6" fill="rgba(76, 29, 149, 0.4)" stroke="#a78bfa" stroke-width="1.5"/>
+        <text x="140" y="648" fill="white" font-size="11" font-weight="600" text-anchor="middle">OKF Entity Synthesizer</text>
+        <text x="140" y="665" fill="#a78bfa" font-size="8" text-anchor="middle">Equipment: Pump, Exchanger, etc.</text>
+        <text x="140" y="679" fill="#a78bfa" font-size="8" text-anchor="middle">Concepts: Hazard, HAZOP, Loops</text>
+        <text x="140" y="694" fill="#94a3b8" font-size="8" text-anchor="middle">Frontmatter + Markdown Body</text>
+
+        <!-- String Quoting & Safe Dumper -->
+        <rect x="260" y="625" width="185" height="85" rx="6" fill="#0f172a" />
+        <rect x="260" y="625" width="185" height="85" rx="6" fill="rgba(76, 29, 149, 0.4)" stroke="#a78bfa" stroke-width="1.5"/>
+        <text x="352" y="648" fill="white" font-size="11" font-weight="600" text-anchor="middle">_OKFSafeDumper</text>
+        <text x="352" y="665" fill="#34d399" font-size="8" text-anchor="middle">Round-Trip String Preservation</text>
+        <text x="352" y="679" fill="#94a3b8" font-size="8" text-anchor="middle">tag_number: "01-P-101A"</text>
+        <text x="352" y="694" fill="#94a3b8" font-size="8" text-anchor="middle">Zero Scalar Coercion</text>
+
+        <!-- Validator -->
+        <rect x="475" y="625" width="190" height="85" rx="6" fill="#0f172a" />
+        <rect x="475" y="625" width="190" height="85" rx="6" fill="rgba(136, 19, 55, 0.4)" stroke="#fb7185" stroke-width="1.5"/>
+        <text x="570" y="648" fill="white" font-size="11" font-weight="600" text-anchor="middle">Schema &amp; Link Validator</text>
+        <text x="570" y="665" fill="#fb7185" font-size="8" text-anchor="middle">validate_okf_bundle_tool()</text>
+        <text x="570" y="679" fill="#94a3b8" font-size="8" text-anchor="middle">Pydantic OKFModel Invariants</text>
+        <text x="570" y="694" fill="#94a3b8" font-size="8" text-anchor="middle">Cross-Reference Integrity</text>
+
+        <!-- Progressive Index Manager -->
+        <rect x="695" y="625" width="145" height="85" rx="6" fill="#0f172a" />
+        <rect x="695" y="625" width="145" height="85" rx="6" fill="rgba(76, 29, 149, 0.4)" stroke="#a78bfa" stroke-width="1.5"/>
+        <text x="767" y="648" fill="white" font-size="11" font-weight="600" text-anchor="middle">Index Cataloger</text>
+        <text x="767" y="665" fill="#a78bfa" font-size="8" text-anchor="middle">update_okf_index_tool()</text>
+        <text x="767" y="679" fill="#94a3b8" font-size="8" text-anchor="middle">okf_index.json registry</text>
+        <text x="767" y="694" fill="#94a3b8" font-size="8" text-anchor="middle">Progressive State Tracking</text>
+
+        <!-- GCS Publishing -->
+        <rect x="865" y="625" width="95" height="85" rx="6" fill="#0f172a" />
+        <rect x="865" y="625" width="95" height="85" rx="6" fill="rgba(120, 53, 15, 0.35)" stroke="#fbbf24" stroke-width="1.5"/>
+        <text x="912" y="648" fill="white" font-size="10" font-weight="600" text-anchor="middle">GCS Sync</text>
+        <text x="912" y="665" fill="#fbbf24" font-size="8" text-anchor="middle">gsutil / client</text>
+        <text x="912" y="679" fill="#94a3b8" font-size="8" text-anchor="middle">Immutable</text>
+        <text x="912" y="694" fill="#94a3b8" font-size="8" text-anchor="middle">Cloud Storage</text>
+
+        <!-- =================================================================
+             LEGEND
+             ================================================================= -->
+        <text x="50" y="775" fill="white" font-size="10" font-weight="600">System Architecture Legend</text>
+
+        <rect x="50" y="790" width="14" height="10" rx="2" fill="rgba(120, 53, 15, 0.35)" stroke="#fbbf24" stroke-width="1"/>
+        <text x="70" y="798" fill="#94a3b8" font-size="8">Raw Sources &amp; Cloud Storage</text>
+
+        <rect x="230" y="790" width="14" height="10" rx="2" fill="rgba(8, 51, 68, 0.4)" stroke="#22d3ee" stroke-width="1"/>
+        <text x="250" y="798" fill="#94a3b8" font-size="8">Ingestion &amp; Multimodal Parsing</text>
+
+        <rect x="420" y="790" width="14" height="10" rx="2" fill="rgba(6, 78, 59, 0.4)" stroke="#34d399" stroke-width="1"/>
+        <text x="440" y="798" fill="#94a3b8" font-size="8">ADK Reasoning &amp; Orchestration</text>
+
+        <rect x="610" y="790" width="14" height="10" rx="2" fill="rgba(76, 29, 149, 0.4)" stroke="#a78bfa" stroke-width="1"/>
+        <text x="630" y="798" fill="#94a3b8" font-size="8">OKF v0.2 Entity Engine</text>
+
+        <rect x="780" y="790" width="14" height="10" rx="2" fill="rgba(136, 19, 55, 0.4)" stroke="#fb7185" stroke-width="1"/>
+        <text x="800" y="798" fill="#94a3b8" font-size="8">Security &amp; Validation Gates</text>
+      </svg>
+    </div>
+
+    <!-- Info Cards -->
+    <div class="cards">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-dot cyan"></div>
+          <h3>Dual-Stream PDF/Drawing Ingestion</h3>
+        </div>
+        <ul>
+          <li>• <strong>Stream A (Native Text):</strong> Uses <code>pypdf</code> text and layout extraction for structured Data Sheets, SDS documents, and Operating Manuals with intact font tables.</li>
+          <li>• <strong>Stream B (Multimodal Drawing):</strong> Automatically triggered when <code>is_vector_drawing()</code> detects stroked vector paths (&gt;50 operators) and zero font dictionaries (AutoCAD P&amp;IDs, PFDs).</li>
+          <li>• <strong>Gemini Vision Parts:</strong> Employs <code>google.genai.types.Part.from_bytes()</code> to perform direct visual inspection of P&amp;ID instrument bubbles, line tags, and stream flow directions.</li>
+          <li>• <strong>Zero Ingestion Blindspots:</strong> Prevents silent extraction failures where vector-only diagrams yield empty text strings.</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-dot amber"></div>
+          <h3>Cognitive Precedence Hierarchy</h3>
+        </div>
+        <ul>
+          <li>• <strong>Tier 1 — As-Built Data Sheets:</strong> Primary authority for design limits (MAWP, design temp, pump head, impeller diameter, flow rate).</li>
+          <li>• <strong>Tier 2 — P&amp;ID Schematics:</strong> Definitive authority for piping connectivity, nozzle sizes, instrument tag loops (e.g. <code>01-FIT-101</code>), and safety valves.</li>
+          <li>• <strong>Tier 3 — PFD Heat &amp; Material Balance:</strong> Primary reference for normal operating temperatures, pressures, stream compositions, and flow balances.</li>
+          <li>• <strong>Tier 4–6 — Manuals, SDS &amp; Standards:</strong> Operational limits, startup procedures, chemical hazard classification, and design code compliance.</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-dot violet"></div>
+          <h3>OKF v0.2 Synthesis &amp; Integrity</h3>
+        </div>
+        <ul>
+          <li>• <strong>Canonical Dual Document:</strong> Produces clean YAML frontmatter for machine parsing and structured Markdown body for human engineering review.</li>
+          <li>• <strong>_OKFSafeDumper:</strong> Custom PyYAML dumper enforcing strict quoted string preservation for engineering tag numbers (preventing octal or scalar coercion).</li>
+          <li>• <strong>Rigorous Validation Gate:</strong> Every bundle is validated by <code>validate_okf_bundle_tool</code> against Pydantic schema invariants and cross-reference integrity.</li>
+          <li>• <strong>Progressive Catalog Index:</strong> Maintains <code>okf_index.json</code> as an atomic progressive manifest across single-file and multi-file batch runs.</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <p class="footer">
+      Extracter Agent Architecture • Gemini Enterprise Agent Platform • Google ADK • Cloud Run Ready • Spec-Driven Development
+    </p>
+  </div>
+</body>
+</html>

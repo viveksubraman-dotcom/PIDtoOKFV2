@@ -80,15 +80,17 @@ When fulfilling an extraction or bundle construction request, you MUST execute t
 
 5. STEP 5: BUNDLE INDEXING & VALIDATION (`build_okf_indexes_and_validate_tool` / `validate_okf_bundle_tool`)
    - After creating or updating concept documents, call `build_okf_indexes_and_validate_tool()` to compile progressive disclosure `index.md` files and update `log.md`.
-   - Alternatively, call `validate_okf_bundle_tool()` to independently verify OKF v0.2 bundle conformance.
    - Verify that all concepts achieve 100% OKF v0.2 validation compliance (`is_valid_okf: true`).
 
 6. STEP 6: PUBLISHING TO GOOGLE CLOUD STORAGE (`export_bundle_to_gcs_tool`)
-   - When requested by the user, invoke `export_bundle_to_gcs_tool` ONLY after validation passes.
-   - Report the published GCS URIs and file counts in your final response.
+   - `generate_equipment_okf_tool`, `generate_okf_concept_tool`, and `build_okf_indexes_and_validate_tool` automatically sync generated Markdown files and indexes directly to GCS when `USE_GCS_STORAGE=true`.
+   - Only invoke full-bundle `export_bundle_to_gcs_tool` when the user explicitly requests publishing/exporting the entire bundle to Google Cloud Storage (`EXPORT_TO_GCS`).
 
 ## Operational Constraints & Negative Rules
 - STRICT REFERENCE IMMUTABILITY: Under NO circumstances may you create, modify, append to, or delete any file in `reference/` (including `reference/raw/` and `reference/wiki/`). It is strictly read-only.
+- ZERO SYNTHETIC INSTRUMENT TAGS FOR NON-P&ID UNITS: When extracting equipment for plant sections where no P&ID exists in `reference/raw/pid/` (e.g., Unit 21 ALKY or Unit 22 OXI where only Process Data Sheets exist), NEVER fabricate or infer instrument loop numbers from the vessel number (e.g., do NOT invent `LT-2201`, `LG-2201`, or `PSV-2201` for `D-2201`). Instead, record the exact Datasheet Nozzle Mark and Service in `tag` (e.g., `Nozzle Y02 (LT)`, `Nozzle K02 (LG)`, `Nozzle U01 (RV)`).
+- MULTI-ELEMENT & REDUNDANT LOOP EXPANSION: For Unit 23 (CDN) P&IDs, never collapse stacked or redundant instrument bubbles into a single tag; explicitly enumerate every sibling transmitter and suffix (`LT-0601`, `LT-0602`, `LT-0603`; `FT-0401A`, `FT-0401B`, `FT-0401C`; `FT-0601`, `FIC-0601`; `HXS-0106/0107`).
+- MANDATORY SAFETY & DISCREPANCY CALLOUTS: Every Hazard, Instrument, Procedure, and Parameter document must include a top-level `> ⚠️ **CRITICAL PROCESS SAFETY / DISCREPANCY WARNING:**` blockquote highlighting governing runaway limits, N₂ header segregation (`STD DWG 8-138`), and cross-document discrepancies.
 - All new knowledge must be written to the designated destination bundle directory.
 - ZERO UNGROUNDED SPECULATION: Every extracted parameter, limit, and dimension must be grounded in an ingested document with an explicit citation.
 - UNIT FIDELITY: Retain original engineering units (e.g., mm, kg/cm²g, mmHgA, °C, kg/h, MM kcal/h) without unauthorized rounding or truncation.

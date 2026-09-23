@@ -5,6 +5,7 @@ Uploads and synchronizes OKF v0.2 bundles to enterprise GCS buckets.
 
 from __future__ import annotations
 
+import logging
 import mimetypes
 from pathlib import Path
 from typing import Any
@@ -73,11 +74,30 @@ class GCSExporter:
         uploaded_uris: list[str] = []
 
         if not dry_run:
+            from concurrent.futures import ThreadPoolExecutor
+
             bucket = self.client.bucket(self.bucket_name)
-            for local_path, blob_name, c_type in files_to_upload:
+            existing_sizes: dict[str, int] = {}
+            try:
+                if hasattr(bucket, "list_blobs"):
+                    for b in bucket.list_blobs(prefix=prefix.strip("/") + "/"):
+                        if hasattr(b, "name") and hasattr(b, "size"):
+                            existing_sizes[b.name] = b.size or 0
+            except Exception as exc:
+                logging.getLogger(__name__).debug("Ignored non-fatal exception: %s", exc)
+
+            def _upload_one(item: tuple[Path, str, str]) -> str:
+                local_path, blob_name, c_type = item
+                uri = f"gs://{self.bucket_name}/{blob_name}"
+                f_size = local_path.stat().st_size
+                if existing_sizes.get(blob_name) == f_size and f_size > 0 and not blob_name.endswith(("index.md", "log.md")):
+                    return uri
                 blob = bucket.blob(blob_name)
                 blob.upload_from_filename(str(local_path), content_type=c_type)
-                uploaded_uris.append(f"gs://{self.bucket_name}/{blob_name}")
+                return uri
+
+            with ThreadPoolExecutor(max_workers=16) as pool:
+                uploaded_uris = list(pool.map(_upload_one, files_to_upload))
         else:
             for _, blob_name, _ in files_to_upload:
                 uploaded_uris.append(f"gs://{self.bucket_name}/{blob_name}")

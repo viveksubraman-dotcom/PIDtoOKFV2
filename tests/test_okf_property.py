@@ -143,18 +143,38 @@ def test_pbt_instrument_loop_link_invariants(tags, services):
 
 @given(
     raw_tag=st.text(
-        alphabet=st.sampled_from(list("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-/_\\ ")),
+        alphabet=st.sampled_from(list("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-/_\\ ()")),
         min_size=1,
         max_size=40,
     ).filter(lambda s: any(c.isalnum() for c in s))
 )
 def test_pbt_sanitize_tag_filename_never_contains_slashes(raw_tag):
-    """Invariant: sanitize_tag_filename never produces path separators ('/' or '\\') or whitespace."""
+    """Invariant: sanitize_tag_filename never produces path separators ('/' or '\\'), parentheses, or whitespace."""
     from extracter_agent.models.domain import sanitize_tag_filename
 
     safe = sanitize_tag_filename(raw_tag)
     assert "/" not in safe
     assert "\\" not in safe
     assert " " not in safe
+    assert "(" not in safe
+    assert ")" not in safe
     assert len(safe) > 0
+
+
+@given(
+    slug=st.text(
+        alphabet=st.sampled_from(list("abcdefghijklmnopqrstuvwxyz0123456789-/")),
+        min_size=3,
+        max_size=35,
+    ).filter(lambda s: s[0].isalnum() and s[-1].isalnum() and "//" not in s)
+)
+def test_pbt_derive_canonical_concept_id_idempotent(slug):
+    """Invariant: derive_canonical_concept_id is idempotent (f(f(x)) == f(x)) and never contains whitespace."""
+    from extracter_agent.models.domain import derive_canonical_concept_id
+
+    once = derive_canonical_concept_id(slug)
+    twice = derive_canonical_concept_id(once)
+    assert once == twice
+    assert " " not in once
+    assert not once.endswith(".md")
 

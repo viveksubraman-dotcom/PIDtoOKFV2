@@ -222,3 +222,50 @@ def test_generate_equipment_okf_tool_multi_unit_slash_tag():
         assert "D-2204A/B/C — Charcoal Adsorbers" in content
         assert "/instruments/TI-2204A_TAH-2204A.md" in content
 
+
+def test_derive_canonical_concept_id_and_equipment_tag():
+    """Verify autonomous derivation of canonical OKF concept paths from raw metadata."""
+    from extracter_agent.models.domain import (
+        derive_canonical_concept_id,
+        derive_canonical_equipment_tag,
+        sanitize_tag_filename,
+    )
+
+    assert sanitize_tag_filename("LT-2201 (Y02)") == "LT-2201"
+    assert (
+        derive_canonical_equipment_tag(
+            "E-2307A/B", ["14780-8120-PS-E2307_E-2307 A_B PROCESS DATA SHEET_Z1.pdf"]
+        )
+        == "E-2307"
+    )
+    assert (
+        derive_canonical_equipment_tag(
+            "P-2302A/B", ["14780-8120-PS-P2302_P-2302 A_B PROCESS DATA SHEET_Z1.pdf"]
+        )
+        == "P-2302"
+    )
+    assert (
+        derive_canonical_concept_id(
+            "hazards/sulfuric-acid-hazard-profile",
+            concept_type="Hazard Profile",
+            title="Sulfuric Acid (98%) Hazard",
+        )
+        == "hazards/sulfuric-acid"
+    )
+    assert (
+        derive_canonical_concept_id(
+            "instruments/cdn-sis-architecture",
+            concept_type="Instrument Specification",
+            title="CDN Safety Instrumented System",
+        )
+        == "instruments/sis-cdn"
+    )
+    assert (
+        derive_canonical_concept_id(
+            "standards/hazop-methodology-sg-q-mp-014-r3",
+            concept_type="Standard",
+            title="HAZOP Methodology SG-Q-MP-014",
+        )
+        == "hazop/methodology"
+    )
+

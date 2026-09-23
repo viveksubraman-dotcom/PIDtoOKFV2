@@ -5,6 +5,7 @@ Implements Open Knowledge Format v0.2 §8 (Index files) and §9 (Log files).
 
 from __future__ import annotations
 
+import logging
 from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
@@ -31,6 +32,115 @@ def _build_index_body(entries: list[tuple[str, str, str, str]]) -> str:
         sections.append("\n".join(lines))
 
     return "\n\n".join(sections) + "\n"
+
+
+def _build_master_root_index(
+    root: Path,
+    entries: list[tuple[str, str, str, str]],
+) -> str:
+    """Compile a comprehensive Master Plant Knowledge Catalog for the root index.md."""
+    base_listing = _build_index_body(entries)
+    equip_rows: list[str] = []
+    hazard_rows: list[str] = []
+    inst_rows: list[str] = []
+    conflict_notes: list[str] = []
+
+    for md_file in sorted(root.rglob("*.md")):
+        if md_file.name in (_INDEX_FILENAME, _LOG_FILENAME):
+            continue
+        rel = md_file.relative_to(root).as_posix()
+        try:
+            raw_text = md_file.read_text(encoding="utf-8")
+            doc = OKFDocument.parse(raw_text)
+            fm = doc.frontmatter
+            title = str(fm.get("title") or md_file.stem)
+            desc = str(fm.get("description") or "").replace("\n", " ").strip()
+            if len(desc) > 140:
+                desc = desc[:137] + "..."
+            meta = fm.get("entity_metadata") or {}
+            if rel.startswith("equipment/"):
+                tag = str(meta.get("tag") or md_file.stem)
+                unit = str(meta.get("unit") or "CDN")
+                eq_class = str(meta.get("equipment_class") or "Vessel")
+                inst_cnt = len(meta.get("instruments") or [])
+                equip_rows.append(
+                    f"| [{tag}]({rel}) | {title} | {unit} | {eq_class} | {inst_cnt} loops | {desc} |"
+                )
+            elif rel.startswith("hazards/"):
+                hazard_rows.append(f"| [{title}]({rel}) | `{rel}` | {desc} |")
+            elif rel.startswith("instruments/"):
+                inst_rows.append(f"| [{title}]({rel}) | `{rel}` | {desc} |")
+
+            for line in doc.body.splitlines():
+                if "CONFLICT" in line.upper() or "⚠️" in line:
+                    clean_line = line.strip().lstrip(">").strip()
+                    if len(clean_line) > 20:
+                        conflict_notes.append(f"- **[{title}]({rel})**: {clean_line[:240]}")
+                        break
+        except Exception as exc:
+            logging.getLogger(__name__).debug("Ignored non-fatal index parse exception: %s", exc)
+
+    catalog_sections: list[str] = [
+        base_listing.rstrip(),
+        "",
+        "---",
+        "",
+        "# Phenol Process Expert — Master Plant Knowledge Catalog (OKF v0.2)",
+        "",
+        "## 1. Plant Unit Architecture & Scope",
+        "- **Unit 21 (ALKY — Cumene Alkylation & Transalkylation):** Benzene/propylene reaction, rectification, and heavies separation (`D-2121`, `D-2122`).",
+        "- **Unit 22 (OXI — Cumene Oxidation):** Combined feed surge (`D-2201` with 610 mm drop-leg boot & Style A coalescer), feed caustic wash (`V-2201`), oxidation reactors (`OX-2201`, `OX-2202`), and off-gas scrubbing/treatment (`D-2202`–`D-2211`).",
+        "- **Unit 23 (CDN — CHP Concentration, Cleavage/Decomposition & Neutralization):** Two-stage vacuum CHP concentration (`V-2301` Preflash Column, `V-2302` Flash Column, `E-2301`–`E-2310`), gravity emergency cumene quench (`D-2301` elevated $\\ge 5000\\text{ mm}$), acid-catalyzed cleavage (`D-2304`), and SIS trip systems (`UC-2301` Concentration & `UC-2302` Decomposition).",
+        "",
+    ]
+
+    if equip_rows:
+        catalog_sections.extend(
+            [
+                "## 2. Master Equipment Specifications & P&ID Loop Matrix",
+                "",
+                "| Tag | Equipment Title | Unit | Class | P&ID Loops | Engineering Function Summary |",
+                "| :--- | :--- | :--- | :--- | :--- | :--- |",
+                *equip_rows,
+                "",
+            ]
+        )
+
+    if hazard_rows:
+        catalog_sections.extend(
+            [
+                "## 3. Chemical Process Hazards & Runaway Safeguards Register",
+                "",
+                "| Chemical / Hazard Profile | Canonical Path | Critical Process Safety Summary |",
+                "| :--- | :--- | :--- |",
+                *hazard_rows,
+                "",
+            ]
+        )
+
+    if inst_rows:
+        catalog_sections.extend(
+            [
+                "## 4. Instrumentation, SIS (`UC-2301` / `UC-2302`) & Overpressure Protection Register",
+                "",
+                "| Subsystem Register | Canonical Path | Scope & Safety Interlock Summary |",
+                "| :--- | :--- | :--- |",
+                *inst_rows,
+                "",
+            ]
+        )
+
+    if conflict_notes:
+        catalog_sections.extend(
+            [
+                "## 5. Cross-Document Engineering Discrepancies & Safety Warnings (`⚠️ CONFLICT`)",
+                "",
+                *conflict_notes[:40],
+                "",
+            ]
+        )
+
+    return "\n".join(catalog_sections) + "\n"
 
 
 def generate_bundle_indexes(bundle_root: Path | str) -> list[Path]:
@@ -85,7 +195,10 @@ def generate_bundle_indexes(bundle_root: Path | str) -> list[Path]:
 
         if entries:
             index_file = directory / _INDEX_FILENAME
-            index_content = _build_index_body(entries)
+            if directory == root:
+                index_content = _build_master_root_index(root, entries)
+            else:
+                index_content = _build_index_body(entries)
             index_file.write_text(index_content, encoding="utf-8")
             written_indexes.append(index_file)
 

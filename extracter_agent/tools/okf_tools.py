@@ -15,7 +15,8 @@ from extracter_agent.models.domain import (
     EngineeringParameter,
     EquipmentEntity,
     InstrumentLoop,
-    sanitize_tag_filename,
+    derive_canonical_concept_id,
+    derive_canonical_equipment_tag,
 )
 from extracter_agent.okf.document import OKFDocument
 from extracter_agent.okf.indexer import generate_bundle_indexes, update_bundle_log
@@ -113,8 +114,8 @@ def generate_equipment_okf_tool(
         gcs_prefix=cfg.destination_gcs_prefix,
     )
 
-    # Save to bundle using slash-sanitized tag filename (e.g. D-2204A/B/C -> D-2204ABC.md)
-    safe_tag = sanitize_tag_filename(tag)
+    # Save to bundle using canonical equipment tag derived from raw PS-<TAG> document code
+    safe_tag = derive_canonical_equipment_tag(tag, source_files)
     equip_dir = bundle_root / "equipment"
     equip_dir.mkdir(parents=True, exist_ok=True)
     output_file = equip_dir / f"{safe_tag}.md"
@@ -243,7 +244,13 @@ def generate_okf_concept_tool(
     )
 
     now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-    clean_id = concept_id.removesuffix(".md").strip("/")
+    clean_id = derive_canonical_concept_id(
+        concept_id=concept_id,
+        concept_type=concept_type,
+        title=title,
+        sources=sources,
+        entity_metadata=entity_metadata,
+    )
     concept_file_path = f"{clean_id}.md"
     resource_uri = f"gs://{cfg.destination_gcs_bucket}/{cfg.destination_gcs_prefix}/{concept_file_path}"
 

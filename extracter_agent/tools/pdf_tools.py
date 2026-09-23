@@ -5,6 +5,7 @@ Strictly complies with Rule 11 (FunctionTool docstring contracts, type safety).
 
 from __future__ import annotations
 
+import logging
 import re
 import tempfile
 from pathlib import Path
@@ -145,8 +146,8 @@ def find_raw_documents_tool(
                     "match_count": len(gcs_matches),
                     "matches": gcs_matches,
                 }
-        except Exception:
-            pass
+        except Exception as exc:
+            logging.getLogger(__name__).debug("Ignored non-fatal exception: %s", exc)
 
     raw_dir = cfg.reference_raw_dir
     results = search_raw_documents(query=query, raw_dir=raw_dir, subfolder=subfolder)
@@ -250,9 +251,14 @@ def process_raw_pdf_tool(
                 target_path,
                 prompt_hint=f"Focus on mechanical equipment data sheet tables and schedules in {target_path.stem}",
             )
+            injected_once = False
             for p in limited_pages:
                 if len(p["text"].strip()) < 50:
-                    p["text"] = f"[Multimodal Visual Extraction of Page {p['page_number']} Tables]:\n{multimodal_text}"
+                    if not injected_once:
+                        p["text"] = f"[Multimodal Visual Extraction of {target_path.name} Tables]:\n{multimodal_text}"
+                        injected_once = True
+                    else:
+                        p["text"] = f"[Page {p['page_number']}: Raster table included in Multimodal Visual Extraction above]"
                     p["char_count"] = len(p["text"])
                     p["word_count"] = len(p["text"].split())
             full_text = f"{full_text}\n{multimodal_text}"
