@@ -88,6 +88,41 @@ Intent classification is strictly cognitive and model-driven using Gemini 3.8 Fl
 5. `VALIDATE_OKF_BUNDLE`: Execute formal OKF v0.2 validation on a bundle (verifying frontmatter schemas, link integrity, and freshness).
 6. `OTHERS`: Polite out-of-scope guidance explaining extraction and OKF synthesis capabilities.
 
+### 2.4 Autonomous Orchestrator Instruction Contract & Trajectory Protocol
+The root coordinator agent (`extracter_orchestrator`) prompt must provide explicit operational instructions establishing:
+1. **Multi-Step Execution Trajectory:** Sequential flow from raw document discovery (`reference/raw/`), text/table extraction (`process_raw_pdf_tool`), OKF concept synthesis (`generate_equipment_okf_tool`), bundle progressive disclosure indexing & validation (`build_okf_indexes_and_validate_tool`), to GCS export (`export_bundle_to_gcs_tool`).
+2. **Chemical Engineering Document Precedence Hierarchy:**
+   - **Mechanical Dimensions & Design Ratings:** Process Data Sheets (especially As-Built Rev Z1) govern. Conflicting annotations on P&ID drawings must be documented with explicit Markdown conflict notes.
+   - **Instrumentation & Control Loops:** P&IDs govern all transmitter tags, control loops, safety instrumented functions (SIS/ESD), voting logic (e.g. 2oo3), and pressure relief trains (PSVs).
+   - **Operating Conditions & Streams:** Process Flow Diagrams (PFDs) govern stream numbers, temperatures, pressures, and flow rates.
+   - **Process Safety Limits:** Licensor standards, operating manuals, and SDS govern safe operating windows and decomposition limits.
+3. **Structured Entity Schemas:** Explicit parameter keys for `design_data`, `operating_conditions`, `connections`, `instruments`, `hazards`, and `source_files`.
+4. **Strict Negative Constraints:** Immutable boundary protection for `reference/` (zero writes or deletions), strict grounding, and engineering unit fidelity.
+
+### 2.4 Vertex AI Preemption Resilience & Retry Architecture (`gemini-3.8-flash`)
+When executing sustained multi-turn trajectories against `gemini-3.8-flash` (`gemini-3.8-flash-rc`), Vertex AI may return transient `500 INTERNAL` (`DECODE_PREEMPTED` on `SHEDDABLE` QoS queues) or `503 UNAVAILABLE` mid-stream errors that gRPC `PredictStreamed` cannot retry automatically once partial stream chunks have been emitted:
+1. **GenAI Client `HttpOptions` Retry Policy:** All `genai.Client()` instances in `extracter_agent/pdf/processor.py` and `extracter_agent/agent/classifier.py` must be initialized with `HttpOptions(retry_options=HttpRetryOptions(attempts=5, initial_delay=2.0, exp_base=2.0, http_status_codes=[429, 500, 502, 503, 504]))`.
+2. **Turn-Level Exponential Backoff & Session Reset:** The evaluation and execution harness (`evals/run_live_vertex_eval.py`) wraps each ADK session turn in an exponential backoff retry loop (up to 4 attempts with jitter and cooldown), re-initializing a clean `InMemorySessionService` session whenever a transient server preemption (`500 INTERNAL`, `DECODE_PREEMPTED`, `503 UNAVAILABLE`, `429 RESOURCE_EXHAUSTED`) interrupts streaming.
+3. **Checkpoint Resumability & Detached Execution:** Evaluation runs support `--resume` to skip already-passed cases and execute inside detached `tmux` / `setsid` sessions so batch evaluations continue uninterrupted across UI/client disconnects.
+
+### 2.5 Multi-Unit Tag Sanitization, Cross-Sheet Conflict Callouts & Topology Extraction
+1. **Multi-Vessel Tag Filename Sanitization (`sanitize_tag_filename`):**
+   - Equipment and instrument tags containing slashes (e.g., `D-2204A/B/C`, `P-2301A/B`, `TI-23-0601 / TAH-23-0601`) must retain their exact display tag in the Markdown title and `entity_metadata.tag`, while sanitizing `/` and `\` out of the filesystem path (`equipment/D-2204ABC.md`, `equipment/P-2301AB.md`) to match `reference/wiki/equipment/` conventions and prevent `FileNotFoundError` subdirectory traversal errors.
+2. **Resilient Domain Parameter Defaults:**
+   - `EngineeringParameter`, `ConnectionStream`, and `InstrumentLoop` default `source` to `"Engineering Reference Document"` when omitted on secondary nozzles/streams to prevent Pydantic `ValidationError` aborts.
+3. **Explicit Multi-Sheet & Cross-Document Conflict Callouts (`⚠️ CONFLICT`):**
+   - When numerical ratings (such as internal design pressure, temperature, or nozzle sizing) differ across P&ID drawings, Process Data Sheet cover sheets vs. mechanical sketch sheets (e.g. Sheet 1 `0.5 kg/cm²g` vs. Sheet 4 `3.5 kg/cm²g` vs. P&ID `3.9 kg/cm²g`), the agent must explicitly document both values and emit a `⚠️ CONFLICT` callout note rather than silently dropping one value.
+4. **Upstream/Downstream Gravity Drainage & SIS Trip Philosophy:**
+   - The agent must explicitly extract upstream feeding vessels, downstream receiving vessels, and minimum static elevation head notes (e.g. `≥ 2500 mm`, `≥ 600 mm`, `≥ 5000 mm above quench nozzle`), as well as the process safety rationale for SIS/ESD valve trip actions (e.g. why `UXV-0601` closes on Concentration ESD `UC-2301`).
+
+### 2.6 Cloud-Native GCS Raw Ingestion & Automatic Bundle Persistence
+To ensure 100% cloud-native operation both during live Agent Runtime (`agent_runtime`) evaluations and remote Playground/API invocations:
+1. **GCS Raw Document Discovery & Ingestion (`gs://cs-poc-y03r7kmfyov4kilzg50fd7s-okf-knowledge/reference/raw/`):**
+   - `find_raw_documents_tool` queries Google Cloud Storage (`reference/raw/`) directly when `USE_GCS_STORAGE=true` (falling back to local `reference/raw/` only in offline unit test sandboxes).
+   - `process_raw_pdf_tool` fetches the authoritative raw PDF blob from `gs://<bucket>/reference/raw/<subfolder>/<pdf_filename>` into an ephemeral cache (`/tmp/extracter_gcs_raw_cache/`) for multi-page text, table, and 300 DPI multimodal extraction.
+2. **Automatic GCS Concept & Index Persistence (`gs://cs-poc-y03r7kmfyov4kilzg50fd7s-okf-knowledge/okf-bundles/phenol-plant/`):**
+   - Every call to `generate_equipment_okf_tool`, `generate_okf_concept_tool`, and `build_okf_indexes_and_validate_tool` automatically persists the generated `.md` concept, `index.md`, and `log.md` directly to `gs://cs-poc-y03r7kmfyov4kilzg50fd7s-okf-knowledge/okf-bundles/phenol-plant/` in addition to the local staging directory (`build/okf_bundle/`).
+
 ---
 
 ## 3. Data Models & Type Contracts
@@ -158,6 +193,16 @@ class EquipmentDesignParameter(BaseModel):
   source_citation: str
 
 
+class InstrumentLoop(BaseModel):
+  tag: str = Field(description="Instrument tag (e.g. TI-0404, FT-0401A, PSV-23-0401A)")
+  service: str = Field(description="Process service or functional description")
+  instrument_type: str = Field(description="Physical or functional instrument type (e.g. RTD, DP Transmitter, PSV)")
+  location: Optional[str] = Field(default=None, description="Physical installation location or nozzle tap point")
+  setpoint_or_range: Optional[str] = Field(default=None, description="Calibrated range or operational setpoint")
+  interlock_or_alarm: Optional[str] = Field(default=None, description="Associated DCS alarm or SIS/ESD trip action")
+  source: str = Field(description="Engineering drawing or datasheet citation")
+
+
 class EquipmentExtractionPayload(BaseModel):
   tag: str
   name: str
@@ -167,6 +212,10 @@ class EquipmentExtractionPayload(BaseModel):
   design_data: list[EquipmentDesignParameter] = Field(default_factory=list)
   operating_conditions: list[EquipmentDesignParameter] = Field(
       default_factory=list
+  )
+  instruments: list[InstrumentLoop] = Field(
+      default_factory=list,
+      description="P&ID instrumentation, transmitters, and control/safety loops associated with this equipment",
   )
   hazards: list[str] = Field(default_factory=list)
   connections: list[dict[str, str]] = Field(default_factory=list)
@@ -180,6 +229,31 @@ class GCSUploadResult(BaseModel):
   total_bytes: int
   gcs_root_uri: str
 ```
+
+### 3.1 OKF v0.2 P&ID Relationship Architecture (Equipment-to-Instrument Cross-Linking)
+
+In chemical engineering facilities, instrumentation is inextricably bound to equipment, piping loops, and process safety barriers. OKF v0.2 models these relationships using a 4-layer architecture:
+
+1. **Structured Frontmatter (`entity_metadata.instruments`):**
+   Equipment concept frontmatter contains an `instruments` array where each element contains:
+   - `tag`: Normalized instrument tag (e.g. `TI-0404`, `FT-0401A/B/C`, `PSV-23-0401A`).
+   - `service`: Functional description of the measurement/actuation.
+   - `type`: Physical instrument or transmitter class (e.g. `RTD`, `DP Transmitter`, `Modulating PSV`).
+   - `location`: Process nozzle, sump, or piping location.
+   - `setpoint_or_range`: Calibrated instrument range or operational trip setpoint.
+   - `interlock_or_alarm`: Associated alarm level (`FAL`, `TAHH`) or SIS/ESD trip action (`UC-2301 Trigger`).
+   - `source`: Engineering drawing or process datasheet citation.
+
+2. **Bidirectional Hypertext Graph Linking:**
+   The Markdown body generates standard bundle-relative Markdown links:
+   - From Equipment to Instrument: `[Tag](/instruments/{tag}.md)` or `[Tag](/instruments/{register}.md#{tag})`.
+   - From Instrument Register to Equipment: `[Tag](/equipment/{tag}.md)`.
+
+3. **Control Philosophy & SIS Topology:**
+   Multi-element safety instrumented functions (e.g., 2oo3 voting on feed flow cutoff via `UXV-0401`, DIERS-sized overpressure relief via `PSV-23-0401A/B/C/D`) are detailed under `## Control Philosophy & Interlocks`.
+
+4. **Engineering Footnote Provenance:**
+   Every instrument row includes explicit footnote citations (e.g. `[^src-pid-0004]`) pointing to the authoritative P&ID drawing.
 
 ---
 
@@ -367,8 +441,79 @@ class GCSUploadResult(BaseModel):
   - Synchronize `specs/README.md` and `README.md`.
 - **Completion Criteria:** Zero High/Critical security vulnerabilities; complete documentation and execution tracking.
 
+### Step 8: P&ID Equipment-Instrument Relationship Extraction & Cross-Linking Engine
+- **Implementation:**
+  - Codify `InstrumentLoop` model in `extracter_agent/models/domain.py` and attach `instruments: list[InstrumentLoop]` to `EquipmentEntity`.
+  - Update `extracter_agent/okf/synthesizer.py` to inject `entity_metadata.instruments` in YAML frontmatter and render `## Instrumentation & Control Loops (P&ID)` table in Markdown body with bundle-relative links (`/instruments/{tag}.md`).
+  - Update `extracter_agent/tools/okf_tools.py` signature and docstring contracts to accept `instruments` parameter.
+- **Unit Tests:**
+  - In `tests/test_okf_unit.py`: Verify that synthesizing an equipment concept with `InstrumentLoop` entities produces valid frontmatter arrays, correctly formatted Markdown tables, and footnote citations.
+  - Test edge cases: equipment with zero instruments, instruments without optional locations/ranges.
+- **Property-Based Tests (PBT):**
+  - In `tests/test_okf_property.py`: Formulate invariant tests with `hypothesis` verifying that:
+    1. For every synthesized instrument loop, the generated Markdown link strictly conforms to bundle-relative URI pattern `^\[[^\]]+\]\(/instruments/[^)]+\.md\)$`.
+    2. Serializing and deserializing OKF frontmatter preserves all instrument tags and attributes without loss or truncation.
+- **Completion Criteria:** 100% unit and property-based test pass rate; zero spec drift; clean schema fidelity.
+
+### Step 9: Expert Wiki Ground Truth Evaluation Suite
+- **Implementation:**
+  - Build automated dataset compiler `evals/builders/build_wiki_eval_dataset.py` that ingests documents from `reference/wiki/` (without modifying them) and generates `evals/datasets/wiki_ground_truth_eval.jsonl`.
+  - **Synthesized Analysis Filter:** Strictly filter out post-extraction human-synthesized HAZOP analysis worksheets that do not exist in `reference/raw/` (8 files: `hazop/nodes/cdn-N02.md`, `cdn-N03.md`, `cdn-n02.md`, `cdn-n03.md`, `hazop/action-register.md`, `hazop/interlock-esd-summary.md`, `hazop/examples/o-p3-fractionation-2026-005.md`, and `hazop/templates/gc-hazop-worksheet-template.md`).
+  - **Clean Golden Benchmark (130 Records):** Compiles 100% of the factual, document-grounded files:
+    - `equipment/`: 54 files (design data, operating conditions, P&ID instruments)
+    - `sources/`: 27 files (drawing indexes, P&ID/PFD catalogs)
+    - `hazards/`: 15 files (chemical SDS properties, GHS limits)
+    - `instruments/`: 13 files (transmitters, SIS trips, PSV registers)
+    - `procedures/`: 5 files (operating manuals, startup/shutdown steps)
+    - `units/`: 5 files (battery limits, design bases)
+    - `root`: 4 files (index, log, overview, project)
+    - `troubleshooting/`: 3 files (operating manual troubleshooting guides)
+    - `hazop/` standards: 3 files (governing standards: `methodology.md`, `risk-matrix.md`, `study-info.md`)
+    - `parameters/`: 1 file (licensor operating windows)
+  - Each JSONL record encapsulates:
+    - `eval_id`: Unique evaluation identifier (e.g. `eval-equipment-V-2301`).
+    - `category`: Functional domain category.
+    - `target_tag`: Canonical entity tag or concept name.
+    - `source_files`: Authoritative raw PDF files in `reference/raw/` that ground this entity.
+    - `user_prompt`: Natural language extraction query.
+    - `expected_intent`: Canonical intent category (`GENERATE_OKF_CONCEPT` or `EXTRACT_DOCUMENT`).
+    - `expected_tool_trajectory`: Required ADK tool execution sequence.
+    - `ground_truth`: Structured expert-verified parameters, tables, instrumentation loops, and safeguards.
+    - `verification_rules`: Strict assertions for parameters, links, and footnotes.
+- **Unit & Property Tests:**
+  - Verify that `wiki_ground_truth_eval.jsonl` contains exactly 130 pure extraction records.
+  - Verify zero inclusion of synthesized HAZOP files (`hazop/nodes/`, `action-register`, `interlock-esd-summary`).
+  - Validate that 100% of JSONL records parse against strict Pydantic evaluation schemas with zero null or empty target tags.
+- **Completion Criteria:** Complete 130-record dataset generated; verified by automated tests; paused for user inspection prior to running evaluations.
+
+### Step 11: Document Discovery, Vector P&ID Multimodal Ingestion & Universal OKF Synthesis
+- **Implementation:**
+  - Implement `find_raw_documents_tool(query, subfolder)` enabling cognitive discovery of target engineering documents across `reference/raw/`.
+  - Upgrade `process_raw_pdf_tool` and `pdf/processor.py` with vector drawing detection (`is_vector_drawing`) and Google GenAI multimodal Part conversion (`extract_pdf_multimodal_part`) to support AutoCAD vector drawings (P&IDs, PFDs) with 0 native text streams.
+  - Implement universal concept synthesis tool `generate_okf_concept_tool` for hazards, instruments, procedures, and units.
+  - Implement standalone bundle validation tool `validate_okf_bundle_tool`.
+  - Register all 7 tools in ADK Root Orchestrator (`extracter_orchestrator`).
+- **Unit & Property Tests:**
+  - Unit tests for raw document searching, vector drawing detection, concept generation, and bundle validation.
+  - Property-based tests verifying invariant search result integrity and valid frontmatter generation across arbitrary concept categories.
+- **Completion Criteria:** All 7 tools registered and passing 100% unit and property tests.
+
+### Step 12: Multimodal Visual Extraction for Vector Drawings & Scanned Schedules
+- **Implementation:**
+  - Implement `extract_pdf_multimodal_summary(file_path, prompt_hint)` in `extracter_agent/pdf/processor.py` using `google.genai.Client` and `types.Part.from_bytes` for automatic multimodal interpretation of vector CAD drawings (P&IDs, PFDs) and scanned raster equipment schedules.
+  - Integrate multimodal extraction into `process_raw_pdf_tool` in `extracter_agent/tools/pdf_tools.py` whenever `is_vector_drawing` is True or pages lack digital font streams (`chars < 50`).
+  - Enable seamless multi-source cross-document reconciliation (e.g. Process Data Sheet + P&ID drawing) in the ADK agent trajectory without failure on vector-only or scanned documents.
+- **Unit & Property Tests:**
+  - Deterministic tests verifying multimodal fallback triggers when text is empty or document is vector drawing.
+  - Property tests verifying that multimodal text preserves equipment tag candidates and engineering units.
+- **Completion Criteria:** Live multi-source evaluation successfully discovers, reads, reconciles, and synthesizes OKF v0.2 equipment concepts citing multiple raw documents.
+
 ---
 
 ## 8. Plan Progress Tracking & Living Spec Synchronization
 - All milestones, verification metrics, and test results will be continuously recorded under `specs/plan/`.
 - If any data model or interface evolves during implementation, this specification will be updated synchronously to prevent spec drift.
+
+
+
+

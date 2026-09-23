@@ -33,3 +33,7 @@ Thumbs.db
 *.tfstate.*
 .terraform/
 .terraform.lock.hcl
+
+# ADK Agent Engine Deployment Temp Folders
+extracter_agent_tmp*/
+

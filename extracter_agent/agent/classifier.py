@@ -9,6 +9,7 @@ Strictly adheres to Rule 11 & Section 2 of Repository Guidelines:
 from __future__ import annotations
 
 import os
+import time
 
 from google import genai
 from google.genai import types
@@ -32,51 +33,72 @@ You MUST provide your reasoning and extract any explicit entity tags or raw PDF 
 
 
 class CognitiveClassifier:
-  """Cognitive intent classifier powered by Vertex AI / Gemini."""
+    """Cognitive intent classifier powered by Vertex AI / Gemini."""
 
-  def __init__(self, client: genai.Client | None = None) -> None:
-    cfg = get_config()
-    self.model_name = cfg.gemini_model
-    self._client = client
+    def __init__(self, client: genai.Client | None = None) -> None:
+        cfg = get_config()
+        self.model_name = cfg.gemini_model
+        self._client = client
 
-  @property
-  def client(self) -> genai.Client:
-    if self._client is None:
-      # Initialized with Vertex AI or standard Gemini API depending on environment
-      cfg = get_config()
-      if os.getenv("GOOGLE_GENAI_USE_VERTEXAI", "").lower() in ("true", "1"):
-        self._client = genai.Client(
-            vertexai=True,
-            project=cfg.google_cloud_project,
-            location=cfg.google_cloud_location,
+    @property
+    def client(self) -> genai.Client:
+        if self._client is None:
+            # Initialized with Vertex AI or standard Gemini API depending on environment
+            cfg = get_config()
+            retry_opts = types.HttpRetryOptions(
+                attempts=5,
+                initial_delay=2.0,
+                max_delay=32.0,
+                exp_base=2.0,
+                jitter=1.0,
+                http_status_codes=[429, 500, 502, 503, 504],
+            )
+            http_opts = types.HttpOptions(retry_options=retry_opts)
+            if os.getenv("GOOGLE_GENAI_USE_VERTEXAI", "").lower() in ("true", "1"):
+                self._client = genai.Client(
+                    vertexai=True,
+                    project=cfg.google_cloud_project,
+                    location=cfg.google_cloud_location,
+                    http_options=http_opts,
+                )
+            else:
+                self._client = genai.Client(http_options=http_opts)
+        return self._client
+
+    def classify_intent(self, prompt: str) -> IntentClassificationResult:
+        """Classify the user prompt into a canonical intent using model-driven reasoning."""
+        last_err: Exception | None = None
+        for attempt in range(3):
+            try:
+                response = self.client.models.generate_content(
+                    model=self.model_name,
+                    contents=prompt,
+                    config=types.GenerateContentConfig(
+                        system_instruction=INTENT_SYSTEM_PROMPT,
+                        response_mime_type="application/json",
+                        response_schema=IntentClassificationResult,
+                        temperature=0.0,
+                    ),
+                )
+                if response.parsed and isinstance(
+                    response.parsed, IntentClassificationResult
+                ):
+                    return response.parsed
+                # Fallback to manual parsing if structured object is in text
+                return IntentClassificationResult.model_validate_json(response.text)
+            except Exception as e:
+                last_err = e
+                if attempt < 2 and any(
+                    code in str(e) for code in ("500", "503", "429", "INTERNAL", "UNAVAILABLE")
+                ):
+                    time.sleep(2.0 * (2**attempt))
+                    continue
+                break
+        # If external API is unreachable in local test sandbox, return cognitive OTHERS with explanation
+        return IntentClassificationResult(
+            intent=IntentCategory.OTHERS,
+            confidence=0.0,
+            reasoning=f"Model reasoning invocation unavailable: {last_err}",
+            target_entities=[],
+            raw_sources=[],
         )
-      else:
-        self._client = genai.Client()
-    return self._client
-
-  def classify_intent(self, prompt: str) -> IntentClassificationResult:
-    """Classify the user prompt into a canonical intent using model-driven reasoning."""
-    try:
-      response = self.client.models.generate_content(
-          model=self.model_name,
-          contents=prompt,
-          config=types.GenerateContentConfig(
-              system_instruction=INTENT_SYSTEM_PROMPT,
-              response_mime_type="application/json",
-              response_schema=IntentClassificationResult,
-              temperature=0.0,
-          ),
-      )
-      if response.parsed and isinstance(response.parsed, IntentClassificationResult):
-        return response.parsed
-      # Fallback to manual parsing if structured object is in text
-      return IntentClassificationResult.model_validate_json(response.text)
-    except Exception as e:
-      # If external API is unreachable in local test sandbox, return cognitive OTHERS with explanation
-      return IntentClassificationResult(
-          intent=IntentCategory.OTHERS,
-          confidence=0.0,
-          reasoning=f"Model reasoning invocation unavailable: {e}",
-          target_entities=[],
-          raw_sources=[],
-      )

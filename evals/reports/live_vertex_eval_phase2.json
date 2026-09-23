@@ -1,0 +1,300 @@
+{
+  "total_cases": 11,
+  "passed_cases": 10,
+  "failed_cases": 1,
+  "intent_accuracy": 1.0,
+  "trajectory_precision": 1.0,
+  "negative_constraint_adherence": 1.0,
+  "security_interception_rate": 1.0,
+  "okf_groundedness_rate": 0.9091,
+  "average_latency_sec": 280.81,
+  "total_duration_sec": 3088.88,
+  "cases": [
+    {
+      "case_id": "eval-equipment-D-2121",
+      "prompt": "Extract verified equipment concept for Cumene Column Reboiler Condensate Pot (Tag: D-2121) from reference/raw and synthesize into OKF v0.2.",
+      "category": "wiki_equipment",
+      "expected_intent": "GENERATE_OKF_CONCEPT",
+      "predicted_intent": "GENERATE_OKF_CONCEPT",
+      "intent_matched": true,
+      "expected_tools": [
+        "process_raw_pdf_tool",
+        "generate_equipment_okf_tool"
+      ],
+      "actual_tools": [
+        "find_raw_documents_tool",
+        "process_raw_pdf_tool",
+        "generate_equipment_okf_tool",
+        "build_okf_indexes_and_validate_tool",
+        "validate_okf_bundle_tool"
+      ],
+      "trajectory_matched": true,
+      "negative_constraint_passed": true,
+      "security_blocked": false,
+      "okf_valid": true,
+      "latency_sec": 345.48,
+      "error": null,
+      "extracted_summary": "### Executive Summary: Equipment Concept Synthesis for D-2121\n\nThe verified Open Knowledge Format (OKF v0.2) concept for **D-2121 (Cumene Column Reboiler Condensate Pot)** has been extracted from the "
+    },
+    {
+      "case_id": "eval-equipment-D-2122",
+      "prompt": "Extract verified equipment concept for PIPB Column Reboiler Condensate Pot (Tag: D-2122) from reference/raw and synthesize into OKF v0.2.",
+      "category": "wiki_equipment",
+      "expected_intent": "GENERATE_OKF_CONCEPT",
+      "predicted_intent": "GENERATE_OKF_CONCEPT",
+      "intent_matched": true,
+      "expected_tools": [
+        "process_raw_pdf_tool",
+        "generate_equipment_okf_tool"
+      ],
+      "actual_tools": [
+        "find_raw_documents_tool",
+        "process_raw_pdf_tool",
+        "generate_equipment_okf_tool",
+        "build_okf_indexes_and_validate_tool",
+        "validate_okf_bundle_tool",
+        "export_bundle_to_gcs_tool"
+      ],
+      "trajectory_matched": true,
+      "negative_constraint_passed": true,
+      "security_blocked": false,
+      "okf_valid": true,
+      "latency_sec": 183.67,
+      "error": null,
+      "extracted_summary": "### Chemical Engineering Extraction Summary: PIPB Column Reboiler Condensate Pot (Tag: D-2122)\n\nThe equipment concept for **D-2122** has been extracted from the authoritative As-Built process engineer"
+    },
+    {
+      "case_id": "eval-equipment-D-2201",
+      "prompt": "Extract verified equipment concept for Combined Feed Surge Drum (Tag: D-2201) from reference/raw and synthesize into OKF v0.2.",
+      "category": "wiki_equipment",
+      "expected_intent": "GENERATE_OKF_CONCEPT",
+      "predicted_intent": "GENERATE_OKF_CONCEPT",
+      "intent_matched": true,
+      "expected_tools": [
+        "process_raw_pdf_tool",
+        "generate_equipment_okf_tool"
+      ],
+      "actual_tools": [
+        "find_raw_documents_tool",
+        "process_raw_pdf_tool",
+        "generate_equipment_okf_tool",
+        "build_okf_indexes_and_validate_tool",
+        "validate_okf_bundle_tool"
+      ],
+      "trajectory_matched": true,
+      "negative_constraint_passed": true,
+      "security_blocked": false,
+      "okf_valid": true,
+      "latency_sec": 177.45,
+      "error": null,
+      "extracted_summary": "### Equipment Concept Synthesis: Combined Feed Surge Drum (`D-2201`)\n\nThe verified equipment concept for the **Combined Feed Surge Drum (`D-2201`)** has been extracted from the authoritative engineeri"
+    },
+    {
+      "case_id": "eval-equipment-D-2202",
+      "prompt": "Extract verified equipment concept for CHP Process Water Break Tank (Tag: D-2202) from reference/raw and synthesize into OKF v0.2.",
+      "category": "wiki_equipment",
+      "expected_intent": "GENERATE_OKF_CONCEPT",
+      "predicted_intent": "GENERATE_OKF_CONCEPT",
+      "intent_matched": true,
+      "expected_tools": [
+        "process_raw_pdf_tool",
+        "generate_equipment_okf_tool"
+      ],
+      "actual_tools": [
+        "find_raw_documents_tool",
+        "process_raw_pdf_tool",
+        "generate_equipment_okf_tool",
+        "build_okf_indexes_and_validate_tool",
+        "validate_okf_bundle_tool",
+        "export_bundle_to_gcs_tool"
+      ],
+      "trajectory_matched": true,
+      "negative_constraint_passed": true,
+      "security_blocked": false,
+      "okf_valid": true,
+      "latency_sec": 219.59,
+      "error": null,
+      "extracted_summary": "An authoritative, verified OKF v0.2 equipment concept has been extracted and synthesized for the **CHP Process Water Break Tank (Tag: `D-2202`)** from the engineering reference documents in `reference"
+    },
+    {
+      "case_id": "eval-equipment-D-2203",
+      "prompt": "Extract verified equipment concept for Oxidizer Chilled Vent Gas Separator (Tag: D-2203) from reference/raw and synthesize into OKF v0.2.",
+      "category": "wiki_equipment",
+      "expected_intent": "GENERATE_OKF_CONCEPT",
+      "predicted_intent": "GENERATE_OKF_CONCEPT",
+      "intent_matched": true,
+      "expected_tools": [
+        "process_raw_pdf_tool",
+        "generate_equipment_okf_tool"
+      ],
+      "actual_tools": [
+        "find_raw_documents_tool",
+        "process_raw_pdf_tool",
+        "generate_equipment_okf_tool",
+        "build_okf_indexes_and_validate_tool",
+        "validate_okf_bundle_tool"
+      ],
+      "trajectory_matched": true,
+      "negative_constraint_passed": true,
+      "security_blocked": false,
+      "okf_valid": true,
+      "latency_sec": 154.88,
+      "error": null,
+      "extracted_summary": "### Synthesis Summary: Oxidizer Chilled Vent Gas Separator (`D-2203`)\n\nThe technical data for the **Oxidizer Chilled Vent Gas Separator** (**Tag: D-2203**) has been extracted from the authoritative Pr"
+    },
+    {
+      "case_id": "eval-equipment-D-2204ABC",
+      "prompt": "Extract verified equipment concept for Charcoal Adsorbers (Tag: D-2204A/B/C) from reference/raw and synthesize into OKF v0.2.",
+      "category": "wiki_equipment",
+      "expected_intent": "GENERATE_OKF_CONCEPT",
+      "predicted_intent": "GENERATE_OKF_CONCEPT",
+      "intent_matched": true,
+      "expected_tools": [
+        "process_raw_pdf_tool",
+        "generate_equipment_okf_tool"
+      ],
+      "actual_tools": [
+        "find_raw_documents_tool",
+        "process_raw_pdf_tool",
+        "generate_equipment_okf_tool"
+      ],
+      "trajectory_matched": true,
+      "negative_constraint_passed": true,
+      "security_blocked": false,
+      "okf_valid": false,
+      "latency_sec": 723.93,
+      "error": "FileNotFoundError: [Errno 2] No such file or directory: 'build/okf_bundle/equipment/D-2204A/B/C.md'",
+      "extracted_summary": null
+    },
+    {
+      "case_id": "eval-equipment-D-2205",
+      "prompt": "Extract verified equipment concept for Decanter (Tag: D-2205) from reference/raw and synthesize into OKF v0.2.",
+      "category": "wiki_equipment",
+      "expected_intent": "GENERATE_OKF_CONCEPT",
+      "predicted_intent": "GENERATE_OKF_CONCEPT",
+      "intent_matched": true,
+      "expected_tools": [
+        "process_raw_pdf_tool",
+        "generate_equipment_okf_tool"
+      ],
+      "actual_tools": [
+        "find_raw_documents_tool",
+        "process_raw_pdf_tool",
+        "generate_equipment_okf_tool",
+        "build_okf_indexes_and_validate_tool",
+        "validate_okf_bundle_tool"
+      ],
+      "trajectory_matched": true,
+      "negative_constraint_passed": true,
+      "security_blocked": false,
+      "okf_valid": true,
+      "latency_sec": 378.77,
+      "error": null,
+      "extracted_summary": "### Verified Equipment Concept: Decanter (`D-2205`)\n\nThe equipment concept for **Decanter (Tag: D-2205)** has been extracted from authoritative raw engineering documents in `reference/raw/` and synthe"
+    },
+    {
+      "case_id": "eval-equipment-D-2206",
+      "prompt": "Extract verified equipment concept for CHP Sump (Tag: D-2206) from reference/raw and synthesize into OKF v0.2.",
+      "category": "wiki_equipment",
+      "expected_intent": "GENERATE_OKF_CONCEPT",
+      "predicted_intent": "GENERATE_OKF_CONCEPT",
+      "intent_matched": true,
+      "expected_tools": [
+        "process_raw_pdf_tool",
+        "generate_equipment_okf_tool"
+      ],
+      "actual_tools": [
+        "find_raw_documents_tool",
+        "process_raw_pdf_tool",
+        "generate_equipment_okf_tool",
+        "build_okf_indexes_and_validate_tool",
+        "validate_okf_bundle_tool"
+      ],
+      "trajectory_matched": true,
+      "negative_constraint_passed": true,
+      "security_blocked": false,
+      "okf_valid": true,
+      "latency_sec": 425.45,
+      "error": null,
+      "extracted_summary": "### Executive Summary & Identification\n\nThe verified equipment concept for the **CHP Sump** (**Tag: D-2206**) has been extracted from the authoritative engineering records in `reference/raw` and synth"
+    },
+    {
+      "case_id": "eval-equipment-D-2207",
+      "prompt": "Extract verified equipment concept for Compressed Air Scrubber (Tag: D-2207) from reference/raw and synthesize into OKF v0.2.",
+      "category": "wiki_equipment",
+      "expected_intent": "GENERATE_OKF_CONCEPT",
+      "predicted_intent": "GENERATE_OKF_CONCEPT",
+      "intent_matched": true,
+      "expected_tools": [
+        "process_raw_pdf_tool",
+        "generate_equipment_okf_tool"
+      ],
+      "actual_tools": [
+        "find_raw_documents_tool",
+        "process_raw_pdf_tool",
+        "generate_equipment_okf_tool",
+        "build_okf_indexes_and_validate_tool",
+        "validate_okf_bundle_tool"
+      ],
+      "trajectory_matched": true,
+      "negative_constraint_passed": true,
+      "security_blocked": false,
+      "okf_valid": true,
+      "latency_sec": 184.7,
+      "error": null,
+      "extracted_summary": "### Chemical Engineering Equipment Concept Summary: Compressed Air Scrubber (Tag: D-2207)\n\nThe verified equipment concept for the **Compressed Air Scrubber (`D-2207`)** has been extracted from the aut"
+    },
+    {
+      "case_id": "eval-equipment-D-2208",
+      "prompt": "Extract verified equipment concept for Oxidizer Vent Gas Separator (Tag: D-2208) from reference/raw and synthesize into OKF v0.2.",
+      "category": "wiki_equipment",
+      "expected_intent": "GENERATE_OKF_CONCEPT",
+      "predicted_intent": "GENERATE_OKF_CONCEPT",
+      "intent_matched": true,
+      "expected_tools": [
+        "process_raw_pdf_tool",
+        "generate_equipment_okf_tool"
+      ],
+      "actual_tools": [
+        "find_raw_documents_tool",
+        "process_raw_pdf_tool",
+        "generate_equipment_okf_tool",
+        "build_okf_indexes_and_validate_tool",
+        "validate_okf_bundle_tool"
+      ],
+      "trajectory_matched": true,
+      "negative_constraint_passed": true,
+      "security_blocked": false,
+      "okf_valid": true,
+      "latency_sec": 141.06,
+      "error": null,
+      "extracted_summary": "The verified equipment concept for the **Oxidizer Vent Gas Separator (Tag: D-2208)** has been successfully extracted from the authoritative engineering documents in `reference/raw/` and synthesized in"
+    },
+    {
+      "case_id": "eval-equipment-D-2211",
+      "prompt": "Extract verified equipment concept for Charcoal Adsorber Blowdown Knockout Drum (Tag: D-2211) from reference/raw and synthesize into OKF v0.2.",
+      "category": "wiki_equipment",
+      "expected_intent": "GENERATE_OKF_CONCEPT",
+      "predicted_intent": "GENERATE_OKF_CONCEPT",
+      "intent_matched": true,
+      "expected_tools": [
+        "process_raw_pdf_tool",
+        "generate_equipment_okf_tool"
+      ],
+      "actual_tools": [
+        "find_raw_documents_tool",
+        "process_raw_pdf_tool",
+        "generate_equipment_okf_tool",
+        "build_okf_indexes_and_validate_tool",
+        "validate_okf_bundle_tool"
+      ],
+      "trajectory_matched": true,
+      "negative_constraint_passed": true,
+      "security_blocked": false,
+      "okf_valid": true,
+      "latency_sec": 153.88,
+      "error": null,
+      "extracted_summary": "### OKF v0.2 Equipment Concept Synthesis: D-2211 (Charcoal Adsorber Blowdown Knockout Drum)\n\nThe verified equipment concept for the **Charcoal Adsorber Blowdown Knockout Drum (Tag: D-2211)** has been "
+    }
+  ]
+}

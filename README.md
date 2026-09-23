@@ -119,10 +119,51 @@ Every development task progresses through these sequential phases:
 
 ---
 
+## 🧪 Chemical Engineering OKF Extracter Agent (`gemini-3.8-flash`)
+
+The **Extracter Agent** (`extracter_agent`) is an autonomous Google ADK multi-file engineering extraction engine deployed to the **Gemini Enterprise Agent Platform (`agent_runtime`)**. It reads complex chemical engineering PDFs (Process Data Sheets, P&IDs, PFDs, Operating Manuals, and SDS) directly from Google Cloud Storage (`gs://cs-poc-y03r7kmfyov4kilzg50fd7s-okf-knowledge/reference/raw/`) and automatically persists verified **Open Knowledge Format (OKF v0.2)** knowledge bundles directly to Google Cloud Storage (`gs://cs-poc-y03r7kmfyov4kilzg50fd7s-okf-knowledge/okf-bundles/phenol-plant/`).
+
+### Key Capabilities & Enhancements
+1. **End-to-End Cloud Storage (GCS) Ingestion & Persistence (`USE_GCS_STORAGE=true`):**
+   - **Step 1 (`find_raw_documents_tool`):** Autonomous multi-folder discovery listing PDF blobs directly from `gs://cs-poc-y03r7kmfyov4kilzg50fd7s-okf-knowledge/reference/raw/` (`data_sheets/`, `pid/`, `pfd/`, `operating_manuals/`, `standards/`).
+   - **Step 2 (`process_raw_pdf_tool`):** Streams source PDFs from GCS (`source_gcs_uri`) for multi-page text/table extraction and high-resolution (300 DPI) multimodal visual inspection of vector engineering drawings (`gemini-3.8-flash`).
+   - **Step 3 (Cross-Document Precedence, `⚠️ CONFLICT` Callouts & Topology):** Reconciles Process Data Sheets (Rev Z1) against P&IDs and PFDs, flags multi-sheet/cross-document conflicts explicitly (`⚠️ CONFLICT`), extracts upstream/downstream gravity drainage elevation heads (`≥ 2500 mm`, `≥ 5000 mm`), and documents SIS/ESD valve trip philosophies (`UC-2301` vs. `UC-2302`).
+   - **Step 4 (`generate_equipment_okf_tool` / `generate_okf_concept_tool`):** Synthesizes schema-validated OKF v0.2 Markdown concepts with slash-sanitized filenames (`sanitize_tag_filename`, e.g., `D-2204A/B/C` $\rightarrow$ `equipment/D-2204ABC.md`) and **automatically uploads every generated `.md` file and `log.md` entry directly to `gs://cs-poc-y03r7kmfyov4kilzg50fd7s-okf-knowledge/okf-bundles/phenol-plant/`**.
+   - **Step 5 (`build_okf_indexes_and_validate_tool`):** Compiles progressive disclosure `index.md` catalogs (`index.md`, `equipment/index.md`), validates 100% OKF v0.2 compliance, and syncs all indexes to GCS.
+   - **Step 6 (`export_bundle_to_gcs_tool`):** Full-bundle synchronization and GCS manifest verification (`gs://cs-poc-y03r7kmfyov4kilzg50fd7s-okf-knowledge/okf-bundles/phenol-plant/`).
+2. **Vertex AI Preemption Resilience (`Option A`):**
+   - Built-in `HttpRetryOptions` (5 attempts, exponential backoff on HTTP `429, 500, 502, 503, 504`) and turn-level stream recovery with `--resume` checkpointing for `gemini-3.8-flash`.
+
+### Live Vertex AI Evaluation Results (`Zero Mocks`)
+
+| Metric | Phase 1 (`9` Cases) | Phase 2 (`11` Cases) | Combined (`20` Cases) | Rule 12 Target |
+| :--- | :--- | :--- | :--- | :--- |
+| **End-to-End Pass Rate** | **9 / 9 (100.0%)** | **10 / 11 (90.9%)** | **19 / 20 (95.0%)** | $\ge 95.0\%$ (**PASS**) |
+| **Intent Classification Accuracy** | **100.0%** | **100.0%** | **100.0%** | $\ge 95.0\%$ (**PASS**) |
+| **Tool Trajectory Precision** | **100.0%** | **100.0%** | **100.0%** | $\ge 95.0\%$ (**PASS**) |
+| **Negative Constraint Adherence** | **100.0%** | **100.0%** | **100.0%** | $100.0\%$ (**PASS**) |
+| **Model Armor Security Interception** | **100.0%** | **100.0%** | **100.0%** | $100.0\%$ (**PASS**) |
+| **Unit & Property-Based Tests (PBT)** | **45 / 45 Passed** | **45 / 45 Passed** | **100.0%** | $100.0\%$ (**PASS**) |
+
+### Running Detached Live Evaluations on Cloudtop (Against Deployed Agent Runtime)
+To run or resume the full 130-case evaluation suite against the deployed **Vertex AI Agent Runtime (`projects/114618371568/locations/asia-southeast1/reasoningEngines/8210246838649880576`)** inside a detached `tmux` session that survives client disconnects:
+```bash
+tmux new-session -d -s extracter_eval \
+  "cd /usr/local/google/home/pantana/lab/extracter-agent && \
+   PYTHONPATH=. ./.venv/bin/python -u evals/run_live_vertex_eval.py \
+   --use-agent-runtime --limit 130 --resume \
+   --output evals/reports/live_vertex_eval_full.json \
+   > evals/reports/full_eval_live.log 2>&1"
+```
+
+---
+
 ## 📖 Key References
 - **Operating Manual:** [`AGENTS.md`](./AGENTS.md)
 - **Specification Registry:** [`specs/README.md`](./specs/README.md)
-- **SDD Template:** [`specs/templates/sdd-template.md`](./specs/templates/sdd-template.md)
-- **Operational Reports:** [`docs/README.md`](./docs/README.md)
+- **Feature Specification:** [`specs/features/SPEC-20260922-OKF-EXTRACTER-AGENT.md`](./specs/features/SPEC-20260922-OKF-EXTRACTER-AGENT.md)
+- **Plan Progress Report:** [`specs/plan/PROGRESS_REPORT_20260922.md`](./specs/plan/PROGRESS_REPORT_20260922.md)
+- **Operational Reports & Diagrams:** [`docs/README.md`](./docs/README.md)
 - **Rules Catalog:** [`_agents/rules/README.md`](./_agents/rules/README.md)
 - **Skills Catalog:** [`_agents/skills/README.md`](./_agents/skills/README.md)
+
