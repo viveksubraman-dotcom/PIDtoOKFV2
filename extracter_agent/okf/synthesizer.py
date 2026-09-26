@@ -755,3 +755,190 @@ def merge_equipment_entity_with_existing(
         tags=sorted(set(new_entity.tags)),
     )
 
+
+def _extract_table_span(
+    lines: list[str],
+) -> tuple[int, int, list[str], str, list[list[str]]] | None:
+    """Locate the first Markdown table in lines and return (start_idx, end_idx, headers, sep_line, rows)."""
+    i = 0
+    while i < len(lines):
+        s = lines[i].strip()
+        if s.startswith("|") and s.endswith("|") and i + 1 < len(lines):
+            sep = lines[i + 1].strip()
+            if sep.startswith("|") and sep.endswith("|") and "-" in sep and re.match(r"^\|[\s:\-|]+\|$", sep):
+                headers = [c.strip() for c in s.split("|")[1:-1]]
+                rows: list[list[str]] = []
+                j = i + 2
+                while j < len(lines):
+                    r_str = lines[j].strip()
+                    if not (r_str.startswith("|") and r_str.endswith("|")):
+                        break
+                    cells = [c.strip() for c in r_str.split("|")[1:-1]]
+                    if any(cells):
+                        rows.append(cells)
+                    j += 1
+                return i, j, headers, sep, rows
+        i += 1
+    return None
+
+
+def _normalize_row_key(cell: str) -> str:
+    """Normalize a Markdown table first-column cell (stripping Markdown links) for row deduplication."""
+    unlinked = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", cell)
+    return unlinked.strip().lower()
+
+
+def _merge_section_content(old_sec: str, new_sec: str) -> str:
+    """Merge Markdown tables and bullet items between an existing section and a newly extracted section."""
+    old_lines = old_sec.splitlines()
+    new_lines = new_sec.splitlines()
+
+    old_tbl = _extract_table_span(old_lines)
+    new_tbl = _extract_table_span(new_lines)
+
+    if old_tbl and new_tbl:
+        _, _, old_headers, _, old_rows = old_tbl
+        new_start, new_end, new_headers, new_sep, new_rows = new_tbl
+        if len(old_headers) == len(new_headers) and len(new_headers) >= 2:
+            src_col = next(
+                (
+                    idx
+                    for idx, h in enumerate(new_headers)
+                    if any(k in h.lower() for k in ("source", "drawing", "ref", "doc"))
+                ),
+                None,
+            )
+            merged_rows: list[list[str]] = [list(r) for r in old_rows]
+            row_idx_by_key: dict[str, int] = {
+                _normalize_row_key(r[0]): idx for idx, r in enumerate(merged_rows) if r
+            }
+            for nr in new_rows:
+                if not nr:
+                    continue
+                rkey = _normalize_row_key(nr[0])
+                if rkey not in row_idx_by_key:
+                    row_idx_by_key[rkey] = len(merged_rows)
+                    merged_rows.append(list(nr))
+                else:
+                    idx = row_idx_by_key[rkey]
+                    old_r = merged_rows[idx]
+                    if (
+                        src_col is not None
+                        and len(old_r) > src_col
+                        and len(nr) > src_col
+                    ):
+                        old_src = old_r[src_col].strip()
+                        new_src = nr[src_col].strip()
+                        old_src_parts = [s.strip() for s in old_src.split(";") if s.strip()]
+                        if len(old_src_parts) <= 1 and _is_same_source_or_revision_update(old_src, new_src):
+                            merged_rows[idx] = list(nr)
+                        elif new_src in old_src_parts and len(old_src_parts) > 1:
+                            # Already merged this exact source into a multi-source row; keep merged row idempotent
+                            merged_rows[idx] = list(old_r)
+                        else:
+                            updated_r = list(nr)
+                            for c_i in range(1, len(updated_r)):
+                                if c_i == src_col or c_i >= len(old_r):
+                                    continue
+                                ov = old_r[c_i].strip()
+                                nv = updated_r[c_i].strip()
+                                if (nv in ("", "—") and ov not in ("", "—")) or (nv and nv in ov):
+                                    updated_r[c_i] = ov
+                                elif (
+                                    ov not in ("", "—")
+                                    and nv not in ("", "—")
+                                    and ov != nv
+                                    and ov not in nv
+                                ):
+                                    updated_r[c_i] = f"{nv} ({old_src}: {ov})"
+                            if new_src and new_src not in old_src_parts:
+                                updated_r[src_col] = f"{old_src}; {new_src}" if old_src else new_src
+                            else:
+                                updated_r[src_col] = old_src
+                            merged_rows[idx] = updated_r
+                    else:
+                        merged_rows[idx] = list(nr)
+
+            rebuilt_table = [
+                "| " + " | ".join(new_headers) + " |",
+                new_sep,
+                *("| " + " | ".join(r) + " |" for r in merged_rows),
+            ]
+            new_lines = new_lines[:new_start] + rebuilt_table + new_lines[new_end:]
+
+    # Also preserve any distinct blockquote callouts (> ) or bullet lines (- , * ) from old_sec
+    existing_preserved_lower = {
+        ln.strip().lower()
+        for ln in new_lines
+        if ln.strip().startswith(("- ", "* ", ">"))
+    }
+    missing_old_lines = [
+        ln
+        for ln in old_lines
+        if ln.strip().startswith(("- ", "* ", ">"))
+        and ln.strip().lower() not in existing_preserved_lower
+    ]
+    if missing_old_lines:
+        new_lines.extend(missing_old_lines)
+
+    return "\n".join(new_lines)
+
+
+def merge_markdown_bodies(existing_body: str, new_body: str) -> str:
+    """Merge existing and new Markdown bodies by H2 ('## ') sections, preserving prior sections and merging table rows."""
+    if not existing_body or not existing_body.strip():
+        return new_body
+    if not new_body or not new_body.strip():
+        return existing_body
+    if existing_body.strip() == new_body.strip():
+        return new_body
+
+    def _split_h2_blocks(text: str) -> list[tuple[str, str]]:
+        blocks: list[tuple[str, str]] = []
+        current_heading = ""
+        current_lines: list[str] = []
+        for line in text.splitlines():
+            if line.startswith("## "):
+                if current_heading or current_lines:
+                    blocks.append((current_heading, "\n".join(current_lines).strip()))
+                current_heading = line.strip()
+                current_lines = []
+            else:
+                current_lines.append(line)
+        if current_heading or current_lines:
+            blocks.append((current_heading, "\n".join(current_lines).strip()))
+        return blocks
+
+    old_blocks = _split_h2_blocks(existing_body)
+    new_blocks = _split_h2_blocks(new_body)
+
+    old_by_heading: dict[str, str] = {
+        h.lower(): content for h, content in old_blocks
+    }
+    seen_headings: set[str] = set()
+    merged_blocks: list[tuple[str, str]] = []
+
+    for h, new_content in new_blocks:
+        h_key = h.lower()
+        seen_headings.add(h_key)
+        if h_key in old_by_heading:
+            merged_content = _merge_section_content(old_by_heading[h_key], new_content)
+            merged_blocks.append((h, merged_content))
+        else:
+            merged_blocks.append((h, new_content))
+
+    # Append any H2 sections from existing_body that were absent in new_body
+    for h, old_content in old_blocks:
+        h_key = h.lower()
+        if h and h_key not in seen_headings:
+            merged_blocks.append((h, old_content))
+
+    out_parts: list[str] = []
+    for h, content in merged_blocks:
+        if h:
+            out_parts.append(f"{h}\n{content}".strip())
+        elif content:
+            out_parts.append(content.strip())
+    return "\n\n".join(out_parts) + "\n"
+
+

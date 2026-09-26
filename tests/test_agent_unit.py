@@ -295,3 +295,102 @@ def test_inspect_existing_okf_concept_tool(tmp_path):
     assert by_src["matches"][0]["concept_id"] == "sources/doc-alpha"
 
 
+def test_incremental_concept_markdown_table_and_section_merge(tmp_path):
+    """Verify generate_okf_concept_tool merges Markdown ## sections, table rows, and revision updates."""
+    bundle_dir = str(tmp_path)
+
+    body_pdf1 = (
+        "# Pressure Instruments Register\n\n"
+        "> ⚠️ **CRITICAL PROCESS SAFETY / DISCREPANCY WARNING:** Verify transmitter ranges.\n\n"
+        "## Instrument Register\n\n"
+        "| Tag | Range | Service | Source |\n"
+        "| --- | --- | --- | --- |\n"
+        "| PT-0401 | 0–5 kg/cm²g | Column Overhead | DWG-23-0004 Rev 0 |\n"
+        "| PI-0402 | 0–10 kg/cm²g | Local Gauge | DWG-23-0004 Rev 0 |\n\n"
+        "## Calibration Notes\n\n"
+        "- Zero-check all vacuum transmitters prior to start-up.\n"
+    )
+    res1 = generate_okf_concept_tool(
+        concept_id="instruments/pressure-instruments",
+        concept_type="Instrument Register",
+        title="Pressure Instruments Register",
+        description="Plant-wide pressure transmitters and gauges.",
+        tags=["pressure", "instruments"],
+        sources=["pid/DWG-23-0004_Rev0.pdf"],
+        body_markdown=body_pdf1,
+        output_bundle_dir=bundle_dir,
+    )
+    assert res1["status"] == "success"
+
+    # Second PDF adds new instruments (PT-0501, PI-0502) and a new section
+    body_pdf2 = (
+        "# Pressure Instruments Register\n\n"
+        "## Instrument Register\n\n"
+        "| Tag | Range | Service | Source |\n"
+        "| --- | --- | --- | --- |\n"
+        "| PT-0501 | 0–6 kg/cm²g | Surge Drum | DWG-23-0005 Rev 0 |\n"
+        "| PI-0502 | 0–6 kg/cm²g | Pump Discharge | DWG-23-0005 Rev 0 |\n\n"
+        "## Safety Interlocks\n\n"
+        "- High-pressure trip initiates feed isolation.\n"
+    )
+    res2 = generate_okf_concept_tool(
+        concept_id="instruments/pressure-instruments",
+        concept_type="Instrument Register",
+        title="Pressure Instruments Register",
+        description="Plant-wide pressure transmitters and gauges.",
+        tags=["interlocks"],
+        sources=["pid/DWG-23-0005_Rev0.pdf"],
+        body_markdown=body_pdf2,
+        output_bundle_dir=bundle_dir,
+    )
+    assert res2["status"] == "success"
+    assert res2["merged_with_existing"] is True
+
+    insp = inspect_existing_okf_concept_tool(
+        concept_id="instruments/pressure-instruments",
+        output_bundle_dir=bundle_dir,
+    )
+    merged_md = insp["body_markdown"]
+    # All 4 tags must be preserved in the merged table
+    assert "| PT-0401 | 0–5 kg/cm²g |" in merged_md
+    assert "| PI-0402 | 0–10 kg/cm²g |" in merged_md
+    assert "| PT-0501 | 0–6 kg/cm²g |" in merged_md
+    assert "| PI-0502 | 0–6 kg/cm²g |" in merged_md
+    # Both sections and the top-level safety warning must be preserved
+    assert "## Calibration Notes" in merged_md
+    assert "## Safety Interlocks" in merged_md
+    assert "CRITICAL PROCESS SAFETY" in merged_md
+
+    # Third call: Newer revision of DWG-23-0004 (Rev 1) updates PT-0401 range in-place
+    body_pdf1_rev1 = (
+        "# Pressure Instruments Register\n\n"
+        "## Instrument Register\n\n"
+        "| Tag | Range | Service | Source |\n"
+        "| --- | --- | --- | --- |\n"
+        "| PT-0401 | 0–7.5 kg/cm²g | Column Overhead | DWG-23-0004 Rev 1 |\n"
+    )
+    res3 = generate_okf_concept_tool(
+        concept_id="instruments/pressure-instruments",
+        concept_type="Instrument Register",
+        title="Pressure Instruments Register",
+        description="Plant-wide pressure transmitters and gauges.",
+        tags=["pressure"],
+        sources=["pid/DWG-23-0004_Rev1.pdf"],
+        body_markdown=body_pdf1_rev1,
+        output_bundle_dir=bundle_dir,
+    )
+    assert res3["status"] == "success"
+    insp_rev1 = inspect_existing_okf_concept_tool(
+        concept_id="instruments/pressure-instruments",
+        output_bundle_dir=bundle_dir,
+    )
+    md_rev1 = insp_rev1["body_markdown"]
+    assert "| PT-0401 | 0–7.5 kg/cm²g | Column Overhead | DWG-23-0004 Rev 1 |" in md_rev1
+    assert "0–5 kg/cm²g" not in md_rev1
+    assert "| PT-0501 | 0–6 kg/cm²g |" in md_rev1
+    src_titles = [s["title"] for s in insp_rev1["sources"]]
+    assert "DWG-23-0004_Rev1.pdf" in src_titles
+    assert "DWG-23-0004_Rev0.pdf" not in src_titles
+    assert "DWG-23-0005_Rev0.pdf" in src_titles
+
+

@@ -31,14 +31,14 @@ All 7 core implementation steps defined in the SDD specification have been compl
 | **Step 14** | Autonomous Domain Slug Taxonomy, Multimodal Cache, Link Sanitization, Master Indexer & 4-Worker Parallel Eval | `extracter_agent/models/domain.py`, `extracter_agent/okf/synthesizer.py`, `extracter_agent/okf/indexer.py`, `extracter_agent/pdf/processor.py`, `extracter_agent/gcs/exporter.py`, `evals/run_live_vertex_eval.py` | 4 passed | 2 passed | **Done (47/47 Tests, 0 Lint/SAST)** |
 | **Step 15** | Complete Codebase De-Hardcoding, Dynamic Bundle-Indexed Cross-Linking & 100% Golden Parity | `extracter_agent/models/domain.py`, `extracter_agent/okf/synthesizer.py`, `extracter_agent/okf/indexer.py`, `extracter_agent/cli.py`, `extracter_agent/agent/`, `extracter_agent/pdf/processor.py`, `evals/run_live_vertex_eval.py` | 2 passed | 1 passed | **Done (50/50 Tests, 100% Golden Parity, 0 Broken Links)** |
 | **Step 16** | In-Place Updated Document Resolution, Content-Hash Cache Hardening, Cloud Run ADK Web UI & Global Gemini Endpoint Routing | `extracter_agent/tools/pdf_tools.py`, `extracter_agent/models/domain.py`, `extracter_agent/okf/synthesizer.py`, `extracter_agent/gcs/exporter.py`, `extracter_agent/config.py`, `extracter_agent/agent/`, `extracter_agent/pdf/processor.py`, `deploy.sh` | 4 passed | 2 passed | **Done (56/56 Tests, ADK Web Live on Cloud Run)** |
-| **Step 17** | Incremental File-by-File Extraction, Revision-Aware Read-Merge-Upsert (`inspect_existing_okf_concept_tool`) & 136-File Raw PDF Eval Dataset | `extracter_agent/okf/synthesizer.py`, `extracter_agent/tools/okf_tools.py`, `extracter_agent/agent/orchestrator.py`, `evals/builders/build_file_by_file_eval_dataset.py`, `evals/datasets/raw_file_by_file_eval.jsonl`, `evals/run_live_vertex_eval.py` | 3 passed | 2 passed | **Done (61/61 Tests, 136/136 Raw Files Mapped)** |
+| **Step 17** | Incremental File-by-File Extraction, Revision-Aware Read-Merge-Upsert (`inspect_existing_okf_concept_tool`, `merge_markdown_bodies`) & 136-File Raw PDF Eval Dataset | `extracter_agent/okf/synthesizer.py`, `extracter_agent/tools/okf_tools.py`, `extracter_agent/agent/orchestrator.py`, `evals/builders/build_file_by_file_eval_dataset.py`, `evals/datasets/raw_file_by_file_eval.jsonl`, `evals/run_live_vertex_eval.py` | 4 passed | 3 passed | **Done (63/63 Tests, 136/136 Raw Files Mapped)** |
 
 ---
 
 ## 2. Quality & Test Metrics
 
-- **Total Test Cases:** 61 passing tests (`PYTHONPATH=. .venv/bin/python -m pytest tests/ evals/test_eval_benchmarks.py -q` — 100% pass rate).
-- **Property-Based Invariants Verified (20 `hypothesis` invariants):**
+- **Total Test Cases:** 63 passing tests (`PYTHONPATH=. .venv/bin/python -m pytest tests/ evals/test_eval_benchmarks.py -q` — 100% pass rate).
+- **Property-Based Invariants Verified (21 `hypothesis` invariants):**
   1. `test_pbt_okf_frontmatter_invariants`: Serialization round-trip holds across all valid frontmatters.
   2. `test_pbt_trust_tier_invariants`: Trust tier monotonicity holds (`human:` strictly yields `human-reviewed`).
   3. `test_pbt_intent_enum_membership`: Strict validation against Canonical Intent Topology enum.
@@ -52,13 +52,14 @@ All 7 core implementation steps defined in the SDD specification have been compl
   11. `test_pbt_dynamic_instrument_link_never_broken`: Dynamic bundle-indexed instrument resolution always points to an existing register file in `bundle_root/instruments/`.
   12. `test_pbt_incremental_merge_monotonic_and_idempotent`: Incremental Read-Merge-Upsert is monotonically non-decreasing in sources and parameters, and re-applying the same update is strictly idempotent.
   13. `test_pbt_same_document_revision_supersedes_without_conflict`: Newer revisions of the same base document supersede old parameter values in-place without generating false conflict warnings.
-  14. `test_pbt_orchestrator_prompt_schema_coverage_invariant`: 100% of required entity schema attributes are documented in orchestrator instructions.
-  15. `test_pbt_search_raw_documents_invariants`: Document search is exception-safe and all returned paths physically exist.
-  16. `test_pbt_gemini_location_decoupled_from_infra_region`: Gemini model endpoint location (`GEMINI_LOCATION=global`) is strictly decoupled from regional GCP infrastructure (`GOOGLE_CLOUD_LOCATION=asia-southeast1`).
-  17. `test_pbt_get_blob_name_invariants`: GCS key formatting combines paths without illegal double slashes.
-  18. `test_pbt_infer_content_type_invariants`: Valid MIME types generated for all OKF extensions.
-  19. `test_pbt_md5_cache_invalidation_on_any_mutation`: Any single-byte mutation (even preserving exact file length) alters the base64 MD5 digest and triggers cache invalidation / re-upload.
-  20. `test_pbt_guardrail_injection_detection_invariant` & `test_pbt_guardrail_benign_clean_invariant`: 100% interception of adversarial prompt injections with zero false positives.
+  14. `test_pbt_merge_markdown_bodies_preserves_rows_and_idempotent`: Non-equipment Markdown section and table row merging preserves the union of all unique row keys across documents and is strictly idempotent.
+  15. `test_pbt_orchestrator_prompt_schema_coverage_invariant`: 100% of required entity schema attributes are documented in orchestrator instructions.
+  16. `test_pbt_search_raw_documents_invariants`: Document search is exception-safe and all returned paths physically exist.
+  17. `test_pbt_gemini_location_decoupled_from_infra_region`: Gemini model endpoint location (`GEMINI_LOCATION=global`) is strictly decoupled from regional GCP infrastructure (`GOOGLE_CLOUD_LOCATION=asia-southeast1`).
+  18. `test_pbt_get_blob_name_invariants`: GCS key formatting combines paths without illegal double slashes.
+  19. `test_pbt_infer_content_type_invariants`: Valid MIME types generated for all OKF extensions.
+  20. `test_pbt_md5_cache_invalidation_on_any_mutation`: Any single-byte mutation (even preserving exact file length) alters the base64 MD5 digest and triggers cache invalidation / re-upload.
+  21. `test_pbt_guardrail_injection_detection_invariant` & `test_pbt_guardrail_benign_clean_invariant`: 100% interception of adversarial prompt injections with zero false positives.
 
 - **Static Code Quality (Ruff):** 100% clean (`All checks passed!`).
 - **Static Security (Bandit):** 0 issues identified (`0 Low, 0 Medium, 0 High`).

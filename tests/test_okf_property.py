@@ -327,5 +327,56 @@ def test_pbt_same_document_revision_supersedes_without_conflict(
     assert len(merged.sources) == 1
 
 
+@given(
+    tags_doc1=st.lists(
+        st.from_regex(r"[A-Z]{2}-[0-9]{4}", fullmatch=True),
+        min_size=1,
+        max_size=4,
+        unique=True,
+    ),
+    tags_doc2=st.lists(
+        st.from_regex(r"[A-Z]{2}-[0-9]{4}", fullmatch=True),
+        min_size=1,
+        max_size=4,
+        unique=True,
+    ),
+)
+def test_pbt_merge_markdown_bodies_preserves_rows_and_idempotent(tags_doc1, tags_doc2):
+    """Invariant: merge_markdown_bodies preserves the union of all unique table row keys across documents and is idempotent."""
+    from extracter_agent.okf.synthesizer import merge_markdown_bodies
+
+    rows1 = "\n".join(f"| {t} | 0-10 bar | Service A | DWG-001 |" for t in tags_doc1)
+    rows2 = "\n".join(f"| {t} | 0-16 bar | Service B | DWG-002 |" for t in tags_doc2)
+
+    md1 = (
+        "# Shared Register\n\n"
+        "## Instrument Table\n\n"
+        "| Tag | Range | Service | Source |\n"
+        "| --- | --- | --- | --- |\n"
+        f"{rows1}\n\n"
+        "## Notes Doc 1\n\n"
+        "- Grounded in DWG-001.\n"
+    )
+    md2 = (
+        "# Shared Register\n\n"
+        "## Instrument Table\n\n"
+        "| Tag | Range | Service | Source |\n"
+        "| --- | --- | --- | --- |\n"
+        f"{rows2}\n\n"
+        "## Notes Doc 2\n\n"
+        "- Grounded in DWG-002.\n"
+    )
+
+    merged_once = merge_markdown_bodies(md1, md2)
+    for t in set(tags_doc1) | set(tags_doc2):
+        assert f"| {t} |" in merged_once
+    assert "## Notes Doc 1" in merged_once
+    assert "## Notes Doc 2" in merged_once
+
+    # Idempotence: merging md2 a second time produces identical output
+    merged_twice = merge_markdown_bodies(merged_once, md2)
+    assert merged_twice == merged_once
+
+
 
 

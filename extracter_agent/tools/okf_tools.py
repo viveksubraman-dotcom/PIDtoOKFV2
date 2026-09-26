@@ -23,6 +23,7 @@ from extracter_agent.okf.indexer import generate_bundle_indexes, update_bundle_l
 from extracter_agent.okf.synthesizer import (
     _normalize_base_source_id,
     merge_equipment_entity_with_existing,
+    merge_markdown_bodies,
     synthesize_equipment_concept,
 )
 from extracter_agent.okf.validator import validate_okf_bundle
@@ -254,7 +255,7 @@ def generate_okf_concept_tool(
         body_markdown: Structured Markdown body with headings, tables, and footnote citations.
         entity_metadata: Optional dictionary of domain-specific attributes.
         output_bundle_dir: Optional destination bundle directory path.
-        merge_existing: When True (default), preserves and merges prior tags, sources, and entity_metadata from an existing concept file on disk.
+        merge_existing: When True (default), preserves and merges prior tags, sources, entity_metadata, H2 sections, and Markdown table rows from an existing concept file on disk.
 
     Returns:
         A dictionary containing generation status, merge indicator, relative path, and frontmatter.
@@ -280,6 +281,7 @@ def generate_okf_concept_tool(
     merged_tags = list(tags)
     merged_sources = list(sources)
     merged_metadata = dict(entity_metadata or {})
+    merged_body = body_markdown
     was_merged = False
 
     if merge_existing and dest_file.exists():
@@ -315,6 +317,8 @@ def generate_okf_concept_tool(
                 combined_meta = dict(prior_meta)
                 combined_meta.update(merged_metadata)
                 merged_metadata = combined_meta
+
+            merged_body = merge_markdown_bodies(existing_doc.body, body_markdown)
             was_merged = True
         except Exception:
             was_merged = False
@@ -351,7 +355,7 @@ def generate_okf_concept_tool(
         "entity_metadata": merged_metadata,
     }
 
-    doc = OKFDocument(frontmatter=frontmatter, body=body_markdown)
+    doc = OKFDocument(frontmatter=frontmatter, body=merged_body)
     dest_file.parent.mkdir(parents=True, exist_ok=True)
     dest_file.write_text(doc.serialize(), encoding="utf-8")
 
