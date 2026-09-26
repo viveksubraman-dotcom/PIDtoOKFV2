@@ -215,6 +215,7 @@ async def run_evaluation(
     use_agent_runtime: bool = False,
     agent_engine_id: str | None = None,
     concurrency: int = 4,
+    dataset: str = "wiki",
 ) -> LiveEvalSummary:
     """Execute the full live evaluation benchmark suite against Vertex AI."""
     start_time = time.time()
@@ -227,6 +228,7 @@ async def run_evaluation(
     print(f"Project:        {os.getenv('GOOGLE_CLOUD_PROJECT')}")
     print(f"Location:       {os.getenv('GOOGLE_CLOUD_LOCATION')}")
     print(f"Model:          {get_config().gemini_model}")
+    print(f"Dataset Mode:   {dataset}")
     print(f"Concurrency:    {concurrency} parallel workers")
     print(f"Target Env:     Vertex AI Native ({os.getenv('GOOGLE_GENAI_USE_VERTEXAI')})")
     if use_agent_runtime:
@@ -268,8 +270,8 @@ async def run_evaluation(
                 "is_negative": True,
             })
 
-    # 3. Wiki Ground Truth Extraction Cases
-    if include_wiki_benchmarks:
+    # 3. Wiki Ground Truth Extraction Cases (Entity-Centric)
+    if include_wiki_benchmarks and dataset in ("wiki", "both"):
         wiki_path = Path("evals/datasets/wiki_ground_truth_eval.jsonl")
         if wiki_path.exists():
             wiki_lines = wiki_path.read_text(encoding="utf-8").strip().splitlines()
@@ -288,6 +290,30 @@ async def run_evaluation(
                     "prompt": w_item["user_prompt"],
                     "category": f"wiki_{w_item['category']}",
                     "expected_intent": w_item.get("expected_intent", "GENERATE_OKF_CONCEPT"),
+                    "expected_tools": exp_traj,
+                    "is_adversarial": False,
+                    "is_negative": False,
+                })
+
+    # 4. Raw File-by-File Incremental Extraction Cases (Document-Centric)
+    if include_wiki_benchmarks and dataset in ("file-by-file", "both"):
+        raw_eval_path = Path("evals/datasets/raw_file_by_file_eval.jsonl")
+        if raw_eval_path.exists():
+            raw_lines = raw_eval_path.read_text(encoding="utf-8").strip().splitlines()
+            for count, line in enumerate(raw_lines):
+                if count >= limit:
+                    break
+                r_item = json.loads(line)
+                exp_traj = r_item.get("expected_tool_trajectory") or [
+                    "process_raw_pdf_tool",
+                    "generate_equipment_okf_tool",
+                    "generate_okf_concept_tool",
+                ]
+                test_cases.append({
+                    "case_id": r_item["eval_id"],
+                    "prompt": r_item["user_prompt"],
+                    "category": r_item.get("category", "raw_file"),
+                    "expected_intent": r_item.get("expected_intent", "GENERATE_OKF_CONCEPT"),
                     "expected_tools": exp_traj,
                     "is_adversarial": False,
                     "is_negative": False,
@@ -570,8 +596,9 @@ def print_summary_table(summary: LiveEvalSummary) -> None:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run Live Vertex AI Evaluation Suite")
-    parser.add_argument("--limit", type=int, default=5, help="Number of Wiki ground truth cases to evaluate")
-    parser.add_argument("--skip-baseline", action="store_true", help="Skip baseline and adversarial cases and evaluate only wiki cases")
+    parser.add_argument("--limit", type=int, default=5, help="Number of benchmark cases to evaluate per dataset")
+    parser.add_argument("--dataset", type=str, default="wiki", choices=["wiki", "file-by-file", "both"], help="Evaluation dataset mode: wiki (entity-centric), file-by-file (raw PDF document-centric), or both")
+    parser.add_argument("--skip-baseline", action="store_true", help="Skip baseline and adversarial cases and evaluate only benchmark cases")
     parser.add_argument("--resume", action="store_true", help="Resume from existing output report, skipping already passed cases")
     parser.add_argument("--use-agent-runtime", action="store_true", help="Use deployed Vertex AI Agent Runtime (VertexAiSessionService) for session & trajectory persistence")
     parser.add_argument("--agent-engine-id", type=str, default=None, help="Override Agent Engine resource ID (defaults to NONPROD_AGENT_RUNTIME_ID in .env)")
@@ -588,6 +615,7 @@ if __name__ == "__main__":
         use_agent_runtime=args.use_agent_runtime,
         agent_engine_id=args.agent_engine_id,
         concurrency=args.concurrency,
+        dataset=args.dataset,
     ))
     save_report(results, out_p)
     print_summary_table(results)

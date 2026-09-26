@@ -21,6 +21,7 @@ from extracter_agent.models.domain import (
 from extracter_agent.okf.document import OKFDocument
 from extracter_agent.okf.indexer import generate_bundle_indexes, update_bundle_log
 from extracter_agent.okf.synthesizer import (
+    merge_equipment_entity_with_existing,
     synthesize_equipment_concept,
 )
 from extracter_agent.okf.validator import validate_okf_bundle
@@ -58,16 +59,19 @@ def generate_equipment_okf_tool(
     source_files: list[str],
     instruments: list[dict[str, str]] | None = None,
     output_bundle_dir: str | None = None,
+    merge_existing: bool = True,
 ) -> dict[str, Any]:
-    """Construct a validated OKF v0.2 Equipment concept document and save it to the bundle and GCS.
+    """Construct or incrementally enrich a validated OKF v0.2 Equipment concept document and save it to the bundle and GCS.
 
     When to use:
         - When synthesizing extracted chemical equipment data into an OKF v0.2 concept.
+        - During file-by-file incremental extraction when a newly processed PDF adds design data,
+          operating conditions, instruments, connections, or hazards to an existing or new equipment tag.
         - Example: generate_equipment_okf_tool(tag="<TAG>", name="<Equipment Title>", unit="<UNIT>", ...)
 
     When NOT to use:
         - Do NOT use for raw unstructured PDF documents.
-        - Do NOT use for hazard or instrument concepts (use dedicated tools).
+        - Do NOT use for standalone hazard or instrument concepts (use generate_okf_concept_tool).
         - Do NOT write directly to reference/ directory.
 
     Args:
@@ -83,9 +87,10 @@ def generate_equipment_okf_tool(
         source_files: List of reference source PDF paths.
         instruments: Optional list of P&ID instruments and control loops (tag, service, instrument_type, location, setpoint_or_range, interlock_or_alarm, source).
         output_bundle_dir: Optional destination bundle directory path.
+        merge_existing: When True (default), automatically merges new facts and sources with any existing equipment concept on disk instead of overwriting prior sources.
 
     Returns:
-        A dictionary containing generation status, relative path, GCS URI, and document frontmatter.
+        A dictionary containing generation status, merge indicator, relative path, GCS URI, and document frontmatter.
     """
     cfg = get_config()
     bundle_root = (
@@ -108,6 +113,20 @@ def generate_equipment_okf_tool(
         sources=source_files,
     )
 
+    safe_tag = derive_canonical_equipment_tag(tag, source_files, bundle_root=bundle_root)
+    equip_dir = bundle_root / "equipment"
+    equip_dir.mkdir(parents=True, exist_ok=True)
+    output_file = equip_dir / f"{safe_tag}.md"
+
+    was_merged = False
+    if merge_existing and output_file.exists():
+        try:
+            existing_doc = OKFDocument.parse(output_file.read_text(encoding="utf-8"))
+            entity = merge_equipment_entity_with_existing(entity, existing_doc)
+            was_merged = True
+        except Exception:
+            was_merged = False
+
     doc = synthesize_equipment_concept(
         entity,
         gcs_bucket=cfg.destination_gcs_bucket,
@@ -115,19 +134,16 @@ def generate_equipment_okf_tool(
         bundle_root=bundle_root,
     )
 
-    # Save to bundle using canonical equipment tag derived from raw PS-<TAG> document code
-    safe_tag = derive_canonical_equipment_tag(tag, source_files, bundle_root=bundle_root)
-    equip_dir = bundle_root / "equipment"
-    equip_dir.mkdir(parents=True, exist_ok=True)
-    output_file = equip_dir / f"{safe_tag}.md"
     output_file.parent.mkdir(parents=True, exist_ok=True)
     output_file.write_text(doc.serialize(), encoding="utf-8")
 
     # Update log
+    log_action = "Concept Enrichment" if was_merged else "Concept Creation"
+    log_verb = "Enriched" if was_merged else "Created"
     log_path = update_bundle_log(
         bundle_root,
-        "Concept Creation",
-        f"Created OKF equipment concept for [{tag} — {name}](/equipment/{safe_tag}.md)",
+        log_action,
+        f"{log_verb} OKF equipment concept for [{tag} — {entity.name}](/equipment/{safe_tag}.md)",
     )
 
     gcs_uri = None
@@ -137,6 +153,7 @@ def generate_equipment_okf_tool(
 
     return {
         "status": "success",
+        "merged_with_existing": was_merged,
         "concept_id": f"equipment/{safe_tag}",
         "output_file": str(
             output_file.relative_to(Path.cwd())
@@ -213,12 +230,13 @@ def generate_okf_concept_tool(
     body_markdown: str,
     entity_metadata: dict[str, Any] | None = None,
     output_bundle_dir: str | None = None,
+    merge_existing: bool = True,
 ) -> dict[str, Any]:
-    """Construct a validated OKF v0.2 concept document and save it to the bundle.
+    """Construct or incrementally enrich a validated OKF v0.2 concept document and save it to the bundle.
 
     When to use:
-        - When synthesizing chemical engineering domain concepts (hazards, instruments,
-          procedures, units, standards) into an OKF v0.2 concept document.
+        - When synthesizing chemical engineering domain concepts (sources, hazards, instruments,
+          procedures, troubleshooting, units, parameters, hazop, standards) into an OKF v0.2 concept document.
         - Example: generate_okf_concept_tool(concept_id="hazards/<chemical-slug>", concept_type="Hazard Profile", title="<Chemical Title>", ...)
 
     When NOT to use:
@@ -235,9 +253,10 @@ def generate_okf_concept_tool(
         body_markdown: Structured Markdown body with headings, tables, and footnote citations.
         entity_metadata: Optional dictionary of domain-specific attributes.
         output_bundle_dir: Optional destination bundle directory path.
+        merge_existing: When True (default), preserves and merges prior tags, sources, and entity_metadata from an existing concept file on disk.
 
     Returns:
-        A dictionary containing generation status, relative path, and frontmatter.
+        A dictionary containing generation status, merge indicator, relative path, and frontmatter.
     """
     cfg = get_config()
     bundle_root = (
@@ -254,10 +273,51 @@ def generate_okf_concept_tool(
         bundle_root=bundle_root,
     )
     concept_file_path = f"{clean_id}.md"
+    dest_file = bundle_root / concept_file_path
     resource_uri = f"gs://{cfg.destination_gcs_bucket}/{cfg.destination_gcs_prefix}/{concept_file_path}"
 
+    merged_tags = list(tags)
+    merged_sources = list(sources)
+    merged_metadata = dict(entity_metadata or {})
+    was_merged = False
+
+    if merge_existing and dest_file.exists():
+        try:
+            existing_doc = OKFDocument.parse(dest_file.read_text(encoding="utf-8"))
+            existing_fm = existing_doc.frontmatter
+            for t in existing_fm.get("tags", []):
+                if isinstance(t, str) and t not in merged_tags:
+                    merged_tags.append(t)
+
+            existing_src_list: list[str] = []
+            for s in existing_fm.get("sources", []):
+                if isinstance(s, dict):
+                    val = str(s.get("resource") or s.get("title") or "").strip()
+                    if val:
+                        existing_src_list.append(val)
+                elif isinstance(s, str) and s.strip():
+                    existing_src_list.append(s.strip())
+
+            combined_sources: list[str] = []
+            seen_src_names: set[str] = set()
+            for s in existing_src_list + merged_sources:
+                key = s.split("/")[-1].lower()
+                if key not in seen_src_names:
+                    seen_src_names.add(key)
+                    combined_sources.append(s)
+            merged_sources = combined_sources
+
+            prior_meta = existing_fm.get("entity_metadata", {})
+            if isinstance(prior_meta, dict):
+                combined_meta = dict(prior_meta)
+                combined_meta.update(merged_metadata)
+                merged_metadata = combined_meta
+            was_merged = True
+        except Exception:
+            was_merged = False
+
     sources_meta = []
-    for idx, s in enumerate(sources):
+    for idx, s in enumerate(merged_sources):
         src_clean = s.split("/")[-1]
         sources_meta.append(
             {
@@ -274,7 +334,7 @@ def generate_okf_concept_tool(
         "title": title,
         "description": description,
         "resource": resource_uri,
-        "tags": sorted(set(tags)),
+        "tags": sorted(set(merged_tags)),
         "sources": sources_meta,
         "generated": {
             "by": f"extracter_agent/{cfg.gemini_model}",
@@ -285,18 +345,19 @@ def generate_okf_concept_tool(
             {"by": "process:okf-validation-suite", "at": now_iso},
         ],
         "status": "stable",
-        "entity_metadata": entity_metadata or {},
+        "entity_metadata": merged_metadata,
     }
 
     doc = OKFDocument(frontmatter=frontmatter, body=body_markdown)
-    dest_file = bundle_root / concept_file_path
     dest_file.parent.mkdir(parents=True, exist_ok=True)
     dest_file.write_text(doc.serialize(), encoding="utf-8")
 
+    log_action = "Concept Enrichment" if was_merged else "Concept Creation"
+    log_verb = "Enriched" if was_merged else "Created"
     log_path = update_bundle_log(
         bundle_root,
-        "Concept Creation",
-        f"Created OKF concept [{clean_id} — {title}](/{clean_id}.md)",
+        log_action,
+        f"{log_verb} OKF concept [{clean_id} — {title}](/{clean_id}.md)",
     )
 
     gcs_uri = None
@@ -306,6 +367,7 @@ def generate_okf_concept_tool(
 
     return {
         "status": "success",
+        "merged_with_existing": was_merged,
         "concept_id": clean_id,
         "output_file": str(
             dest_file.relative_to(Path.cwd())
@@ -317,6 +379,125 @@ def generate_okf_concept_tool(
         "type": concept_type,
         "resource": resource_uri,
         "frontmatter": doc.frontmatter,
+    }
+
+
+def inspect_existing_okf_concept_tool(
+    concept_id: str | None = None,
+    source_filter: str | None = None,
+    output_bundle_dir: str | None = None,
+) -> dict[str, Any]:
+    """Inspect an existing OKF v0.2 concept document or list concepts referencing a source PDF in the bundle.
+
+    When to use:
+        - Before updating an existing concept during incremental file-by-file extraction, to inspect
+          its current frontmatter, sources, tables, and Markdown body.
+        - To discover which OKF concepts in the bundle already cite a specific raw source PDF.
+        - Example: inspect_existing_okf_concept_tool(concept_id="equipment/<tag>")
+        - Example: inspect_existing_okf_concept_tool(source_filter="<document-prefix>")
+
+    When NOT to use:
+        - Do NOT use to read raw PDF files in reference/raw/ (use extract_pdf_engineering_data_tool).
+        - Do NOT use to validate the entire bundle (use validate_okf_bundle_tool).
+
+    Args:
+        concept_id: Optional relative concept identifier (e.g. 'equipment/<tag>' or 'sources/<slug>').
+        source_filter: Optional filename or document code substring to filter concepts by cited source.
+        output_bundle_dir: Optional bundle root directory path. Defaults to configured output_bundle_dir.
+
+    Returns:
+        A dictionary containing the existing concept frontmatter and Markdown body if concept_id is specified,
+        or a list of matching concept summaries if source_filter is specified.
+    """
+    cfg = get_config()
+    bundle_root = (
+        Path(output_bundle_dir) if output_bundle_dir else cfg.output_bundle_dir
+    )
+    if not bundle_root.exists():
+        return {
+            "status": "not_found",
+            "exists": False,
+            "bundle_dir": str(bundle_root),
+            "matches": [],
+        }
+
+    if concept_id:
+        clean_id = concept_id.strip().strip("/").removesuffix(".md")
+        target_path = bundle_root / f"{clean_id}.md"
+        if not target_path.exists():
+            # Case-insensitive or stem fallback search across bundle subdirectories
+            target_stem = Path(clean_id).name.lower()
+            for candidate in sorted(bundle_root.rglob("*.md")):
+                if candidate.name.lower() in ("index.md", "log.md"):
+                    continue
+                rel_no_ext = str(candidate.relative_to(bundle_root)).removesuffix(".md")
+                if rel_no_ext.lower() == clean_id.lower() or candidate.stem.lower() == target_stem:
+                    target_path = candidate
+                    clean_id = rel_no_ext
+                    break
+
+        if not target_path.exists():
+            return {
+                "status": "not_found",
+                "exists": False,
+                "concept_id": clean_id,
+            }
+
+        raw_text = target_path.read_text(encoding="utf-8")
+        try:
+            doc = OKFDocument.parse(raw_text)
+            return {
+                "status": "found",
+                "exists": True,
+                "concept_id": clean_id,
+                "title": doc.frontmatter.get("title"),
+                "type": doc.frontmatter.get("type"),
+                "sources": doc.frontmatter.get("sources", []),
+                "frontmatter": doc.frontmatter,
+                "body_markdown": doc.body,
+            }
+        except Exception as exc:
+            return {
+                "status": "parse_error",
+                "exists": True,
+                "concept_id": clean_id,
+                "error": str(exc),
+                "raw_text": raw_text,
+            }
+
+    query = (source_filter or "").strip().lower()
+    query_prefix = Path(query).stem.split("_")[0].lower() if query else ""
+    matches: list[dict[str, Any]] = []
+    for md_file in sorted(bundle_root.rglob("*.md")):
+        if md_file.name.lower() in ("index.md", "log.md"):
+            continue
+        rel_id = str(md_file.relative_to(bundle_root)).removesuffix(".md")
+        raw_text = md_file.read_text(encoding="utf-8")
+        try:
+            doc = OKFDocument.parse(raw_text)
+            fm = doc.frontmatter
+        except Exception:
+            fm = {}
+        sources_list = fm.get("sources", [])
+        if query:
+            haystack = (raw_text + " " + str(sources_list)).lower()
+            if query not in haystack and (not query_prefix or query_prefix not in haystack):
+                continue
+        matches.append(
+            {
+                "concept_id": rel_id,
+                "title": fm.get("title", md_file.stem),
+                "type": fm.get("type", "unknown"),
+                "sources": sources_list,
+            }
+        )
+
+    return {
+        "status": "success",
+        "bundle_dir": str(bundle_root),
+        "source_filter": source_filter,
+        "total_matches": len(matches),
+        "matches": matches,
     }
 
 
@@ -342,4 +523,5 @@ def validate_okf_bundle_tool(
     cfg = get_config()
     root = Path(bundle_dir) if bundle_dir else cfg.output_bundle_dir
     return validate_okf_bundle(root)
+
 

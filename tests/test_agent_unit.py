@@ -19,6 +19,7 @@ from extracter_agent.tools.okf_tools import (
     build_okf_indexes_and_validate_tool,
     generate_equipment_okf_tool,
     generate_okf_concept_tool,
+    inspect_existing_okf_concept_tool,
     validate_okf_bundle_tool,
 )
 from extracter_agent.tools.pdf_tools import (
@@ -31,7 +32,7 @@ def test_agent_and_app_initialization():
     """Test ADK Agent and App container construction."""
     agent = create_extracter_agent()
     assert agent.name == "extracter_orchestrator"
-    assert len(agent.tools) == 7
+    assert len(agent.tools) == 8
     assert agent.before_agent_callback is not None
     assert app.name == "extracter-agent"
     assert app.root_agent is not None
@@ -42,11 +43,12 @@ def test_orchestrator_instruction_contract():
     """Verify ORCHESTRATOR_INSTRUCTIONS fulfills Section 2.4 SDD requirements."""
     prompt = ORCHESTRATOR_INSTRUCTIONS
 
-    # Trajectory Protocol
+    # Trajectory Protocol & Dual Extraction Modes
     assert "Autonomous Execution Trajectory Protocol" in prompt
+    assert "Mode B — File-by-File (Document-Centric) Incremental Extraction" in prompt
     assert "STEP 1: DISCOVERY & RAW DOCUMENT SELECTION" in prompt
     assert "STEP 2: INGESTION & DOCUMENT PARSING" in prompt
-    assert "STEP 3: ENGINEERING CROSS-DOCUMENT RECONCILIATION & PRECEDENCE" in prompt
+    assert "STEP 3: INCREMENTAL INSPECTION & CROSS-DOCUMENT RECONCILIATION" in prompt
     assert "STEP 4: OKF v0.2 SYNTHESIS" in prompt
     assert "STEP 5: BUNDLE INDEXING & VALIDATION" in prompt
     assert "STEP 6: PUBLISHING TO GOOGLE CLOUD STORAGE" in prompt
@@ -235,4 +237,61 @@ def test_gemini_global_location_routing_in_vertex_mode(monkeypatch):
 
     agent = create_extracter_agent()
     assert agent.model.client_kwargs == {"location": "global"}
+
+
+def test_inspect_existing_okf_concept_tool(tmp_path):
+    """Test inspect_existing_okf_concept_tool by concept_id and source_filter, plus incremental concept merge."""
+    bundle_dir = str(tmp_path)
+
+    # 1. Create initial concept from Source 1
+    res1 = generate_okf_concept_tool(
+        concept_id="sources/doc-alpha",
+        concept_type="Source Document",
+        title="Document Alpha",
+        description="First source summary.",
+        tags=["datasheet"],
+        sources=["data_sheets/DOC_ALPHA_REV1.pdf"],
+        body_markdown="# Document Alpha\n\nSummary text.",
+        entity_metadata={"rev": "1"},
+        output_bundle_dir=bundle_dir,
+    )
+    assert res1["status"] == "success"
+    assert res1["merged_with_existing"] is False
+
+    # 2. Enrich existing concept with Source 2 (merge_existing=True)
+    res2 = generate_okf_concept_tool(
+        concept_id="sources/doc-alpha",
+        concept_type="Source Document",
+        title="Document Alpha",
+        description="Enriched source summary.",
+        tags=["pid"],
+        sources=["pid/DWG_ALPHA_001.pdf"],
+        body_markdown="# Document Alpha\n\nEnriched summary text.",
+        entity_metadata={"sheet_count": 2},
+        output_bundle_dir=bundle_dir,
+    )
+    assert res2["status"] == "success"
+    assert res2["merged_with_existing"] is True
+    assert set(res2["frontmatter"]["tags"]) == {"datasheet", "pid"}
+    assert len(res2["frontmatter"]["sources"]) == 2
+    assert res2["frontmatter"]["entity_metadata"] == {"rev": "1", "sheet_count": 2}
+
+    # 3. Inspect by concept_id
+    insp = inspect_existing_okf_concept_tool(
+        concept_id="sources/doc-alpha",
+        output_bundle_dir=bundle_dir,
+    )
+    assert insp["status"] == "found"
+    assert insp["exists"] is True
+    assert len(insp["sources"]) == 2
+
+    # 4. Inspect by source_filter
+    by_src = inspect_existing_okf_concept_tool(
+        source_filter="DOC_ALPHA",
+        output_bundle_dir=bundle_dir,
+    )
+    assert by_src["status"] == "success"
+    assert by_src["total_matches"] == 1
+    assert by_src["matches"][0]["concept_id"] == "sources/doc-alpha"
+
 

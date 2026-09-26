@@ -198,3 +198,70 @@ def test_pbt_dynamic_instrument_link_never_broken(prefix, loop_num):
     assert target_file.exists(), f"Resolved link {resolved} does not exist in {bundle_dir}"
 
 
+@given(
+    p1_names=st.lists(
+        st.from_regex(r"[A-Za-z0-9 ]{3,15}", fullmatch=True).map(str.strip).filter(bool),
+        min_size=1,
+        max_size=4,
+        unique_by=str.lower,
+    ),
+    p2_names=st.lists(
+        st.from_regex(r"[A-Za-z0-9 ]{3,15}", fullmatch=True).map(str.strip).filter(bool),
+        min_size=1,
+        max_size=4,
+        unique_by=str.lower,
+    ),
+    val1=st.from_regex(r"[0-9]{1,4}", fullmatch=True),
+    val2=st.from_regex(r"[0-9]{1,4}", fullmatch=True),
+)
+def test_pbt_incremental_merge_monotonic_and_idempotent(p1_names, p2_names, val1, val2):
+    """Invariant: Incremental Read-Merge-Upsert is monotonically non-decreasing in sources and parameters, and re-applying the same update is idempotent."""
+    from extracter_agent.models.domain import EngineeringParameter, EquipmentEntity
+    from extracter_agent.okf.synthesizer import (
+        merge_equipment_entity_with_existing,
+        synthesize_equipment_concept,
+    )
+
+    e1 = EquipmentEntity(
+        tag="E-900",
+        name="Test Cooler",
+        equipment_class="Heat Exchanger",
+        unit="U90",
+        function_summary="Initial function summary.",
+        design_data=[
+            EngineeringParameter(parameter=p, value=val1, unit="mm", source="DOC-1")
+            for p in p1_names
+        ],
+        hazards=["Initial hazard 1"],
+        sources=["data_sheets/DOC_1.pdf"],
+    )
+    doc1 = OKFDocument.parse(synthesize_equipment_concept(e1).serialize())
+
+    e2 = EquipmentEntity(
+        tag="E-900",
+        name="Test Cooler",
+        equipment_class="Heat Exchanger",
+        unit="U90",
+        function_summary="Enriched function summary from second PDF.",
+        design_data=[
+            EngineeringParameter(parameter=p, value=val2, unit="mm", source="DOC-2")
+            for p in p2_names
+        ],
+        hazards=["Secondary hazard 2"],
+        sources=["pid/DOC_2.pdf"],
+    )
+
+    merged_once = merge_equipment_entity_with_existing(e2, doc1)
+    expected_unique_params = len({p.lower() for p in (p1_names + p2_names)})
+    assert len(merged_once.design_data) == expected_unique_params
+    assert len(merged_once.sources) == 2
+
+    # Re-synthesizing and merging e2 a second time must be idempotent
+    doc2 = OKFDocument.parse(synthesize_equipment_concept(merged_once).serialize())
+    merged_twice = merge_equipment_entity_with_existing(e2, doc2)
+    assert len(merged_twice.design_data) == len(merged_once.design_data)
+    assert len(merged_twice.sources) == len(merged_once.sources)
+    assert len(merged_twice.hazards) == len(merged_once.hazards)
+
+
+

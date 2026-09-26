@@ -581,10 +581,35 @@ In chemical engineering facilities, instrumentation is inextricably bound to equ
   - `test_pbt_gemini_location_decoupled_from_infra_region`: `hypothesis` property test verifying that across arbitrary regional infrastructure locations (`asia-southeast1`, `us-central1`, `europe-west1`), the Gemini model endpoint location remains strictly bound to `GEMINI_LOCATION`.
 - **Completion Criteria:** All Step 16 unit and property-based tests passing, ADK Web UI deployed and verified on Google Cloud Run (`extracter-agent-web`), `deploy.sh` executable and documented in `README.md`.
 
+### Step 17: Incremental File-by-File Extraction, Read-Merge-Upsert Tooling & 136-File Document-Centric Evaluation Dataset
+- **Actions:**
+  1. **New Bundle Inspection Tool `inspect_existing_okf_concept_tool` (`extracter_agent/tools/okf_tools.py` & `extracter_agent/agent/orchestrator.py`):**
+     - Implement `inspect_existing_okf_concept_tool(concept_id: str | None = None, source_filter: str | None = None, output_bundle_dir: str | None = None)` allowing the agent to inspect an existing OKF concept document (`equipment/<TAG>`, `instruments/<register>`, `hazards/<chemical>`, etc.) or query all existing concepts in the bundle that cite a given raw source PDF before or during incremental file-by-file extraction.
+     - Register `inspect_existing_okf_concept_tool` in `create_extracter_agent()` (8 registered `FunctionTool`s total).
+  2. **Automatic Incremental Read-Merge-Upsert Engine (`extracter_agent/okf/synthesizer.py` & `extracter_agent/tools/okf_tools.py`):**
+     - Implement `merge_equipment_entity_with_existing(new_entity: EquipmentEntity, existing_doc: OKFDocument) -> EquipmentEntity` in `extracter_agent/okf/synthesizer.py`:
+       - Parses the existing `OKFDocument` tables (`## Design Data`, `## Operating Conditions`, `## Instrumentation & Control Loops (P&ID)`, `## Connections & Stream Summary`), `## Hazards & Safeguards`, `## Function`, and `frontmatter["sources"]` / `frontmatter["entity_metadata"]`.
+       - Merges `design_data` and `operating_conditions` by normalized parameter name: preserves parameters from previous PDFs not present in `new_entity`; when a parameter is present in both from different `source` documents with a differing numerical/string value, preserves both and automatically appends a `⚠️ CONFLICT — <Parameter>: <ExistingSource> specifies <ExistingValue>, whereas <NewSource> specifies <NewValue> — verify with engineer before HAZOP` bullet to `hazards`.
+       - Merges `instruments` by normalized `tag` and `connections` by `stream_id`, preserving prior entries while enriching empty fields and adding newly discovered P&ID loops/streams.
+       - Preserves the deduplicated union of `hazards` and `sources`.
+     - Add `merge_existing: bool = True` to `generate_equipment_okf_tool` and `generate_okf_concept_tool` so sequential file-by-file ingestion automatically enriches existing `.md` concepts rather than overwriting previously extracted data.
+  3. **Document-Centric (File-by-File) Workflow Protocol in `ORCHESTRATOR_INSTRUCTIONS` (`extracter_agent/agent/orchestrator.py`):**
+     - Update `ORCHESTRATOR_INSTRUCTIONS` (with zero hardcoded tags or dataset examples) to explicitly guide the agent when prompted to process a raw PDF file (`data_sheets/*.pdf`, `pid/*.pdf`, `pfd/*.pdf`, `operating_manuals/*.pdf`, `standards/*.pdf`): ingest via `process_raw_pdf_tool`, optionally inspect existing concepts via `inspect_existing_okf_concept_tool`, synthesize/upsert the `sources/` catalog record and all governed domain concepts (`equipment/`, `instruments/`, `hazards/`, `procedures/`, `troubleshooting/`, `units/`, `parameters/`, `hazop/`) via `generate_equipment_okf_tool` / `generate_okf_concept_tool` with incremental merge, and validate via `build_okf_indexes_and_validate_tool`.
+  4. **136-File Document-Centric Evaluation Dataset Builder & Runner Support (`evals/builders/build_file_by_file_eval_dataset.py`, `evals/datasets/raw_file_by_file_eval.jsonl`, `evals/run_live_vertex_eval.py`):**
+     - Build `evals/builders/build_file_by_file_eval_dataset.py` to scan all 136 raw PDF files in `reference/raw/` (`data_sheets`: 55, `pid`: 46, `standards`: 26, `pfd`: 8, `operating_manuals`: 1), map each PDF to all verified ground-truth `.md` concepts in `reference/wiki/` that cite it, and emit 136 evaluation records in `evals/datasets/raw_file_by_file_eval.jsonl`.
+     - Add `--dataset` (`wiki` vs `file-by-file`) option to `evals/run_live_vertex_eval.py` to support evaluating the agent file-by-file across all 136 raw PDFs.
+- **Unit & Property-Based Tests (PBT):**
+  - `test_incremental_equipment_merge_and_conflict_detection`: Unit test verifying multi-turn file-by-file extraction (Data Sheet followed by P&ID) merges parameters, instruments, connections, and sources while automatically generating a `⚠️ CONFLICT` hazard entry on differing values.
+  - `test_inspect_existing_okf_concept_tool`: Unit test verifying `inspect_existing_okf_concept_tool` by `concept_id` and by `source_filter`.
+  - `test_raw_file_by_file_eval_dataset_integrity`: Unit test verifying `evals/datasets/raw_file_by_file_eval.jsonl` covers all 136 raw PDFs in `reference/raw/` with 100% grounded target wiki paths.
+  - `test_pbt_incremental_merge_monotonic_and_idempotent`: `hypothesis` property test verifying that `merge_equipment_entity_with_existing` is idempotent on identical re-ingestion and monotonic (zero data loss) when merging disjoint/complementary sources.
+- **Completion Criteria:** All Step 17 unit and property tests passing, 136-record `evals/datasets/raw_file_by_file_eval.jsonl` generated and verified, zero hardcoded domain tags (`test_zero_hardcoded_domain_maps_or_tags` passing).
+
 ---
 
 ## 8. Plan Progress Tracking & Living Spec Synchronization
 - All milestones, verification metrics, and test results will be continuously recorded under `specs/plan/`.
 - If any data model or interface evolves during implementation, this specification will be updated synchronously to prevent spec drift.
+
 
 

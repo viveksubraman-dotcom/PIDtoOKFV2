@@ -14,6 +14,7 @@ from extracter_agent.tools import (
     find_raw_documents_tool,
     generate_equipment_okf_tool,
     generate_okf_concept_tool,
+    inspect_existing_okf_concept_tool,
     process_raw_pdf_tool,
     validate_okf_bundle_tool,
 )
@@ -21,6 +22,8 @@ from extracter_agent.tools import (
 EVAL_DATASET = Path("evals/datasets/extraction_eval.jsonl")
 
 WIKI_EVAL_DATASET = Path("evals/datasets/wiki_ground_truth_eval.jsonl")
+
+RAW_FILE_EVAL_DATASET = Path("evals/datasets/raw_file_by_file_eval.jsonl")
 
 
 def test_eval_dataset_integrity():
@@ -78,11 +81,45 @@ def test_wiki_ground_truth_eval_dataset_integrity():
     assert "hazop" in categories_found
 
 
+def test_raw_file_by_file_eval_dataset_integrity():
+    """Verify the 136-record raw file-by-file evaluation dataset covers 100% of raw PDFs in reference/raw/."""
+    assert RAW_FILE_EVAL_DATASET.exists()
+    lines = RAW_FILE_EVAL_DATASET.read_text(encoding="utf-8").strip().splitlines()
+    actual_pdfs = sorted(Path("reference/raw").rglob("*.pdf"))
+    assert len(lines) == len(actual_pdfs) == 136
+
+    subfolders_found: dict[str, int] = {}
+    valid_intents = {c.value for c in IntentCategory}
+
+    for idx, line in enumerate(lines):
+        record = json.loads(line)
+        assert record.get("eval_id"), f"Record {idx} missing eval_id"
+        raw_path = record.get("raw_pdf_path", "")
+        assert Path(raw_path).exists(), f"Raw PDF does not exist: {raw_path}"
+        sf = record.get("subfolder", "")
+        subfolders_found[sf] = subfolders_found.get(sf, 0) + 1
+        assert "user_prompt" in record and raw_path in record["user_prompt"]
+        assert record.get("expected_intent") in valid_intents
+        assert "process_raw_pdf_tool" in record.get("expected_tool_trajectory", [])
+        assert len(record.get("expected_affected_concepts", [])) >= 1, (
+            f"Raw file {raw_path} has 0 mapped ground-truth concepts"
+        )
+
+    assert subfolders_found == {
+        "data_sheets": 55,
+        "pid": 46,
+        "standards": 26,
+        "pfd": 8,
+        "operating_manuals": 1,
+    }
+
+
 def test_eval_tool_signatures_and_docstrings():
     """Verify 100% of registered tools conform to ADK Rule 11 contracts."""
     tools = [
         find_raw_documents_tool,
         process_raw_pdf_tool,
+        inspect_existing_okf_concept_tool,
         generate_equipment_okf_tool,
         generate_okf_concept_tool,
         build_okf_indexes_and_validate_tool,

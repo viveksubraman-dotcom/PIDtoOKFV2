@@ -482,4 +482,123 @@ def test_gcs_pdf_cache_redownloads_on_md5_or_size_change(monkeypatch):
         assert cached_file.read_bytes() == v2_bytes
 
 
+def test_incremental_equipment_merge_and_conflict_detection(tmp_path):
+    """Verify file-by-file incremental extraction merges sources, parameters, instruments, connections, and flags cross-document conflicts."""
+    from extracter_agent.tools.okf_tools import generate_equipment_okf_tool
+
+    bundle_dir = str(tmp_path)
+
+    # Pass 1: Process Data Sheet ingested first
+    res1 = generate_equipment_okf_tool(
+        tag="V-9100",
+        name="Primary Flash Drum",
+        equipment_class="Vessel",
+        unit="U91",
+        function_summary="Separates light vapor from liquid feed.",
+        design_data=[
+            {
+                "parameter": "Design Pressure",
+                "value": "3.5",
+                "unit": "kg/cm2g",
+                "source": "PS-V9100",
+            },
+            {
+                "parameter": "Shell ID",
+                "value": "2400",
+                "unit": "mm",
+                "source": "PS-V9100",
+            },
+        ],
+        operating_conditions=[
+            {
+                "parameter": "Operating Temperature",
+                "value": "85",
+                "unit": "°C",
+                "source": "PS-V9100",
+            }
+        ],
+        connections=[],
+        hazards=["Maintain nitrogen blanket during shutdown."],
+        source_files=["data_sheets/PS-V9100_DATASHEET.pdf"],
+        instruments=[],
+        output_bundle_dir=bundle_dir,
+    )
+    assert res1["status"] == "success"
+    assert res1["merged_with_existing"] is False
+
+    # Pass 2: P&ID ingested second (adds instruments, stream connection, and conflicting Design Pressure 5.0 vs 3.5)
+    res2 = generate_equipment_okf_tool(
+        tag="V-9100",
+        name="Primary Flash Drum",
+        equipment_class="Vessel",
+        unit="U91",
+        function_summary="Separates light vapor from liquid feed with ESD level protection.",
+        design_data=[
+            {
+                "parameter": "Design Pressure",
+                "value": "5.0",
+                "unit": "kg/cm2g",
+                "source": "DWG-91-001",
+            },
+            {
+                "parameter": "Corrosion Allowance",
+                "value": "3.0",
+                "unit": "mm",
+                "source": "DWG-91-001",
+            },
+        ],
+        operating_conditions=[
+            {
+                "parameter": "Operating Pressure",
+                "value": "1.2",
+                "unit": "kg/cm2g",
+                "source": "DWG-91-001",
+            }
+        ],
+        connections=[
+            {
+                "stream_id": "S-901",
+                "temperature": "85",
+                "pressure": "1.2",
+                "flow_rate": "15000",
+                "description": "Flash drum liquid outlet",
+                "source": "DWG-91-001",
+            }
+        ],
+        hazards=["High level trips inlet isolation valve."],
+        source_files=["pid/DWG-91-001_PID.pdf"],
+        instruments=[
+            {
+                "tag": "LT-9101",
+                "service": "Drum Level",
+                "instrument_type": "Guided Wave Radar",
+                "location": "Drum Side",
+                "setpoint_or_range": "0-2000 mm",
+                "interlock_or_alarm": "LSHH-9101",
+                "source": "DWG-91-001",
+            }
+        ],
+        output_bundle_dir=bundle_dir,
+    )
+    assert res2["status"] == "success"
+    assert res2["merged_with_existing"] is True
+
+    # Verify both sources are preserved
+    sources_out = res2["frontmatter"]["sources"]
+    assert len(sources_out) == 2
+
+    # Verify prior Shell ID + new Corrosion Allowance + conflict note on Design Pressure are all preserved in Markdown
+    md_text = (Path(bundle_dir) / "equipment" / "V-9100.md").read_text(encoding="utf-8")
+    assert "Shell ID" in md_text
+    assert "2400" in md_text
+    assert "Corrosion Allowance" in md_text
+    assert "Operating Temperature" in md_text
+    assert "Operating Pressure" in md_text
+    assert "LT-9101" in md_text
+    assert "S-901" in md_text
+    assert "Maintain nitrogen blanket during shutdown." in md_text
+    assert "⚠️ CONFLICT — Design Pressure" in md_text
+
+
+
 

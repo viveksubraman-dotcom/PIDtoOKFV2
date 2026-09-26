@@ -137,6 +137,11 @@ The **Extracter Agent** (`extracter_agent`) is an autonomous Google ADK multi-fi
    - **GCS Raw PDF Cache Verification (`pdf_tools.py`):** Compares both `size_bytes` and base64 MD5 digest (`blob.md5_hash`) against `/tmp/extracter_gcs_raw_cache/`, automatically re-downloading updated PDFs even when replaced in-place under the same filename.
    - **POSIX Child `st_mtime_ns` Cache Invalidation (`domain.py`, `synthesizer.py`):** Tracks `(len(md_files), max(child.stat().st_mtime_ns))` in `_iter_bundle_catalog` and `resolve_bundle_instrument_link` so in-place edits immediately invalidate in-memory caches.
    - **MD5 Digest Verification in GCS Exporter (`exporter.py`):** Verifies base64 MD5 digests in `GCSExporter.export_bundle` so equal-byte-length updates are always uploaded to GCS.
+4. **Incremental File-by-File (Document-Centric) Extraction & Read-Merge-Upsert (`Step 17`):**
+   - **Dual Extraction Modes:** Supports both **Entity-Centric Extraction** (by equipment tag, instrument loop, hazard, or plant unit) and **File-by-File Incremental Extraction** (processing raw PDFs one by one from `reference/raw/<subfolder>/<filename>.pdf`).
+   - **Non-Destructive Read-Merge-Upsert (`merge_equipment_entity_with_existing`):** `generate_equipment_okf_tool` and `generate_okf_concept_tool` automatically merge new facts, sources, parameters, instruments, and stream connections with existing `.md` concepts on disk without overwriting prior sources, and automatically flag numerical discrepancies across documents with `⚠️ CONFLICT — <PARAMETER>: ...`.
+   - **Bundle Inspection Tool (`inspect_existing_okf_concept_tool`):** Allows the agent to inspect existing concept frontmatter/body or query which concepts already cite a given raw source PDF.
+   - **136-File Document-Centric Evaluation Benchmark (`evals/datasets/raw_file_by_file_eval.jsonl`):** Covers **100% (`136 / 136`) of the raw PDFs** in `reference/raw/` (`data_sheets`: 55, `pid`: 46, `standards`: 26, `pfd`: 8, `operating_manuals`: 1) mapped to 724 ground-truth concept links in `reference/wiki/`.
 
 ### 🚀 Deploying Agent Runtime & ADK Web UI (`deploy.sh`)
 
@@ -166,17 +171,20 @@ A unified [`deploy.sh`](./deploy.sh) script deploys both the **ADK Agent (`agent
 | **Tool Trajectory Precision** | **100.0%** | **100.0%** | **100.0%** | $\ge 95.0\%$ (**PASS**) |
 | **Negative Constraint Adherence** | **100.0%** | **100.0%** | **100.0%** | $100.0\%$ (**PASS**) |
 | **Model Armor Security Interception** | **100.0%** | **100.0%** | **100.0%** | $100.0\%$ (**PASS**) |
-| **Unit & Property-Based Tests (PBT)** | **56 / 56 Passed** | **56 / 56 Passed** | **100.0%** | $100.0\%$ (**PASS**) |
+| **Unit & Property-Based Tests (PBT)** | **60 / 60 Passed** | **60 / 60 Passed** | **100.0%** | $100.0\%$ (**PASS**) |
 
 ### Running Detached Live Evaluations on Cloudtop (Against Deployed Agent Runtime)
-To run or resume the full 130-case evaluation suite against the deployed **Vertex AI Agent Runtime (`projects/114618371568/locations/asia-southeast1/reasoningEngines/8210246838649880576`)** inside a detached `tmux` session that survives client disconnects:
+To run or resume the **130-case Entity-Centric (`--dataset wiki`)** or **136-case File-by-File (`--dataset file-by-file`)** evaluation suite against the deployed **Vertex AI Agent Runtime (`projects/114618371568/locations/asia-southeast1/reasoningEngines/8210246838649880576`)**:
 ```bash
-tmux new-session -d -s extracter_eval \
-  "cd /usr/local/google/home/pantana/lab/extracter-agent && \
-   PYTHONPATH=. ./.venv/bin/python -u evals/run_live_vertex_eval.py \
-   --use-agent-runtime --limit 130 --concurrency 4 \
-   --output evals/reports/live_vertex_eval_full.json \
-   > evals/reports/full_eval_live.log 2>&1"
+# 1. Entity-Centric Wiki Ground-Truth Evaluation (130 Wiki Cases + 9 Baseline/Security = 139 Cases)
+PYTHONPATH=. ./.venv/bin/python -u evals/run_live_vertex_eval.py \
+  --use-agent-runtime --dataset wiki --limit 130 --concurrency 4 \
+  --output evals/reports/live_vertex_eval_full.json
+
+# 2. File-by-File Raw PDF Incremental Evaluation (136 Raw PDF Cases + 9 Baseline/Security = 145 Cases)
+PYTHONPATH=. ./.venv/bin/python -u evals/run_live_vertex_eval.py \
+  --use-agent-runtime --dataset file-by-file --limit 136 --concurrency 4 \
+  --output evals/reports/live_vertex_eval_file_by_file.json
 ```
 
 ---

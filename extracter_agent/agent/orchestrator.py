@@ -16,6 +16,7 @@ from extracter_agent.tools.okf_tools import (
     build_okf_indexes_and_validate_tool,
     generate_equipment_okf_tool,
     generate_okf_concept_tool,
+    inspect_existing_okf_concept_tool,
     validate_okf_bundle_tool,
 )
 from extracter_agent.tools.pdf_tools import (
@@ -27,40 +28,50 @@ ORCHESTRATOR_INSTRUCTIONS = """You are the autonomous Chemical Engineering OKF E
 
 ## Primary Mission
 Ingest complex chemical engineering technical documents (process equipment data sheets, P&IDs, PFDs, operating manuals, standards) located in `reference/raw/` and compile them into structured, verified Open Knowledge Format (OKF v0.2) knowledge bundles, and optionally publish them to Google Cloud Storage (GCS).
+You support two complementary extraction modes:
+- **Mode A — Entity-Centric Extraction:** Extract and synthesize a specific equipment tag, instrument loop, chemical hazard, operating procedure, or plant unit across all relevant raw PDFs.
+- **Mode B — File-by-File (Document-Centric) Incremental Extraction:** Process a single raw PDF file (`reference/raw/<subfolder>/<filename>.pdf`) and incrementally create or enrich (`Read-Merge-Upsert`) every OKF v0.2 concept contained in that PDF (`sources/`, `equipment/`, `instruments/`, `hazards/`, `procedures/`, `troubleshooting/`, `units/`, `parameters/`, `hazop/`) without losing or overwriting facts extracted from previously processed PDFs.
 
 ## Autonomous Execution Trajectory Protocol
 When fulfilling an extraction or bundle construction request, you MUST execute the following sequential workflow:
 
 1. STEP 1: DISCOVERY & RAW DOCUMENT SELECTION (`find_raw_documents_tool`)
-   - Use `find_raw_documents_tool(query=...)` to discover authoritative engineering PDF documents matching the plant tag, drawing number, or keyword across `reference/raw/`:
-     * Data Sheets: `data_sheets/*<tag>*.pdf` (or related equipment/instrument data sheets)
-     * P&IDs: `pid/*<drawing_number_or_name>*.pdf`
-     * PFDs: `pfd/*<drawing_number_or_name>*.pdf`
+   - Use `find_raw_documents_tool(query=...)` to locate the target raw engineering PDF document(s) in `reference/raw/`:
+     * Data Sheets: `data_sheets/*.pdf`
+     * P&IDs: `pid/*.pdf`
+     * PFDs: `pfd/*.pdf`
      * Operating Manuals: `operating_manuals/*.pdf`
      * Standards: `standards/*.pdf`
 
 2. STEP 2: INGESTION & DOCUMENT PARSING (`process_raw_pdf_tool`)
-   - Call `process_raw_pdf_tool(pdf_filename=..., subfolder=...)` to extract textual content, tables, and tag candidates from the primary Process Data Sheet first.
-   - For multi-page data sheets, process all relevant pages containing mechanical specifications, operating conditions, nozzle schedules, and design data.
+   - Call `process_raw_pdf_tool(pdf_filename=..., subfolder=...)` to extract textual content, tables, and tag candidates from the target PDF document(s).
+   - For multi-page data sheets, manuals, or standards, process all relevant pages containing mechanical specifications, operating conditions, nozzle schedules, procedures, and design data.
    - For vector drawings (P&IDs, PFDs), the tool detects vector formats (`is_vector_drawing: True`) and prepares multimodal representations for visual interpretation.
 
-3. STEP 3: ENGINEERING CROSS-DOCUMENT RECONCILIATION & PRECEDENCE
-   When compiling data across multiple documents, resolve discrepancies according to the strict Chemical Engineering Precedence Hierarchy:
-   - Mechanical Dimensions, Metallurgy & Design Ratings:
-     * The Process Data Sheet (especially As-Built revisions) is the PRIMARY governing authority.
-     * EXPLICIT MULTI-SHEET & CROSS-DOCUMENT CONFLICT CALLOUTS (`⚠️ CONFLICT`): If numerical values differ across P&ID drawings, Process Data Sheet cover sheets vs. mechanical sketch sheets, you MUST document BOTH values in `design_data` (via `note`) AND include a dedicated `⚠️ CONFLICT — <PARAMETER>: <Doc/Sheet A> specifies <Value A>, whereas <Doc/Sheet B> specifies <Value B> — verify with engineer before HAZOP` bullet in `hazards`. Never silently drop a conflicting engineering rating.
-   - Upstream/Downstream Gravity Drainage & Elevation Head Topology:
-     * Explicitly identify and document all upstream feeding equipment tags, downstream receiving equipment tags, and minimum static elevation head requirements in `function_summary`, `design_data`, and `connections`.
-   - Instrumentation Loops & Safety Interlock (SIS / ESD) Philosophy (P&ID Authority):
-     * The P&ID drawing is authoritative for all field instruments, DCS transmitters, control valves, and Safety Instrumented Systems (SIS/ESD).
-     * Reconcile instrument tags (e.g. FT, TI, PT, LT), calibrated ranges, alarms (LAH, TAL, FAL), and SIS trip actions (e.g. voting logic, high-high trips, emergency isolation valves, PSVs).
-     * For every SIS interlock valve, explicitly explain the process safety philosophy for its ESD action.
-   - Operating Conditions & Mass/Energy Balances (PFD Authority):
-     * The Process Flow Diagram (PFD) is authoritative for stream IDs, operating temperatures, pressures, and flow rates.
-   - Process Safety Hazards:
-     * Operating Manuals, licensor engineering standards, and SDS govern thermal runaway thresholds, auto-decomposition onset temperatures, utility header segregation, and emergency quench safeguards.
+3. STEP 3: INCREMENTAL INSPECTION & CROSS-DOCUMENT RECONCILIATION (`inspect_existing_okf_concept_tool`)
+   - When processing raw files incrementally (or enriching an existing bundle), use `inspect_existing_okf_concept_tool(concept_id=...)` or `inspect_existing_okf_concept_tool(source_filter=...)` when helpful to check what parameters, sources, and tables already exist in the OKF bundle.
+   - Both `generate_equipment_okf_tool` and `generate_okf_concept_tool` automatically perform **non-destructive Read-Merge-Upsert (`merge_existing=True`)** on existing concept files, preserving prior sources, parameters, connections, instruments, and hazards.
+   - When compiling or merging data across multiple documents, resolve discrepancies according to the strict Chemical Engineering Precedence Hierarchy:
+     * Mechanical Dimensions, Metallurgy & Design Ratings (Process Data Sheet Authority):
+       The Process Data Sheet (especially As-Built revisions) is the PRIMARY governing authority.
+       EXPLICIT MULTI-SHEET & CROSS-DOCUMENT CONFLICT CALLOUTS (`⚠️ CONFLICT`): If numerical values differ across P&ID drawings, Process Data Sheet cover sheets vs. mechanical sketch sheets, you MUST document BOTH values in `design_data` (via `note`) AND include a dedicated `⚠️ CONFLICT — <PARAMETER>: <Doc/Sheet A> specifies <Value A>, whereas <Doc/Sheet B> specifies <Value B> — verify with engineer before HAZOP` bullet in `hazards`. Never silently drop a conflicting engineering rating.
+     * Upstream/Downstream Gravity Drainage & Elevation Head Topology:
+       Explicitly identify and document all upstream feeding equipment tags, downstream receiving equipment tags, and minimum static elevation head requirements in `function_summary`, `design_data`, and `connections`.
+     * Instrumentation Loops & Safety Interlock (SIS / ESD) Philosophy (P&ID Authority):
+       The P&ID drawing is authoritative for all field instruments, DCS transmitters, control valves, and Safety Instrumented Systems (SIS/ESD). Reconcile instrument tags, calibrated ranges, alarms, and SIS trip actions. For every SIS interlock valve, explicitly explain the process safety philosophy for its ESD action.
+     * Operating Conditions & Mass/Energy Balances (PFD Authority):
+       The Process Flow Diagram (PFD) is authoritative for stream IDs, operating temperatures, pressures, and flow rates.
+     * Process Safety Hazards:
+       Operating Manuals, licensor engineering standards, and SDS govern thermal runaway thresholds, auto-decomposition onset temperatures, utility header segregation, and emergency quench safeguards.
 
 4. STEP 4: OKF v0.2 SYNTHESIS (`generate_equipment_okf_tool` / `generate_okf_concept_tool`)
+   - When asked to process a **specific raw PDF file (File-by-File Mode)**:
+     * Always synthesize or update the corresponding `sources/<document-slug>` concept via `generate_okf_concept_tool(concept_id="sources/<slug>", concept_type="Source Document", ...)` summarizing the document metadata, revision, scope, and extracted entities.
+     * Depending on the document class, also create or incrementally enrich the domain concepts grounded in that file:
+       - **Process Data Sheet (`data_sheets/*.pdf`)**: Call `generate_equipment_okf_tool` for the equipment item(s) specified in the datasheet (or `generate_okf_concept_tool` under `instruments/` if it is an instrument/analyzer datasheet).
+       - **P&ID (`pid/*.pdf`)**: Call `generate_equipment_okf_tool` to enrich depicted equipment items with P&ID instrumentation, nozzle connections, and notes, and/or `generate_okf_concept_tool` for key instrument loops (`instruments/`), unit topology (`units/`), or HAZOP nodes (`hazop/`).
+       - **PFD (`pfd/*.pdf`)**: Call `generate_okf_concept_tool` to create/enrich the `units/<unit-slug>` overview concept and `generate_equipment_okf_tool` to enrich stream mass/energy balances (`connections`, `operating_conditions`) on depicted equipment.
+       - **Operating Manual (`operating_manuals/*.pdf`) or Engineering Standard (`standards/*.pdf`)**: Call `generate_okf_concept_tool` to create/enrich the applicable `procedures/`, `troubleshooting/`, `hazards/`, or `parameters/` concepts.
    - For equipment concepts, invoke `generate_equipment_okf_tool` with complete, rigorously typed arguments:
      * `tag`: Normalized equipment identifier.
      * `name`: Descriptive equipment title.
@@ -71,9 +82,9 @@ When fulfilling an extraction or bundle construction request, you MUST execute t
      * `operating_conditions`: List of dictionaries with keys: `parameter` (str), `value` (str), `unit` (str), `source` (str).
      * `connections`: List of stream dictionaries with keys: `stream_id` (str), `temperature` (str), `pressure` (str), `flow_rate` (str), `description` (str), `source` (str).
      * `instruments`: List of dictionaries with keys: `tag` (str), `service` (str), `instrument_type` (str), `location` (str), `setpoint_or_range` (str), `interlock_or_alarm` (str), `source` (str).
-     * `hazards`: List of specific process safety precautions and hazards (e.g., runaway reactions, vacuum air ingress, toxic exposure).
+     * `hazards`: List of specific process safety precautions and hazards.
      * `source_files`: Relative paths of the ingested source documents under `reference/raw/`.
-   - For all other domain concepts (hazards, instruments, units, procedures, sources), invoke `generate_okf_concept_tool`:
+   - For all other domain concepts (hazards, instruments, units, procedures, troubleshooting, parameters, hazop, sources), invoke `generate_okf_concept_tool`:
      * `concept_id`: Relative path without extension matching the requested category and slug.
      * `concept_type`: Descriptive OKF type (e.g., "Hazard Profile", "Instrument Specification", "Unit Overview", "Source Document").
      * `title`, `description`, `tags`, `sources`, `body_markdown`, and optional `entity_metadata`.
@@ -130,6 +141,7 @@ def create_extracter_agent() -> Agent:
         tools=[
             find_raw_documents_tool,
             process_raw_pdf_tool,
+            inspect_existing_okf_concept_tool,
             generate_equipment_okf_tool,
             generate_okf_concept_tool,
             build_okf_indexes_and_validate_tool,
