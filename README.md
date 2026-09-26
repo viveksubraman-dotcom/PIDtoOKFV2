@@ -109,7 +109,7 @@ flowchart TB
 | **Model Endpoint** | `GEMINI_LOCATION=global` (`locations/global/publishers/google/models/gemini-3.8-flash`) | `GEMINI_LOCATION=global` (`locations/global/publishers/google/models/gemini-3.8-flash`) |
 | **Core Responsibilities** | Multi-turn reasoning, Model Armor pre-flight guardrails, PDF multimodal extraction, incremental Read-Merge-Upsert, and OKF v0.2 validation. | Interactive ADK Developer UI (`/dev-ui/`), SSE/WebSocket event streaming, trace visualization, and session persistence via `agentengine://`. |
 
-> 📊 **Interactive Architecture Diagrams:** See [`docs/extracter-agent-architecture.md`](./docs/extracter-agent-architecture.md) and [`docs/multi-source-extraction-architecture.md`](./docs/multi-source-extraction-architecture.md) (plus their companion standalone HTML visualizers in [`docs/`](./docs/)).
+> 📊 **Interactive Architecture Diagrams:** See [`docs/data-ingestion-architecture.md`](./docs/data-ingestion-architecture.md) and the standalone dark-themed SVG visualizer [`docs/data-ingestion-architecture.html`](./docs/data-ingestion-architecture.html).
 
 ---
 
@@ -418,6 +418,6 @@ PYTHONPATH=. .venv/bin/pytest tests/ evals/test_eval_benchmarks.py -q
 - **Agent Operating Manual:** [`AGENTS.md`](./AGENTS.md)
 - **Feature Specification (SDD):** [`specs/features/SPEC-20260922-OKF-EXTRACTER-AGENT.md`](./specs/features/SPEC-20260922-OKF-EXTRACTER-AGENT.md)
 - **Implementation Progress Report:** [`specs/plan/PROGRESS_REPORT_20260922.md`](./specs/plan/PROGRESS_REPORT_20260922.md)
-- **System Architecture Diagrams:** [`docs/extracter-agent-architecture.md`](./docs/extracter-agent-architecture.md) | [`docs/multi-source-extraction-architecture.md`](./docs/multi-source-extraction-architecture.md)
+- **Data Ingestion & Extraction Architecture:** [`docs/data-ingestion-architecture.md`](./docs/data-ingestion-architecture.md) | [`docs/data-ingestion-architecture.html`](./docs/data-ingestion-architecture.html)
 - **Security Audit Report (CodeMender):** [`docs/codemender-sast-report.md`](./docs/codemender-sast-report.md)
-- **Cloud Cost Estimate:** [`docs/gcp_cost_estimate_extracter_agent.md`](./docs/gcp_cost_estimate_extracter_agent.md)
+- **Operational Documentation Index:** [`docs/README.md`](./docs/README.md)

@@ -1,230 +1,124 @@
-# Data Ingestion & OKF v0.2 Synthesis Architecture
+# Dual-Mode Data Ingestion & Autonomous OKF v0.2 Extraction Architecture
 
-> **System:** Extracter Agent — Automated Engineering Knowledge Extraction  
-> **Status:** Implemented & Verified (43 Unit & Property-Based Tests Passing)  
-> **Runtime Target:** Gemini Enterprise Agent Platform (`agent_runtime`) & Cloud Run  
-> **Foundation Model:** Gemini 2.5 Pro (via Google ADK `google-adk`)  
-> **Companion Interactive Diagram:** [Open Standalone HTML Diagram Asset](./data-ingestion-architecture.html)
+> 📊 **Interactive Standalone HTML/SVG Diagram:** Open [`docs/data-ingestion-architecture.html`](./data-ingestion-architecture.html) in any browser (`xdg-open ./docs/data-ingestion-architecture.html`) to view the full dark-themed SVG architecture visualizer.
 
 ---
 
-## 1. Executive Summary
+## 1. Architectural Overview
 
-The **Extracter Agent** is an autonomous AI agent engineered to ingest heterogeneous chemical and mechanical engineering documents from a read-only corpus (`reference/raw/`) and synthesize structured, validated **Open Knowledge Format (OKF v0.2)** bundles.
+The **Chemical Engineering OKF Extracter Agent** (`extracter_orchestrator`) is an autonomous **Google Agent Development Kit (`google-adk`)** reasoning engine deployed on the **Gemini Enterprise Agent Platform (`agent_runtime`)** in `asia-southeast1` and powered by **`gemini-3.8-flash`** on the **Vertex AI Global Endpoint (`GEMINI_LOCATION=global`)**.
 
-Processing engineering documentation presents unique technical challenges:
-1. **Heterogeneous Modalities:** Engineering packages mix tabular data sheets, narrative operating manuals, SDS hazard reports, and graphical AutoCAD drawings (P&IDs and PFDs).
-2. **The Vector Drawing Blindspot:** AutoCAD-exported P&IDs and PFDs contain stroked line paths, glyph curves, and zero `/Font` dictionary entries. Standard PDF text extraction returns empty strings.
-3. **Cross-Document Data Discrepancies:** Different documents specify divergent operating and design parameters for identical equipment tags (e.g. design pressure on an equipment data sheet vs. operating pressure on a PFD vs. relief setpoints on a P&ID).
-4. **Data Integrity & Schema Fidelity:** Engineering tag numbers (such as `01-P-101A` or `01-FIT-101`) risk silent octal or scalar coercion when serialized to YAML without strict dumper safeguards.
-
-To solve these challenges, the system implements a **Dual-Stream Ingestion Architecture**, a **Deterministic 6-Tier Precedence Engine**, a **Google ADK Cognitive Orchestrator**, and a **Quoted YAML / Markdown OKF v0.2 Dumper**.
+It ingests **136 raw engineering PDFs** (`data_sheets/`, `pid/`, `pfd/`, `operating_manuals/`, `standards/`) from **Google Cloud Storage (`gs://cs-poc-y03r7kmfyov4kilzg50fd7s-okf-knowledge/reference/raw/`)** or local [`reference/raw/`](../reference/raw/) and compiles them into **Open Knowledge Format (`OKF v0.2`)** Markdown knowledge bundles under **`gs://cs-poc-y03r7kmfyov4kilzg50fd7s-okf-knowledge/okf-bundles/phenol-plant/`** and local `build/okf_bundle/`.
 
 ---
 
-## 2. Interactive Architecture Diagram
+## 2. Dual Data Ingestion Modes (Mode A vs. Mode B)
 
-An interactive, dark-themed system topology diagram is rendered in the companion file:
-- **[docs/data-ingestion-architecture.html](./data-ingestion-architecture.html)**
+The architecture supports two complementary ingestion workflows through the same unified 8-tool ADK agent without any hardcoded tags or regex routing:
 
-To preview in local environments:
-```bash
-# macOS
-open ./docs/data-ingestion-architecture.html
+```mermaid
+flowchart LR
+    subgraph ModeA["Mode A: Entity-Centric Ingestion (Equipment / Concept ID)"]
+        A1["User Prompt / Eval Runner\n'Extract D-2304' or 'Extract sis-cdn'\n(--dataset wiki: 130 Cases)"]
+        A2["Step 1: find_raw_documents_tool\nDiscovers ALL matching PDFs\n(PS-D2304_Z1.pdf + DWG-0004.pdf + PFD-006.pdf)"]
+        A3["Step 2: process_raw_pdf_tool\nExtracts text, tables & 300 DPI vision\nacross all discovered PDFs in 1 turn"]
+        A4["Step 4: generate_equipment_okf_tool\nReconciles all sources & writes\nequipment/D-2304.md + syncs to GCS"]
+        A1 --> A2 --> A3 --> A4
+    end
 
-# Linux
-xdg-open ./docs/data-ingestion-architecture.html
+    subgraph ModeB["Mode B: Raw PDF File-by-File Incremental Ingestion"]
+        B1["Turn 1: Ingest PDF #1\n'Process data_sheets/14780-8120-PS-D2304_Z1.pdf'\n(--dataset file-by-file: 136 PDFs)"]
+        B2["Creates sources/ps-d2304.md\n& equipment/D-2304.md\n(Mechanical design & nozzles)"]
+        B3["Turn 2: Ingest PDF #2\n'Process pid/14780-23-010-01-0004_00.pdf'"]
+        B4["Step 3: inspect_existing_okf_concept_tool\n+ Step 4: Non-Destructive Read-Merge-Upsert\nEnriches D-2304.md & pressure-instruments.md"]
+        B1 --> B2 --> B3 --> B4
+    end
 ```
 
----
-
-## 3. System Architecture & Component Topology
-
-```
-┌────────────────────────────────────────────────────────────────────────────────────────┐
-│ 1. IMMUTABLE SOURCE CORPUS (reference/raw/) [Read-Only]                                │
-│   ├─ Data Sheets (raw/datasheet)       ├─ P&ID Drawings (raw/pid)                      │
-│   ├─ PFD Flowsheets (raw/pfd)          ├─ Operating Manuals (raw/manual)               │
-│   ├─ Safety Data (raw/sds)             └─ Engineering Standards (raw/std)               │
-└─────────────────────────────────────────┬──────────────────────────────────────────────┘
-                                          │
-                                          ▼
-┌────────────────────────────────────────────────────────────────────────────────────────┐
-│ 2. DUAL-STREAM INGESTION & PARSING PIPELINE (extracter_agent/pdf/processor.py)         │
-│   ├─ Catalog Scanner: discover_raw_documents() [224 documents cataloged]               │
-│   ├─ Vector Heuristic Gate: is_vector_drawing() (Strokes > 50, /Font == 0)             │
-│   ├─ Stream A (Native Text): pypdf layout & tabular extractor                          │
-│   ├─ Stream B (Multimodal Vision): google.genai.types.Part.from_bytes()                │
-│   └─ Token Windowing & SHA-256 Fingerprinting                                          │
-└─────────────────────────────────────────┬──────────────────────────────────────────────┘
-                                          │
-                                          ▼
-┌────────────────────────────────────────────────────────────────────────────────────────┐
-│ 3. AUTONOMOUS COGNITIVE ORCHESTRATION (extracter_agent/agent/orchestrator.py)          │
-│   ├─ Model Armor Security: before_agent_callback prompt injection / leakage filters   │
-│   ├─ ADK Orchestrator Agent: Gemini 2.5 Pro (temperature=0.1, cognitive reasoning)    │
-│   ├─ Conflict Precedence Engine: Deterministic 6-tier hierarchy arbitration            │
-│   └─ FunctionTool Registry (7 Strongly Typed ADK Tools):                               │
-│       • find_raw_documents_tool        • read_raw_document_tool                        │
-│       • batch_read_documents_tool      • generate_okf_equipment_tool                   │
-│       • generate_okf_concept_tool      • validate_okf_bundle_tool                      │
-│       • update_okf_index_tool                                                          │
-└─────────────────────────────────────────┬──────────────────────────────────────────────┘
-                                          │
-                                          ▼
-┌────────────────────────────────────────────────────────────────────────────────────────┐
-│ 4. OKF v0.2 SYNTHESIS, VALIDATION & PUBLISHING (extracter_agent/okf/ & gcs/)           │
-│   ├─ OKF Entity Synthesizer: Equipment (Pumps, Exchangers) & Concepts (Hazards, Loops) │
-│   ├─ _OKFSafeDumper: PyYAML dumper enforcing strict string quotation for tags         │
-│   ├─ Schema & Cross-Ref Validator: Pydantic OKFModel invariants & connection checks   │
-│   ├─ Progressive Index Manager: okf_index.json atomic manifest tracking               │
-│   └─ GCS Cloud Storage Publisher: Immutable artifact replication to target bucket     │
-└────────────────────────────────────────────────────────────────────────────────────────┘
-```
+| Dimension | Mode A: Entity-Centric (Equipment / Concept ID) | Mode B: Raw PDF File-by-File (Document-Centric) |
+| :--- | :--- | :--- |
+| **Input Granularity** | Target entity tag or concept topic (e.g., `D-2304`, `V-2301`, `cumene-hydroperoxide`, `sis-cdn`, `unit-23-cdn`). | Single raw PDF path (e.g., `reference/raw/data_sheets/14780-8120-PS-D2304_Z1.pdf` or `reference/raw/pid/14780-23-010-01-0004_00.pdf`). |
+| **Discovery Pattern** | Multi-folder search across `data_sheets/`, `pid/`, `pfd/`, `operating_manuals/`, and `standards/` to gather all documents referencing the entity. | Direct ingestion of the specified PDF (`find_raw_documents_tool` $\rightarrow$ `process_raw_pdf_tool`) + inspection of existing concepts via `inspect_existing_okf_concept_tool`. |
+| **Synthesis & Persistence** | Synthesizes the complete cross-referenced `.md` concept in a single trajectory (and merges with any existing file on disk). | Always writes/updates `sources/<doc-slug>.md` **and** incrementally creates or merges (`Read-Merge-Upsert`) every equipment, instrument, unit, hazard, or procedure concept in that PDF. |
+| **Evaluation Dataset** | [`evals/datasets/wiki_ground_truth_eval.jsonl`](../evals/datasets/wiki_ground_truth_eval.jsonl) (`130` Wiki Cases + `9` Baseline/Security = `139` Cases, `--dataset wiki`). | [`evals/datasets/raw_file_by_file_eval.jsonl`](../evals/datasets/raw_file_by_file_eval.jsonl) (`136` Raw PDFs + `9` Baseline/Security = `145` Cases, `--dataset file-by-file`). |
 
 ---
 
-## 4. Subsystem Specifications
+## 3. How the Agent Extracts, Reconciles & Synthesizes Data (6-Step Pipeline)
 
-### 4.1 Ingestion & Parsing Subsystem (`extracter_agent/pdf/`)
+Every user request or evaluation turn executes a deterministic 6-step pipeline inside [`extracter_orchestrator`](../extracter_agent/agent/orchestrator.py):
 
-The ingestion subsystem transforms diverse raw binary PDF streams into semantic representations tailored for Gemini 2.5 Pro.
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Client as Cloud Run Web UI (/dev-ui/) or Eval CLI
+    participant Guard as Model Armor Guardrail (before_agent_callback)
+    participant Agent as extracter_orchestrator (Gemini 3.8 Flash Global)
+    participant PDF as PDF & Vision Tools (PyMuPDF + 300 DPI Vision)
+    participant Merge as Read-Merge-Upsert Engine (synthesizer.py)
+    participant GCS as GCS & Local Bundle Store
 
-#### 4.1.1 The Vector Drawing Dilemma & Heuristic Detection
-Engineering P&IDs and PFDs created in CAD systems (AutoCAD, SmartPlant P&ID, AVEVA) commonly output vector path drawings rather than searchable text layers. Text characters are frequently stroked as primitive lines and arcs without embedded `/Font` or `/ToUnicode` dictionaries. Traditional text extractors return zero characters, causing silent data loss.
-
-To resolve this, `extracter_agent/pdf/processor.py` implements `is_vector_drawing`:
-```python
-def is_vector_drawing(reader: pypdf.PdfReader) -> bool:
-    """Heuristically detects CAD vector drawings lacking native text layers."""
-    text_sample = "".join((page.extract_text() or "") for page in reader.pages[:3])
-    if len(text_sample.strip()) > 100:
-        return False
-    # Detect stroked vector drawing operators and absence of font dictionaries
-    for page in reader.pages[:3]:
-        has_fonts = bool(page.get("/Resources", {}).get("/Font", {}))
-        contents = page.get_contents()
-        if contents and not has_fonts:
-            return True
-    return False
+    Client->>Guard: User Prompt (Mode A: Tag/Concept OR Mode B: Raw PDF File)
+    Guard->>Guard: Check prompt injection & path traversal
+    Guard->>Agent: Verified Prompt + Cognitive Intent Classification
+    Agent->>PDF: Step 1: find_raw_documents_tool(query, subfolder)
+    PDF-->>GCS: List blobs + check size_bytes & base64 MD5 (blob.md5_hash)
+    PDF-->>Agent: Matching PDF paths & GCS URIs
+    Agent->>PDF: Step 2: process_raw_pdf_tool(pdf_filename, subfolder)
+    alt Digital PDF Text/Tables Present (chars >= 50)
+        PDF->>PDF: Extract digital text, tables & tag candidates via PyMuPDF
+    else Vector CAD Drawing (P&ID / PFD) or Scanned Sheet (chars < 50)
+        PDF->>PDF: Render pages at 300 DPI + check SHA-256 Multimodal Cache
+        PDF->>Agent: 300 DPI Gemini 3.8 Flash visual extraction (loops, nozzles, ratings)
+    end
+    opt Incremental Enrichment of Existing Concepts
+        Agent->>Merge: Step 3: inspect_existing_okf_concept_tool(concept_id / source_filter)
+        Merge-->>Agent: Existing frontmatter, sources, ## headings & Markdown tables
+    end
+    Agent->>Merge: Step 4: generate_equipment_okf_tool OR generate_okf_concept_tool (merge_existing=True)
+    Merge->>Merge: Revision-Aware Reconciliation (_is_same_source_or_revision_update)\n- Same doc / newer rev (Rev Z0 -> Rev Z1): Update in-place (NO CONFLICT)\n- Cross-doc / multi-sheet discrepancy: Emit ⚠️ CONFLICT callout\n- Merge equipment tables OR Markdown ## sections & table rows
+    Merge->>GCS: Write OKF v0.2 .md locally + immediate GCS upload
+    Agent->>GCS: Step 5 & 6: build_okf_indexes_and_validate_tool()\nCompile Master index.md + log.md & verify 0 broken links
+    Agent-->>Client: Grounded Engineering Summary + Validation Report
 ```
 
-#### 4.1.2 Stream Routing
-1. **Stream A (Native Text Extraction):** For documents with `is_vector_drawing() == False` (data sheets, manuals, SDS, standards), the processor extracts clean layout text, tabular blocks, and page metadata via `pypdf`.
-2. **Stream B (Multimodal Drawing Extraction):** For documents with `is_vector_drawing() == True` (P&IDs, PFDs), the processor loads the raw PDF bytes into a `google.genai.types.Part.from_bytes(data=pdf_bytes, mime_type="application/pdf")`. This part is passed directly to Gemini 2.5 Pro, enabling high-resolution multimodal vision analysis of instrument bubbles, flow arrows, piping connections, and nozzle callouts.
+### Detailed Breakdown of Each Extraction Stage
 
----
+#### Stage 0: Pre-Flight Security Guardrail & Cognitive Intent Classification
+- **Model Armor Hook ([`before_agent_callback`](../extracter_agent/agent/guardrails.py)):** Intercepts every incoming prompt before LLM tool reasoning to block prompt injection, system instruction overrides, and path traversal attempts (`../`).
+- **Cognitive Intent Classifier ([`CognitiveClassifier`](../extracter_agent/agent/classifier.py)):** Uses `gemini-3.8-flash` (`location="global"`) with structured `IntentClassificationResult` output to classify requests into the 7 canonical intents (`EXTRACT_DOCUMENT`, `GENERATE_OKF_CONCEPT`, `BUILD_OKF_BUNDLE`, `VALIDATE_OKF`, `EXPORT_TO_GCS`, `DOMAIN_QA`, `OTHERS`) with zero regex heuristics.
 
-### 4.2 Cognitive Precedence Engine & Conflict Arbitration
+#### Stage 1: Raw Document Discovery & MD5 Cache Verification ([`find_raw_documents_tool`](../extracter_agent/tools/pdf_tools.py))
+- Searches across all 5 raw engineering subfolders (`data_sheets/`, `pid/`, `pfd/`, `operating_manuals/`, `standards/`).
+- When `USE_GCS_STORAGE=true`, lists blobs directly from `gs://cs-poc-y03r7kmfyov4kilzg50fd7s-okf-knowledge/reference/raw/` and records each blob's `size_bytes`, `md5_hash` (base64 MD5), and `updated` timestamp.
+- When downloading a PDF to `/tmp/extracter_gcs_raw_cache/`, verifies **both** file size and base64 MD5 digest (`_compute_file_md5_b64`). If a PDF in GCS was overwritten in-place under the same filename, the cache automatically invalidates and re-downloads the fresh PDF.
 
-When cross-referencing multi-file clusters (e.g. extracting a Centrifugal Pump `01-P-101A` from its Data Sheet, P&ID `01-PID-001`, and PFD `01-PFD-001`), parameter discrepancies arise.
+#### Stage 2: Hybrid PDF Parsing & 300 DPI Multimodal Vision ([`process_raw_pdf_tool`](../extracter_agent/tools/pdf_tools.py) & [`processor.py`](../extracter_agent/pdf/processor.py))
+- **Digital Text & Table Stream (`PyMuPDF`):** Extracts native text blocks, structured tables, and candidate equipment/instrument tags per page.
+- **Vector CAD & Raster Detection:** AutoCAD P&IDs (`pid/*.pdf`), PFDs (`pfd/*.pdf`), and scanned mechanical vessel sketches often contain `< 50` embedded characters (`is_vector_drawing: True`).
+- **300 DPI Multimodal Visual Extraction (`extract_pdf_multimodal_summary`):**
+  - Renders pages at **300 DPI** and sends them to **`gemini-3.8-flash` (`GEMINI_LOCATION=global`)** to visually read instrument bubbles, stacked/redundant loops (`LT-0601/0602/0603`, `FT-0401A/B/C`), control valve failure actions (`FC`/`FO`), PSV set pressures, nozzle schedules, and decimal values (`0.5` vs `5.0 kg/cm²g`).
+  - **Two-Tier SHA-256 Vision Cache:** Caches multimodal extraction results by file SHA-256 digest in `/tmp/extracter_multimodal_cache/` and `gs://.../cache/multimodal/`, attaching the multimodal transcript once per PDF to prevent context window bloat.
 
-The orchestrator enforces a **Deterministic 6-Tier Authority Hierarchy**:
+#### Stage 3: Bundle State Inspection ([`inspect_existing_okf_concept_tool`](../extracter_agent/tools/okf_tools.py))
+- Before updating shared concepts (`equipment/<TAG>`, `instruments/<register>`, `units/<unit>`, `hazards/<chemical>`), the agent can inspect the existing `.md` file by `concept_id` or query all concepts citing a specific PDF via `source_filter`.
+- Returns existing frontmatter `sources`, `tags`, `entity_metadata`, and `body_markdown` so the agent reuses existing `## <Heading>` names and Markdown table columns.
 
-| Tier | Document Type | Directory Pattern | Authoritative Fields |
-| :--- | :--- | :--- | :--- |
-| **1** | **As-Built Data Sheet** | `reference/raw/datasheet/` | **Design limits:** MAWP, design temperature, pump head, impeller diameter, motor kW, metallurgy, mechanical seal plan. |
-| **2** | **P&ID Schematic** | `reference/raw/pid/` | **Topology & instrumentation:** Nozzle connections, line sizes, instrument control loops (FIC, PIC, TI), relief valve setpoints, isolation valve tags. |
-| **3** | **PFD Flowsheet** | `reference/raw/pfd/` | **Process conditions:** Normal operating temperature, normal operating pressure, mass/volumetric flow rates, stream fluid compositions. |
-| **4** | **Operating Manual** | `reference/raw/manual/` | **Procedures:** Startup/shutdown sequences, NPSH available curves, lube oil specs, interlock setpoints. |
-| **5** | **Safety Data Sheet (SDS)** | `reference/raw/sds/` | **Hazards & chemicals:** Flash point, auto-ignition temp, NFPA ratings, toxic exposure limits (TLV-TWA). |
-| **6** | **General Standard** | `reference/raw/standards/` | **Code compliance:** ASME Section VIII Div 1, API 610, API 682 standard allowances. |
+#### Stage 4: Revision-Aware Read-Merge-Upsert & Conflict Detection ([`synthesizer.py`](../extracter_agent/okf/synthesizer.py))
+Both synthesis tools perform **non-destructive Read-Merge-Upsert (`merge_existing=True` by default)**:
 
----
+1. **Structured Equipment Merging ([`merge_equipment_entity_with_existing`](../extracter_agent/okf/synthesizer.py#L610-L756)):**
+   - Parses the existing `equipment/<TAG>.md` document (`## Design Data`, `## Operating Conditions`, `## Instrumentation & Control Loops (P&ID)`, `## Connections & Stream Summary`, `## Hazards & Safeguards`, `## Function`).
+   - Merges `design_data` and `operating_conditions` by normalized parameter name using [`_is_same_source_or_revision_update`](../extracter_agent/okf/synthesizer.py#L510-L522):
+     - **Same Document or Newer Revision (`PS-D2304 Rev Z0` $\rightarrow$ `PS-D2304 Rev Z1`):** Updates the value and source citation **in-place** without generating a conflict warning, and replaces the superseded revision in `frontmatter.sources`.
+     - **Different Active Documents (`PS-D2304` vs. `DWG-23-0004`) or Different Sheets (`Sheet 1 Cover` vs. `Sheet 4 Sketch`):** Preserves both values in the table `note` column and automatically appends `⚠️ CONFLICT — <Parameter>: <Doc A> specifies <Val A>, whereas <Doc B> specifies <Val B> — verify with engineer before HAZOP` to `## Hazards & Safeguards`.
+   - Merges `instruments` by normalized `tag` and `connections` by `stream_id`, and dynamically resolves every instrument tag link against actual `instruments/*.md` registers in the bundle via [`resolve_bundle_instrument_link`](../extracter_agent/okf/synthesizer.py#L72-L162) (zero hardcoded ISA prefix tables).
 
-### 4.3 Google ADK Orchestrator & Toolchain
+2. **Non-Equipment Concept & Shared Register Table Merging ([`merge_markdown_bodies`](../extracter_agent/okf/synthesizer.py#L879-L934)):**
+   - Used by [`generate_okf_concept_tool`](../extracter_agent/tools/okf_tools.py#L221-L361) for `instruments/`, `units/`, `hazards/`, `procedures/`, `troubleshooting/`, `parameters/`, `hazop/`, and `sources/`.
+   - Splits existing and incoming Markdown bodies into `## <Heading>` blocks, retains any `## <Heading>` sections from earlier PDFs omitted in the new turn, merges Markdown table rows by normalized first-column key (`Tag`, `Parameter`, `Stream`), applies revision-aware source supersession on the `Source`/`Drawing` column, and preserves top-level `> ⚠️ **CRITICAL PROCESS SAFETY / DISCREPANCY WARNING:**` blockquotes and bullet lists.
 
-The orchestrator is implemented in `extracter_agent/agent/orchestrator.py` as a Google ADK `Agent` interacting with 7 strongly typed `FunctionTool` definitions:
-
-```
-┌────────────────────────────────────────────────────────────────────────┐
-│                         ADK FUNCTIONTOOL REGISTRY                      │
-├───────────────────────────────┬────────────────────────────────────────┤
-│ Tool Name                     │ Operational Scope                      │
-├───────────────────────────────┼────────────────────────────────────────┤
-│ find_raw_documents_tool       │ Semantic catalog search across 224 raw │
-│                               │ files with category & keyword filters. │
-├───────────────────────────────┼────────────────────────────────────────┤
-│ read_raw_document_tool        │ Single document extraction (Dual-      │
-│                               │ Stream: Text layout or Multimodal Part)│
-├───────────────────────────────┼────────────────────────────────────────┤
-│ batch_read_documents_tool     │ Multi-file cluster extraction for      │
-│                               │ cross-document entity synthesis.       │
-├───────────────────────────────┼────────────────────────────────────────┤
-│ generate_okf_equipment_tool   │ Synthesizes OKF v0.2 Equipment bundles │
-│                               │ (Pumps, Exchangers, Vessels, Columns). │
-├───────────────────────────────┼────────────────────────────────────────┤
-│ generate_okf_concept_tool     │ Synthesizes OKF v0.2 Concept bundles   │
-│                               │ (Hazards, Loops, Units, HAZOP Nodes).  │
-├───────────────────────────────┼────────────────────────────────────────┤
-│ validate_okf_bundle_tool      │ Invariant & cross-reference validation │
-│                               │ against Pydantic OKFModel contracts.   │
-├───────────────────────────────┼────────────────────────────────────────┤
-│ update_okf_index_tool         │ Atomic manifest update to keep         │
-│                               │ okf_index.json synchronized.           │
-└───────────────────────────────┴────────────────────────────────────────┘
-```
-
-#### Canonical 6-Step Agent Trajectory
-1. **Step 1 (Discovery):** Call `find_raw_documents_tool` to identify all relevant source files for the target entity or domain query.
-2. **Step 2 (Ingestion):** Call `read_raw_document_tool` or `batch_read_documents_tool` to obtain extracted text streams or multimodal vision parts.
-3. **Step 3 (Reconciliation):** Reconcile cross-document discrepancies using the 6-tier precedence hierarchy.
-4. **Step 4 (Synthesis):** Call `generate_okf_equipment_tool` or `generate_okf_concept_tool` to produce valid OKF YAML frontmatter and human-readable Markdown body.
-5. **Step 5 (Validation):** Call `validate_okf_bundle_tool` to guarantee schema fidelity and zero broken references.
-6. **Step 6 (Publishing & Indexing):** Call `update_okf_index_tool` to register the entity in `okf_index.json` and stage artifacts for Google Cloud Storage synchronization.
-
----
-
-### 4.4 Data Integrity: `_OKFSafeDumper` String Quoting
-
-In chemical engineering documentation, tag numbers frequently follow alphanumeric patterns such as `01-P-101A`, `001-V-102`, or `07-E-201`. When standard PyYAML dumps these values:
-- Tags starting with `0` can be interpreted as octal integers.
-- Unquoted strings containing colons, dashes, or boolean-like terms (`NO`, `YES`, `TRUE`) are coerced into booleans or dictionaries.
-
-To prevent corruption, `extracter_agent/okf/document.py` implements a custom YAML representer:
-```python
-class _OKFSafeDumper(yaml.SafeDumper):
-    """Custom YAML SafeDumper enforcing explicit quotes on strings with special characters."""
-    pass
-
-def _str_presenter(dumper: yaml.Dumper, data: str):
-    # Enforce quotation if string contains dashes, colons, or resembles numbers
-    if any(c in data for c in ":-[]{}#&*!|>'\"%@`") or data.startswith("0"):
-        return dumper.represent_scalar("tag:yaml.org,2002:str", data, style='"')
-    return dumper.represent_scalar("tag:yaml.org,2002:str", data)
-
-_OKFSafeDumper.add_representer(str, _str_presenter)
-```
-
----
-
-## 5. Security & Model Armor Guardrails
-
-In compliance with enterprise security rules:
-- **Pre-Flight Hook (`before_agent_callback`):** Inspects user prompts and extracted document tokens for prompt injection attempts, system instruction overrides, and unauthorized exfiltration patterns before passing context to Gemini 2.5 Pro.
-- **Reference Corpus Immutability:** The agent runtime strictly enforces read-only access to `reference/`. All generated knowledge is written to staging directories or published to Google Cloud Storage.
-- **Cloud IAM Restricted Sharing:** Ingress to web and proxy services enforces Identity-Aware Proxy (IAP) or Google OAuth 2.0. No `allUsers` IAM permissions are permitted.
-
----
-
-## 6. Verification & Quality Metrics
-
-The ingestion architecture has been verified against the unit and property test suites:
-
-| Test Suite | File | Tests | Status |
-| :--- | :--- | :--- | :--- |
-| **PDF Ingestion & Discovery** | `tests/unit/test_pdf_processor.py` | 8 | **PASS** |
-| **Toolchain & Multimodal Tools** | `tests/unit/test_okf_tools.py` | 12 | **PASS** |
-| **OKF Serialization Invariants** | `tests/unit/test_okf_document.py` | 9 | **PASS** |
-| **Property-Based Testing (PBT)** | `tests/pbt/test_okf_invariants.py` | 6 | **PASS** |
-| **ADK Orchestrator Reasoning** | `tests/unit/test_orchestrator.py` | 5 | **PASS** |
-| **Live Evaluation Trajectory** | `evals/test_golden_trajectories.py` | 3 | **PASS** |
-| **Total Test Suite** | `pytest tests/ evals/` | **43** | **100% PASS** |
-
----
-
-## 7. Next Actions & Operational Verification
-
-1. **Live Evaluation Benchmark:** Execute `agents-cli eval run` across the 55 single-file Data Sheet cases to measure trajectory precision ($\ge 95\%$) and groundedness (1.000).
-2. **SAST Scan:** Execute CodeMender (`cm find`) before build promotion.
-3. **Artifact Staging & Cloud Run Deploy:** Promote to Non-Prod Cloud Run environment via Cloud Build CI/CD.
+#### Stage 5 & 6: Master Catalog Indexing, OKF v0.2 Validation & Parallel GCS Sync ([`indexer.py`](../extracter_agent/okf/indexer.py), [`validator.py`](../extracter_agent/okf/validator.py), [`exporter.py`](../extracter_agent/gcs/exporter.py))
+- Compiles the progressive disclosure Master Catalog (`index.md`, `equipment/index.md`) and chronological audit log (`log.md`).
+- Validates 100% OKF v0.2 YAML frontmatter compliance, trust-tier monotonicity, and **zero broken internal Markdown links**.
+- Syncs all updated files to `gs://cs-poc-y03r7kmfyov4kilzg50fd7s-okf-knowledge/okf-bundles/phenol-plant/` using a 16-worker `ThreadPoolExecutor` with base64 MD5 digest verification (`compute_file_md5_b64` vs. `blob.md5_hash`).
