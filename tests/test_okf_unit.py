@@ -645,6 +645,127 @@ def test_incremental_equipment_merge_and_conflict_detection(tmp_path):
     assert "⚠️ CONFLICT — Design Temperature" in md_text_3
 
 
+def test_equipment_tag_resolution_never_collides_on_shared_sources(tmp_path):
+    """Verify equipment items citing shared P&IDs, manuals, or connected vessel datasheets never collide with neighbor equipment files."""
+    from extracter_agent.models.domain import derive_canonical_equipment_tag
 
+    equip_dir = tmp_path / "equipment"
+    equip_dir.mkdir(parents=True)
+    # Create existing vessel D-8100 and pump P-8200 citing a shared P&ID and manual
+    (equip_dir / "D-8100.md").write_text(
+        "---\ntype: Equipment Concept\ntitle: D-8100 — Sump Vessel\nsources:\n- title: 14780-8120-PS-D8100_Z1.pdf\n- title: 14780-8120-25-23-0020A_Z1.pdf\n- title: OM-Unit-Manual.pdf\nentity_metadata:\n  tag: D-8100\n---\n# D-8100\n",
+        encoding="utf-8",
+    )
+    (equip_dir / "P-8200.md").write_text(
+        "---\ntype: Equipment Concept\ntitle: P-8200 — Sump Pit Pump\nsources:\n- title: 14780-8120-PS-P8200_Z1.pdf\n- title: 14780-8120-25-23-0020A_Z1.pdf\nentity_metadata:\n  tag: P-8200\n---\n# P-8200\n",
+        encoding="utf-8",
+    )
+    (equip_dir / "P-8104A.md").write_text(
+        "---\ntype: Equipment Concept\ntitle: P-8104A — Sump Pump\nentity_metadata:\n  tag: P-8104A\n---\n# P-8104A\n",
+        encoding="utf-8",
+    )
+
+    # 1. Pump P-8104A citing both its own datasheet PS-P8104 and vessel datasheet PS-D8100 must resolve to P-8104A, never D-8100
+    assert (
+        derive_canonical_equipment_tag(
+            "P-8104A",
+            [
+                "14780-8120-PS-P8104_Z1.pdf",
+                "14780-8120-PS-D8100_Z1.pdf",
+                "14780-8120-25-23-0020A_Z1.pdf",
+            ],
+            bundle_root=tmp_path,
+        )
+        == "P-8104A"
+    )
+
+    # 2. Package X-8201 citing shared P&ID and P-8200 datasheet must resolve to X-8201, never P-8200 or D-8100
+    assert (
+        derive_canonical_equipment_tag(
+            "X-8201",
+            [
+                "14780-8120-25-23-0020A_Z1.pdf",
+                "14780-8120-PS-P8200_Z1.pdf",
+                "OM-Unit-Manual.pdf",
+            ],
+            bundle_root=tmp_path,
+        )
+        == "X-8201"
+    )
+
+
+def test_concept_id_specificity_prevents_prefix_and_shared_source_collision(tmp_path):
+    """Verify multi-token slugs never collapse into shorter prefix files and explicit slugs beat shared-source neighbors."""
+    from extracter_agent.models.domain import derive_canonical_concept_id
+
+    haz_dir = tmp_path / "hazards"
+    haz_dir.mkdir(parents=True)
+    (haz_dir / "toluene.md").write_text(
+        "---\ntype: Hazard Profile\ntitle: Toluene Hazard\nsources:\n- title: SDS_toluene.pdf\n- title: OM-Manual.pdf\n- title: DWG-006.pdf\n---\n# Toluene\n",
+        encoding="utf-8",
+    )
+    (haz_dir / "toluene-diisocyanate.md").write_text(
+        "---\ntype: Hazard Profile\ntitle: Toluene Diisocyanate Hazard\nsources:\n- title: SDS_tdi.pdf\n---\n# TDI\n",
+        encoding="utf-8",
+    )
+
+    hazop_dir = tmp_path / "hazop"
+    hazop_dir.mkdir(parents=True)
+    (hazop_dir / "methodology.md").write_text(
+        "---\ntype: HAZOP\ntitle: HAZOP Methodology\nsources:\n- title: STD-014.pdf\n---\n# Methodology\n",
+        encoding="utf-8",
+    )
+    (hazop_dir / "risk-matrix.md").write_text(
+        "---\ntype: HAZOP\ntitle: HAZOP Risk Matrix\nsources:\n- title: STD-014.pdf\n- title: STD-002.pdf\n---\n# Risk Matrix\n",
+        encoding="utf-8",
+    )
+
+    # 1. Derivative chemical with '-hazard-profile' suffix must resolve to toluene-diisocyanate, never toluene
+    assert (
+        derive_canonical_concept_id(
+            "hazards/toluene-diisocyanate-hazard-profile",
+            concept_type="Hazard Profile",
+            title="Toluene Diisocyanate Process Hazard Profile",
+            sources=["SDS_tdi.pdf", "OM-Manual.pdf", "DWG-006.pdf"],
+            bundle_root=tmp_path,
+        )
+        == "hazards/toluene-diisocyanate"
+    )
+
+    # 2. Base chemical with '-hazard' suffix must resolve to toluene, never toluene-diisocyanate
+    assert (
+        derive_canonical_concept_id(
+            "hazards/toluene-hazard",
+            concept_type="Hazard Profile",
+            title="Toluene & Toluene Diisocyanate Process Safety Profile",
+            sources=["SDS_toluene.pdf", "OM-Manual.pdf"],
+            bundle_root=tmp_path,
+        )
+        == "hazards/toluene"
+    )
+
+    # 3. HAZOP methodology with 'Matrix' in title and shared STD-014 source must resolve to hazop/methodology, never hazop/risk-matrix
+    assert (
+        derive_canonical_concept_id(
+            "hazop/hazop-methodology",
+            concept_type="HAZOP",
+            title="HAZOP Methodology & Deviation Matrix — STD-014",
+            sources=["STD-014.pdf"],
+            bundle_root=tmp_path,
+        )
+        == "hazop/methodology"
+    )
+
+    # 4. Uncreated hazop/study-info with 'Matrix' in title and concept_type must resolve to hazop/study-info, never hazop/risk-matrix
+    assert (
+        derive_canonical_concept_id(
+            "hazop/study-info",
+            concept_type="HAZOP Study Matrix",
+            title="HAZOP Study Info — Process Hazard Analysis Study Matrix",
+            sources=["STD-014.pdf", "STD-002.pdf"],
+            bundle_root=tmp_path,
+        )
+        == "hazop/study-info"
+    )
 
 

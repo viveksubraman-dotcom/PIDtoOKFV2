@@ -15,6 +15,7 @@ from extracter_agent.models.domain import (
     EngineeringParameter,
     EquipmentEntity,
     InstrumentLoop,
+    _extract_equipment_base_id,
     derive_canonical_concept_id,
     derive_canonical_equipment_tag,
 )
@@ -124,8 +125,13 @@ def generate_equipment_okf_tool(
     if merge_existing and output_file.exists():
         try:
             existing_doc = OKFDocument.parse(output_file.read_text(encoding="utf-8"))
-            entity = merge_equipment_entity_with_existing(entity, existing_doc)
-            was_merged = True
+            existing_tag = str(
+                (existing_doc.frontmatter.get("entity_metadata") or {}).get("tag")
+                or str(existing_doc.frontmatter.get("title", "")).split("—")[0].strip()
+            )
+            if not existing_tag or _extract_equipment_base_id(existing_tag) == _extract_equipment_base_id(tag):
+                entity = merge_equipment_entity_with_existing(entity, existing_doc)
+                was_merged = True
         except Exception:
             was_merged = False
 
@@ -288,38 +294,55 @@ def generate_okf_concept_tool(
         try:
             existing_doc = OKFDocument.parse(dest_file.read_text(encoding="utf-8"))
             existing_fm = existing_doc.frontmatter
-            for t in existing_fm.get("tags", []):
-                if isinstance(t, str) and t not in merged_tags:
-                    merged_tags.append(t)
+            same_entity = True
+            if clean_id.startswith("equipment/"):
+                existing_tag = str(
+                    (existing_fm.get("entity_metadata") or {}).get("tag")
+                    or str(existing_fm.get("title", "")).split("—")[0].strip()
+                )
+                incoming_tag = str(
+                    merged_metadata.get("tag")
+                    or title.split("—")[0].strip()
+                    or clean_id.split("/")[-1]
+                )
+                if existing_tag and incoming_tag and (
+                    _extract_equipment_base_id(existing_tag) != _extract_equipment_base_id(incoming_tag)
+                ):
+                    same_entity = False
 
-            existing_src_list: list[str] = []
-            for s in existing_fm.get("sources", []):
-                if isinstance(s, dict):
-                    val = str(s.get("resource") or s.get("title") or "").strip()
-                    if val:
-                        existing_src_list.append(val)
-                elif isinstance(s, str) and s.strip():
-                    existing_src_list.append(s.strip())
+            if same_entity:
+                for t in existing_fm.get("tags", []):
+                    if isinstance(t, str) and t not in merged_tags:
+                        merged_tags.append(t)
 
-            combined_sources: list[str] = []
-            src_idx_by_base: dict[str, int] = {}
-            for s in existing_src_list + merged_sources:
-                key = _normalize_base_source_id(s) or s.split("/")[-1].lower()
-                if key not in src_idx_by_base:
-                    src_idx_by_base[key] = len(combined_sources)
-                    combined_sources.append(s)
-                else:
-                    combined_sources[src_idx_by_base[key]] = s
-            merged_sources = combined_sources
+                existing_src_list: list[str] = []
+                for s in existing_fm.get("sources", []):
+                    if isinstance(s, dict):
+                        val = str(s.get("resource") or s.get("title") or "").strip()
+                        if val:
+                            existing_src_list.append(val)
+                    elif isinstance(s, str) and s.strip():
+                        existing_src_list.append(s.strip())
 
-            prior_meta = existing_fm.get("entity_metadata", {})
-            if isinstance(prior_meta, dict):
-                combined_meta = dict(prior_meta)
-                combined_meta.update(merged_metadata)
-                merged_metadata = combined_meta
+                combined_sources: list[str] = []
+                src_idx_by_base: dict[str, int] = {}
+                for s in existing_src_list + merged_sources:
+                    key = _normalize_base_source_id(s) or s.split("/")[-1].lower()
+                    if key not in src_idx_by_base:
+                        src_idx_by_base[key] = len(combined_sources)
+                        combined_sources.append(s)
+                    else:
+                        combined_sources[src_idx_by_base[key]] = s
+                merged_sources = combined_sources
 
-            merged_body = merge_markdown_bodies(existing_doc.body, body_markdown)
-            was_merged = True
+                prior_meta = existing_fm.get("entity_metadata", {})
+                if isinstance(prior_meta, dict):
+                    combined_meta = dict(prior_meta)
+                    combined_meta.update(merged_metadata)
+                    merged_metadata = combined_meta
+
+                merged_body = merge_markdown_bodies(existing_doc.body, body_markdown)
+                was_merged = True
         except Exception:
             was_merged = False
 

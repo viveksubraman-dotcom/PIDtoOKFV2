@@ -378,5 +378,27 @@ def test_pbt_merge_markdown_bodies_preserves_rows_and_idempotent(tags_doc1, tags
     assert merged_twice == merged_once
 
 
+@given(
+    prefix=st.sampled_from(["D", "E", "P", "V", "X", "TK", "OX"]),
+    num=st.integers(min_value=1000, max_value=9999),
+    suffix=st.sampled_from(["", "A", "B", "A/B", "A/B/C"]),
+    other_prefix=st.sampled_from(["D", "E", "P", "V", "X"]),
+    other_num=st.integers(min_value=1000, max_value=9999),
+)
+def test_pbt_equipment_tag_base_id_preservation_invariant(
+    prefix, num, suffix, other_prefix, other_num
+):
+    """Invariant: Across arbitrary equipment tags and distractor PS-<OTHER> source files, derive_canonical_equipment_tag always preserves the exact <PREFIX>-<NUM> base identity."""
+    from extracter_agent.models.domain import (
+        _extract_equipment_base_id,
+        derive_canonical_equipment_tag,
+    )
 
+    tag = f"{prefix}-{num}{suffix}"
+    distractor_src = f"14780-8120-PS-{other_prefix}{other_num}_PROCESS_DATA_SHEET_Z1.pdf"
+    own_src = f"14780-8120-PS-{prefix}{num}_PROCESS_DATA_SHEET_Z1.pdf"
 
+    resolved = derive_canonical_equipment_tag(
+        tag, [distractor_src, own_src], bundle_root=Path("/nonexistent_bundle_dir_pbt")
+    )
+    assert _extract_equipment_base_id(resolved) == f"{prefix}-{num}"

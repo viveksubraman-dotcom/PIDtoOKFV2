@@ -612,11 +612,31 @@ In chemical engineering facilities, instrumentation is inextricably bound to equ
   - `test_pbt_merge_markdown_bodies_preserves_rows_and_idempotent`: `hypothesis` property test verifying that `merge_markdown_bodies` preserves the union of all unique table row keys across documents and is idempotent.
 - **Completion Criteria:** All Step 17 unit and property tests passing (`63/63`), 136-record `evals/datasets/raw_file_by_file_eval.jsonl` generated and verified, zero hardcoded domain tags (`test_zero_hardcoded_domain_maps_or_tags` passing).
 
+### Step 18: Strict Entity-Identity & Symmetric Slug Guard in Canonical Concept Resolution (Option A - RCA Approved)
+- **Actions:**
+  1. **Equipment Base-ID Identity Guard (`extracter_agent/models/domain.py` — `derive_canonical_equipment_tag`):**
+     - Implement `_extract_equipment_base_id(tag_str: str) -> str` to extract the canonical `<PREFIX>-<NUMBER>` base identifier (e.g., `P-2304` from `P-2304A`, `E-2307` from `E-2307A/B`, `X-2321` from `X-2321`).
+     - Filter `ps_candidates` extracted from `source_files` so that only Process Data Sheets whose base equipment ID matches `_extract_equipment_base_id(safe)` are eligible to canonicalize the filename stem (preventing a pump citing both `PS-P2304` and vessel datasheet `PS-D2307` from resolving to `D-2307.md`).
+     - Restrict source-citation fallback matching against `_iter_bundle_catalog` strictly to the equipment's own dedicated Process Data Sheet code (`ps-<prefix><number>`) or an explicit frontmatter `tag:` match sharing the same base ID, never matching across different equipment tags via shared P&IDs or operating manuals.
+  2. **Core-Slug Normalization & Symmetric Specificity Scoring (`extracter_agent/models/domain.py` — `derive_canonical_concept_id`):**
+     - Strip generic descriptor affixes (`-hazard-profile`, `-process-hazard`, `-hazard`, `-profile`, `-register`, `-specification`, `-procedure`, `-overview`, and redundant `<category>-` prefixes) to form `core_id` and check for an exact catalog match in Step 1 before fuzzy scoring.
+     - In Step 2, incorporate symmetric slug Jaccard similarity (`len(slug_tokens & item_stem_tokens) / len(slug_tokens | item_stem_tokens)`), stem specificity bonus (`0.20 * len(slug_tokens & item_stem_tokens)`), and a capped source bonus (`min(0.35, ...)`) so multi-token concepts (e.g., `cumene-hydroperoxide`) never collapse into shorter prefix concepts (`cumene`), and concepts with explicit slug matches (`hazop/methodology`) are never overridden by neighbor files citing the same standard (`hazop/risk-matrix`).
+  3. **Entity Tag Verification Guard on Merge/Upsert (`extracter_agent/tools/okf_tools.py`):**
+     - In `generate_equipment_okf_tool` and `generate_okf_concept_tool`, when `dest_file` already exists on disk and `merge_existing=True`, verify that any existing `entity_metadata.tag` (if present on an equipment concept) shares the same base equipment ID before merging or overwriting; if a non-equipment concept tool is called with `concept_id="equipment/<tag>"`, route its `clean_id` through `derive_canonical_equipment_tag` with strict base-ID isolation.
+  4. **Bundle Collision Repair & Live Sync:**
+     - Re-extract / restore the 6 collided concepts (`equipment/D-2202.md`, `equipment/D-2307.md`, `equipment/P-2320.md`, `equipment/X-2308.md`, `hazards/cumene.md`, `hazop/risk-matrix.md`) plus `equipment/X-2320.md` and `equipment/X-2321.md`, rebuild bundle indexes, sync to GCS, and redeploy both `agent_runtime` and `cloud_run` (`extracter-agent-web`).
+- **Unit & Property-Based Tests (PBT):**
+  - `test_equipment_tag_resolution_never_collides_on_shared_sources`: Unit test verifying that equipment items citing shared P&IDs, operating manuals, or connected vessel datasheets never resolve to a different equipment tag's filename.
+  - `test_concept_id_specificity_prevents_prefix_and_shared_source_collision`: Unit test verifying that multi-word chemical/domain slugs never collapse into shorter prefix files in the same folder and explicit slug matches beat shared-source neighbors.
+  - `test_pbt_equipment_tag_base_id_preservation_invariant`: `hypothesis` property test verifying across arbitrary generated equipment tags (`<PREFIX>-<DIGITS><SUFFIX>`) and arbitrary distractor `PS-<OTHER>` source files that `derive_canonical_equipment_tag` always preserves the exact `<PREFIX>-<DIGITS>` base equipment identity.
+- **Completion Criteria:** All unit and property-based tests passing (`66/66`), zero concept collisions in `build/okf_bundle/`, updated ADK agent deployed to `agent_runtime`, updated ADK Web UI deployed to Cloud Run (`extracter-agent-web`), and all changes committed and pushed to GitHub.
+
 ---
 
 ## 8. Plan Progress Tracking & Living Spec Synchronization
 - All milestones, verification metrics, and test results will be continuously recorded under `specs/plan/`.
 - If any data model or interface evolves during implementation, this specification will be updated synchronously to prevent spec drift.
+
 
 
 

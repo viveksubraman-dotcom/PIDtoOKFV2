@@ -85,6 +85,15 @@ def _iter_bundle_catalog(bundle_root: Path | None = None) -> list[dict[str, Any]
     return catalog
 
 
+def _extract_equipment_base_id(tag_str: str) -> str:
+    """Extract canonical '<PREFIX>-<DIGITS>' base equipment identifier."""
+    cleaned = sanitize_tag_filename(tag_str).upper()
+    m = re.match(r"^([A-Z]{1,4})[-_]?(\d{3,4})", cleaned)
+    if m:
+        return f"{m.group(1)}-{m.group(2)}"
+    return cleaned
+
+
 def derive_canonical_equipment_tag(
     tag: str,
     source_files: list[str] | None = None,
@@ -92,33 +101,61 @@ def derive_canonical_equipment_tag(
 ) -> str:
     """Derive the canonical equipment filename tag dynamically from source document metadata and bundle catalog.
 
-    Zero hardcoded equipment tag literals. Resolves against existing bundle equipment concepts
-    citing the same Process Data Sheet or parses the generic 'PS-<TAG>' engineering document code.
+    Zero hardcoded equipment tag literals. Enforces strict base equipment ID isolation so shared P&IDs,
+    operating manuals, or connected vessel datasheets never cause cross-entity filename collisions.
     """
     safe = sanitize_tag_filename(tag)
+    req_base = _extract_equipment_base_id(safe)
     catalog = [c for c in _iter_bundle_catalog(bundle_root) if c["category"] == "equipment"]
 
-    # 1. If exact sanitized tag already exists in bundle catalog, check if a more specific PS-<TAG> file matches
-    src_names = [Path(s).name.lower() for s in (source_files or []) if s]
+    # 1. Extract PS-<TAG> candidates from source_files that share the same base equipment ID
     ps_candidates: list[str] = []
     for src in source_files or []:
-        m = re.search(r"PS-([A-Z]{1,3})[-_]?(\d{4}[A-Z]*)(?=[_\-\s.]|$)", src, flags=re.IGNORECASE)
+        m = re.search(
+            r"PS-([A-Z]{1,3})[-_]?(\d{4}[A-Z]*)(?=[_\-\s.]|$)",
+            src,
+            flags=re.IGNORECASE,
+        )
         if m:
-            ps_candidates.append(f"{m.group(1).upper()}-{m.group(2).upper()}")
+            cand = f"{m.group(1).upper()}-{m.group(2).upper()}"
+            if _extract_equipment_base_id(cand) == req_base:
+                ps_candidates.append(cand)
 
     for ps_tag in ps_candidates:
         if any(c["stem"].upper() == ps_tag for c in catalog):
             return ps_tag
 
+    # 2. Exact stem match in bundle catalog
     if any(c["stem"].upper() == safe.upper() for c in catalog):
         return next(c["stem"] for c in catalog if c["stem"].upper() == safe.upper())
 
-    for src_name in src_names:
-        for c in catalog:
-            if src_name in c["head_lower"]:
-                return str(c["stem"])
+    # 3. Match existing catalog file only if it shares the same equipment class letter prefix
+    #    and explicitly declares this exact equipment tag in its frontmatter or dedicated PS-<TAG>
+    ps_code_match = re.match(r"^([A-Z]{1,4})-(\d{3,4})$", req_base)
+    dedicated_ps_token = (
+        f"ps-{ps_code_match.group(1).lower()}{ps_code_match.group(2)}"
+        if ps_code_match
+        else ""
+    )
+    req_prefix = ps_code_match.group(1).upper() if ps_code_match else ""
+    raw_tag_lower = tag.strip().lower()
+    for c in catalog:
+        c_base = _extract_equipment_base_id(str(c["stem"]))
+        if req_prefix and not c_base.startswith(f"{req_prefix}-"):
+            continue
+        head = c["head_lower"]
+        if raw_tag_lower and (
+            f"tag: {raw_tag_lower}\n" in head
+            or f"tag: '{raw_tag_lower}'" in head
+            or f'tag: "{raw_tag_lower}"' in head
+            or f"title: {raw_tag_lower} " in head
+        ):
+            return str(c["stem"])
+        if dedicated_ps_token and dedicated_ps_token in head and c_base == req_base:
+            return str(c["stem"])
 
-    if ps_candidates and not re.search(r"[A-Z]{3,}$", safe):
+    # 4. When no catalog entry exists yet, use matching PS-<TAG> candidate for 2-unit paired tags
+    if ps_candidates and re.search(r"\d[A-Z]{2}$", safe):
         return ps_candidates[0]
 
     return safe
@@ -158,19 +195,31 @@ def derive_canonical_concept_id(
         raw_tag = clean_id.split("/")[-1]
         return f"equipment/{derive_canonical_equipment_tag(raw_tag, sources, bundle_root)}"
 
+    req_cat = norm_parts[0].lower() if len(norm_parts) > 1 else "root"
+    raw_slug = norm_parts[-1].lower() if norm_parts else clean_id.lower()
+    core_slug = re.sub(
+        r"-(?:process-hazard-profile|chemical-hazard-profile|hazard-profile|process-hazard|hazard|profile|register|specification|procedure|overview|architecture|summary)$",
+        "",
+        raw_slug,
+    ).strip("-")
+    if core_slug.startswith(f"{req_cat}-") and len(core_slug) > len(req_cat) + 1:
+        core_slug = core_slug.removeprefix(f"{req_cat}-")
+    core_id = f"{req_cat}/{core_slug}" if len(norm_parts) > 1 and core_slug else normalized_id
+
     catalog = _iter_bundle_catalog(bundle_root)
     if not catalog:
-        return normalized_id
+        return core_id
 
-    # 1. Exact case-insensitive match against existing bundle concept
+    # 1. Exact case-insensitive match against existing bundle concept (clean_id, normalized_id, or core_id)
+    candidate_exact_ids = {clean_id.lower(), normalized_id.lower(), core_id.lower()}
     for item in catalog:
-        if item["concept_id"].lower() == clean_id.lower() or item["concept_id"].lower() == normalized_id.lower():
+        if item["concept_id"].lower() in candidate_exact_ids:
             return str(item["concept_id"])
 
-    # 2. Match by target category + shared authoritative source files / token overlap
-    req_cat = parts[0].lower() if len(parts) > 1 else "root"
+    # 2. Match by target category + symmetric slug specificity + capped source overlap
+    slug_tokens = set(re.findall(r"[a-z0-9]{2,}", core_slug.lower()))
     query_tokens = set(
-        re.findall(r"[a-z0-9]{2,}", f"{clean_id} {title} {concept_type}".lower())
+        re.findall(r"[a-z0-9]{2,}", f"{core_slug} {title} {concept_type}".lower())
     ) - {"md", "okf", "pdf", "extract", "process", "document", "concept", "profile", "register"}
     src_tokens = [Path(s).stem.lower() for s in (sources or []) if s and len(Path(s).stem) >= 4]
 
@@ -178,23 +227,49 @@ def derive_canonical_concept_id(
     best_score = 0.0
     for item in catalog:
         item_cat = str(item["category"]).lower()
-        # Allow matching within the same category, or resolving root/sources/hazop aliases
         if item_cat != req_cat and not (
-            req_cat in ("root", "standards") or item_cat in ("root", "sources", "hazop")
+            req_cat in ("root", "standards") and item_cat in ("root", "sources", "hazop")
         ):
             continue
 
-        item_tokens = set(re.findall(r"[a-z0-9]{2,}", f"{item['concept_id']} {item['stem']}".lower()))
-        overlap = len(query_tokens & item_tokens) / max(1, len(item_tokens))
-        src_bonus = sum(0.35 for st in src_tokens if st in item["head_lower"])
-        cat_bonus = 0.25 if item_cat == req_cat else 0.0
-        score = overlap + src_bonus + cat_bonus
+        item_stem_tokens = set(re.findall(r"[a-z0-9]{2,}", str(item["stem"]).lower()))
+        if not item_stem_tokens:
+            continue
 
-        if score > best_score and score >= 0.55:
+        # Direct strict-subset guard between requested slug_tokens and catalog item_stem_tokens:
+        # Never collapse a base concept into a multi-word derivative or vice versa (even if only one exists on disk)
+        if (
+            item_cat == req_cat
+            and slug_tokens
+            and (slug_tokens < item_stem_tokens or item_stem_tokens < slug_tokens)
+        ):
+            continue
+
+        overlap = len(query_tokens & item_stem_tokens) / max(1, len(item_stem_tokens))
+        slug_jaccard = (
+            len(slug_tokens & item_stem_tokens) / max(1, len(slug_tokens | item_stem_tokens))
+            if slug_tokens
+            else 0.0
+        )
+        # Require at least one shared stem token (overlap > 0) and shared slug token for non-sources concepts
+        has_sds_match = any(
+            st.startswith("sds_") and st in item["head_lower"] for st in src_tokens
+        )
+        if overlap == 0.0 and not has_sds_match:
+            continue
+        if slug_tokens and req_cat != "sources" and not has_sds_match and slug_jaccard == 0.0:
+            continue
+
+        specificity_bonus = 0.15 * len(slug_tokens & item_stem_tokens)
+        src_bonus = min(0.35, sum(0.25 for st in src_tokens if st in item["head_lower"]))
+        cat_bonus = 0.25 if item_cat == req_cat else 0.0
+        score = overlap + (slug_jaccard * 0.5) + specificity_bonus + src_bonus + cat_bonus
+
+        if score > best_score and score >= 0.75:
             best_score = score
             best_id = str(item["concept_id"])
 
-    return best_id or normalized_id
+    return best_id or core_id
 
 
 

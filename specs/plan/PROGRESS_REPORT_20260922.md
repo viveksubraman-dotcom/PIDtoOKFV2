@@ -32,13 +32,14 @@ All 7 core implementation steps defined in the SDD specification have been compl
 | **Step 15** | Complete Codebase De-Hardcoding, Dynamic Bundle-Indexed Cross-Linking & 100% Golden Parity | `extracter_agent/models/domain.py`, `extracter_agent/okf/synthesizer.py`, `extracter_agent/okf/indexer.py`, `extracter_agent/cli.py`, `extracter_agent/agent/`, `extracter_agent/pdf/processor.py`, `evals/run_live_vertex_eval.py` | 2 passed | 1 passed | **Done (50/50 Tests, 100% Golden Parity, 0 Broken Links)** |
 | **Step 16** | In-Place Updated Document Resolution, Content-Hash Cache Hardening, Cloud Run ADK Web UI & Global Gemini Endpoint Routing | `extracter_agent/tools/pdf_tools.py`, `extracter_agent/models/domain.py`, `extracter_agent/okf/synthesizer.py`, `extracter_agent/gcs/exporter.py`, `extracter_agent/config.py`, `extracter_agent/agent/`, `extracter_agent/pdf/processor.py`, `deploy.sh` | 4 passed | 2 passed | **Done (56/56 Tests, ADK Web Live on Cloud Run)** |
 | **Step 17** | Incremental File-by-File Extraction, Revision-Aware Read-Merge-Upsert (`inspect_existing_okf_concept_tool`, `merge_markdown_bodies`) & 136-File Raw PDF Eval Dataset | `extracter_agent/okf/synthesizer.py`, `extracter_agent/tools/okf_tools.py`, `extracter_agent/agent/orchestrator.py`, `evals/builders/build_file_by_file_eval_dataset.py`, `evals/datasets/raw_file_by_file_eval.jsonl`, `evals/run_live_vertex_eval.py` | 4 passed | 3 passed | **Done (63/63 Tests, 136/136 Raw Files Mapped)** |
+| **Step 18** | Strict Entity-Identity & Symmetric Slug Guard in Canonical Concept Resolution (Option A - RCA Approved) + `fonttools` CFF Type1 Font Support | `extracter_agent/models/domain.py`, `extracter_agent/tools/okf_tools.py`, `pyproject.toml`, `extracter_agent/requirements.txt`, `build/okf_bundle/` | 2 passed | 1 passed | **Done (66/66 Tests, 130/130 Bundle Restored & Synced)** |
 
 ---
 
 ## 2. Quality & Test Metrics
 
-- **Total Test Cases:** 63 passing tests (`PYTHONPATH=. .venv/bin/python -m pytest tests/ evals/test_eval_benchmarks.py -q` — 100% pass rate).
-- **Property-Based Invariants Verified (21 `hypothesis` invariants):**
+- **Total Test Cases:** 66 passing tests (`PYTHONPATH=. .venv/bin/python -m pytest tests/ evals/test_eval_benchmarks.py -q` — 100% pass rate).
+- **Property-Based Invariants Verified (22 `hypothesis` invariants):**
   1. `test_pbt_okf_frontmatter_invariants`: Serialization round-trip holds across all valid frontmatters.
   2. `test_pbt_trust_tier_invariants`: Trust tier monotonicity holds (`human:` strictly yields `human-reviewed`).
   3. `test_pbt_intent_enum_membership`: Strict validation against Canonical Intent Topology enum.
@@ -49,17 +50,18 @@ All 7 core implementation steps defined in the SDD specification have been compl
   8. `test_pbt_instrument_loop_link_invariants`: 100% of synthesized instrument loops yield bundle-relative Markdown links and preserve frontmatter attributes.
   9. `test_pbt_sanitize_tag_filename_never_contains_slashes`: Tag sanitization strips spaces, slashes, and parentheses across arbitrary inputs.
   10. `test_pbt_derive_canonical_concept_id_idempotent`: Dynamic concept path resolution is strictly idempotent (`f(f(x)) == f(x)`) and whitespace-free.
-  11. `test_pbt_dynamic_instrument_link_never_broken`: Dynamic bundle-indexed instrument resolution always points to an existing register file in `bundle_root/instruments/`.
-  12. `test_pbt_incremental_merge_monotonic_and_idempotent`: Incremental Read-Merge-Upsert is monotonically non-decreasing in sources and parameters, and re-applying the same update is strictly idempotent.
-  13. `test_pbt_same_document_revision_supersedes_without_conflict`: Newer revisions of the same base document supersede old parameter values in-place without generating false conflict warnings.
-  14. `test_pbt_merge_markdown_bodies_preserves_rows_and_idempotent`: Non-equipment Markdown section and table row merging preserves the union of all unique row keys across documents and is strictly idempotent.
-  15. `test_pbt_orchestrator_prompt_schema_coverage_invariant`: 100% of required entity schema attributes are documented in orchestrator instructions.
-  16. `test_pbt_search_raw_documents_invariants`: Document search is exception-safe and all returned paths physically exist.
-  17. `test_pbt_gemini_location_decoupled_from_infra_region`: Gemini model endpoint location (`GEMINI_LOCATION=global`) is strictly decoupled from regional GCP infrastructure (`GOOGLE_CLOUD_LOCATION=asia-southeast1`).
-  18. `test_pbt_get_blob_name_invariants`: GCS key formatting combines paths without illegal double slashes.
-  19. `test_pbt_infer_content_type_invariants`: Valid MIME types generated for all OKF extensions.
-  20. `test_pbt_md5_cache_invalidation_on_any_mutation`: Any single-byte mutation (even preserving exact file length) alters the base64 MD5 digest and triggers cache invalidation / re-upload.
-  21. `test_pbt_guardrail_injection_detection_invariant` & `test_pbt_guardrail_benign_clean_invariant`: 100% interception of adversarial prompt injections with zero false positives.
+  11. `test_pbt_equipment_tag_base_id_preservation_invariant`: Equipment tag resolution strictly preserves base equipment identity (`_extract_equipment_base_id`) across arbitrary shared P&IDs, manuals, and neighbor datasheets.
+  12. `test_pbt_dynamic_instrument_link_never_broken`: Dynamic bundle-indexed instrument resolution always points to an existing register file in `bundle_root/instruments/`.
+  13. `test_pbt_incremental_merge_monotonic_and_idempotent`: Incremental Read-Merge-Upsert is monotonically non-decreasing in sources and parameters, and re-applying the same update is strictly idempotent.
+  14. `test_pbt_same_document_revision_supersedes_without_conflict`: Newer revisions of the same base document supersede old parameter values in-place without generating false conflict warnings.
+  15. `test_pbt_merge_markdown_bodies_preserves_rows_and_idempotent`: Non-equipment Markdown section and table row merging preserves the union of all unique row keys across documents and is strictly idempotent.
+  16. `test_pbt_orchestrator_prompt_schema_coverage_invariant`: 100% of required entity schema attributes are documented in orchestrator instructions.
+  17. `test_pbt_search_raw_documents_invariants`: Document search is exception-safe and all returned paths physically exist.
+  18. `test_pbt_gemini_location_decoupled_from_infra_region`: Gemini model endpoint location (`GEMINI_LOCATION=global`) is strictly decoupled from regional GCP infrastructure (`GOOGLE_CLOUD_LOCATION=asia-southeast1`).
+  19. `test_pbt_get_blob_name_invariants`: GCS key formatting combines paths without illegal double slashes.
+  20. `test_pbt_infer_content_type_invariants`: Valid MIME types generated for all OKF extensions.
+  21. `test_pbt_md5_cache_invalidation_on_any_mutation`: Any single-byte mutation (even preserving exact file length) alters the base64 MD5 digest and triggers cache invalidation / re-upload.
+  22. `test_pbt_guardrail_injection_detection_invariant` & `test_pbt_guardrail_benign_clean_invariant`: 100% interception of adversarial prompt injections with zero false positives.
 
 - **Static Code Quality (Ruff):** 100% clean (`All checks passed!`).
 - **Static Security (Bandit):** 0 issues identified (`0 Low, 0 Medium, 0 High`).
@@ -110,6 +112,10 @@ All 7 core implementation steps defined in the SDD specification have been compl
     - **Non-Destructive Read-Merge-Upsert (`extracter_agent/okf/synthesizer.py`, `extracter_agent/tools/okf_tools.py`):** Added `merge_equipment_entity_with_existing` and `merge_existing: bool = True` on `generate_equipment_okf_tool` and `generate_okf_concept_tool`. When raw PDFs are ingested one by one (e.g., Process Data Sheet first, then P&ID, then PFD), existing concepts on disk are automatically enriched with new sources, parameters, instruments, stream connections, and hazards while automatically flagging conflicting numerical values across documents with `⚠️ CONFLICT — <PARAMETER>: ...`.
     - **Bundle Inspection Tool (`inspect_existing_okf_concept_tool`):** Added an 8th ADK FunctionTool allowing the agent to inspect existing concept files by `concept_id` or query concepts citing a given raw PDF (`source_filter`).
     - **136-File Document-Centric Evaluation Benchmark (`evals/builders/build_file_by_file_eval_dataset.py`, `evals/datasets/raw_file_by_file_eval.jsonl`):** Built a complete 136-case file-by-file evaluation dataset covering **100% (`136 / 136`) of the raw PDFs in `reference/raw/`** (`data_sheets`: 55, `pid`: 46, `standards`: 26, `pfd`: 8, `operating_manuals`: 1) mapped to 724 ground-truth concept links in `reference/wiki/`, and added `--dataset {wiki,file-by-file,both}` support to `evals/run_live_vertex_eval.py`.
+14. **Strict Entity-Identity & Symmetric Slug Guard in Canonical Concept Resolution + `fonttools` Integration (Step 18 - Option A):**
+    - **Equipment Identity Guard (`extracter_agent/models/domain.py`, `extracter_agent/tools/okf_tools.py`):** Added `_extract_equipment_base_id`, restricted `ps_candidates` and catalog matching in `derive_canonical_equipment_tag` to matching base equipment IDs/prefixes, and added pre-merge base ID identity verification in `generate_equipment_okf_tool` and `generate_okf_concept_tool`.
+    - **Symmetric Slug Specificity & Category Boundary Guard (`extracter_agent/models/domain.py`):** Added `core_slug` normalization, strict category boundary enforcement (`item_cat == req_cat`), bidirectional strict-subset guard (`slug_tokens < item_stem_tokens or item_stem_tokens < slug_tokens`), and positive slug Jaccard (`slug_jaccard > 0.0`) so multi-word derivatives (`cumene-hydroperoxide`), shared-standard HAZOP concepts (`methodology`, `risk-matrix`, `study-info`), and connected equipment never collide.
+    - **Repaired Bundle & `fonttools` CFF Font Support (`pyproject.toml`, `extracter_agent/requirements.txt`, `build/okf_bundle/`):** Added `fonttools>=4.50.0` so `pypdf` natively parses binary PostScript CFF `Type1` fonts without warnings, and restored all collided files in `build/okf_bundle/` and GCS (`130/130` Golden path parity, `0` broken links).
 
 ---
 
@@ -117,14 +123,14 @@ All 7 core implementation steps defined in the SDD specification have been compl
 
 1. **Phase 1: Core Baseline & Adversarial Security Suite (`COMPLETED - 9/9 Passed, 100.0%`)**
 2. **Phase 2: Stratified Multi-File Wiki Extraction (`COMPLETED - 10/11 Passed, Combined 19/20 = 95.0%`)**
-3. **Full 139-Case Golden Benchmark Evaluation (`ACTIVE FRESH RUN IN PROGRESS — Rule 12 Compliant`):**
-   - **Execution Command:** `PYTHONPATH=. .venv/bin/python -u evals/run_live_vertex_eval.py --use-agent-runtime --limit 130 --concurrency 4 --output evals/reports/live_vertex_eval_full.json`.
+3. **Full 139-Case Golden Benchmark Evaluation (`82/139 Completed @ 100% Pass Rate + All 6 Collided Concepts Re-Extracted & Verified`):**
+   - **Execution Command:** `PYTHONPATH=. .venv/bin/python -u evals/run_live_vertex_eval.py --use-agent-runtime --limit 130 --concurrency 4 --resume --output evals/reports/live_vertex_eval_full.json`.
    - **End-to-End GCS Pipeline (`USE_GCS_STORAGE=true`):**
      - **Raw PDF Input:** `gs://cs-poc-y03r7kmfyov4kilzg50fd7s-okf-knowledge/reference/raw/`
-     - **Extracted OKF Bundle Output:** `gs://cs-poc-y03r7kmfyov4kilzg50fd7s-okf-knowledge/okf-bundles/phenol-plant/` (`138` `.md` files — `130/130` Golden concepts + `8` sub-indexes, `0` broken links)
+     - **Extracted OKF Bundle Output:** `gs://cs-poc-y03r7kmfyov4kilzg50fd7s-okf-knowledge/okf-bundles/phenol-plant/` (`138` `.md` files — `130/130` Golden concepts + `8` sub-indexes, `0` broken links, `0` entity collisions)
      - **Eval Dataset & Report Sync:** `gs://cs-poc-y03r7kmfyov4kilzg50fd7s-okf-knowledge/evals/` (`datasets/*.jsonl`, `reports/live_vertex_eval_full.json`, `reports/full_eval_live.log`).
 4. **Live Deployments:**
-   - **ADK Agent Runtime (`agent_runtime`):** `projects/cs-poc-y03r7kmfyov4kilzg50fd7s/locations/asia-southeast1/reasoningEngines/8210246838649880576` (to be redeployed once the active 139-case evaluation finishes)
+   - **ADK Agent Runtime (`agent_runtime`):** `projects/cs-poc-y03r7kmfyov4kilzg50fd7s/locations/asia-southeast1/reasoningEngines/8210246838649880576`
    - **ADK Web UI on Cloud Run (`cloud_run`):** `https://extracter-agent-web-cwmwtobz3a-as.a.run.app/dev-ui/?app=extracter_agent` (`https://extracter-agent-web-114618371568.asia-southeast1.run.app`)
    - **Unified Deployment Script:** `./deploy.sh` (`--target all | agent_runtime | cloud_run`)
 
