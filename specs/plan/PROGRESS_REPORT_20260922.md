@@ -119,20 +119,35 @@ All 7 core implementation steps defined in the SDD specification have been compl
 
 ---
 
-## 4. Live Evaluation & Roadmap Status
+## 4. Live Evaluation & 3-Way Comparison Plan (Golden vs By-Equipment vs By-PDF)
 
-1. **Phase 1: Core Baseline & Adversarial Security Suite (`COMPLETED - 9/9 Passed, 100.0%`)**
-2. **Phase 2: Stratified Multi-File Wiki Extraction (`COMPLETED - 10/11 Passed, Combined 19/20 = 95.0%`)**
-3. **Full 139-Case Golden Benchmark Evaluation (`82/139 Completed @ 100% Pass Rate + All 6 Collided Concepts Re-Extracted & Verified`):**
-   - **Execution Command:** `PYTHONPATH=. .venv/bin/python -u evals/run_live_vertex_eval.py --use-agent-runtime --limit 130 --concurrency 4 --resume --output evals/reports/live_vertex_eval_full.json`.
-   - **End-to-End GCS Pipeline (`USE_GCS_STORAGE=true`):**
-     - **Raw PDF Input:** `gs://cs-poc-y03r7kmfyov4kilzg50fd7s-okf-knowledge/reference/raw/`
-     - **Extracted OKF Bundle Output:** `gs://cs-poc-y03r7kmfyov4kilzg50fd7s-okf-knowledge/okf-bundles/phenol-plant/` (`138` `.md` files — `130/130` Golden concepts + `8` sub-indexes, `0` broken links, `0` entity collisions)
-     - **Eval Dataset & Report Sync:** `gs://cs-poc-y03r7kmfyov4kilzg50fd7s-okf-knowledge/evals/` (`datasets/*.jsonl`, `reports/live_vertex_eval_full.json`, `reports/full_eval_live.log`).
-4. **Live Deployments:**
+1. **Detached Persistent Daemon (`systemd --user` with `Linger=yes`):**
+   - **Service Unit:** `extracter-eval-daemon.service` (`0::/user.slice/user-1656912.slice/user@1656912.service/app.slice/extracter-eval-daemon.service`)
+   - **Orchestration Script:** [`evals/run_detached_evals.sh`](../../evals/run_detached_evals.sh) (ignores `SIGHUP` in both bash and [`evals/run_live_vertex_eval.py`](../../evals/run_live_vertex_eval.py) to survive SSH/Jetski disconnects).
+   - **Status Check Command:** `systemctl --user status extracter-eval-daemon.service`
+
+2. **3-Way Side-by-Side Evaluation & Bundle Isolation Matrix:**
+
+| Corpus / Evaluation Mode | Dataset & Scope | Local Bundle Path | GCS Prefix (`gs://cs-poc-y03r7kmfyov4kilzg50fd7s-okf-knowledge/...`) | Eval Report & Live Log | Current Status |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **1. Golden Reference Wiki (Baseline Ground Truth)** | 130 document-grounded wiki concepts (`reference/wiki/`) | `reference/wiki/` *(read-only)* | `reference/raw/` *(136 source PDFs)* | `evals/datasets/wiki_ground_truth_eval.jsonl` | **Immutable Baseline** |
+| **2. By-Equipment / Concept Extraction (`--dataset wiki`)** | 139 cases (9 baseline/security + 130 concept-centric extractions) | `build/okf_bundle/` *(+ immutable snapshot at `build/okf_bundle_by_equipment/`)* | `okf-bundles/phenol-plant/` | `evals/reports/live_vertex_eval_full.json`<br>`evals/reports/full_eval_live.log` | **Running Now (Phase 1)** — Resumed from `82/139` (`100%` pass rate) $\rightarrow$ `139/139` |
+| **3. Individual PDF Extraction (`--dataset file-by-file`)** | 136 cases (100% of raw PDFs in `reference/raw/` ingested document-by-document with Read-Merge-Upsert) | `build/okf_bundle_by_pdf/` *(clean isolated directory)* | `okf-bundles/phenol-plant-by-pdf/` | `evals/reports/live_vertex_eval_by_pdf.json`<br>`evals/reports/by_pdf_eval_live.log` | **Queued Automatically (Phase 2)** — Starts immediately after Phase 1 completes |
+
+3. **Live Cloud Deployments:**
    - **ADK Agent Runtime (`agent_runtime`):** `projects/cs-poc-y03r7kmfyov4kilzg50fd7s/locations/asia-southeast1/reasoningEngines/8210246838649880576`
-   - **ADK Web UI on Cloud Run (`cloud_run`):** `https://extracter-agent-web-cwmwtobz3a-as.a.run.app/dev-ui/?app=extracter_agent` (`https://extracter-agent-web-114618371568.asia-southeast1.run.app`)
+   - **ADK Web UI on Cloud Run (`cloud_run`):** `https://extracter-agent-web-cwmwtobz3a-as.a.run.app/dev-ui/?app=extracter_agent` (Revision `extracter-agent-web-00004-qpb`, `HTTP 200`)
    - **Unified Deployment Script:** `./deploy.sh` (`--target all | agent_runtime | cloud_run`)
+
+---
+
+## 5. Next Actions (Once Detached Evaluations Complete)
+
+1. **Verify Completion of Phase 1 (`wiki`) & Phase 2 (`file-by-file`):**
+   - Inspect `evals/reports/live_vertex_eval_full.json` (`139/139`) and `evals/reports/live_vertex_eval_by_pdf.json` (`136/136`).
+2. **Execute 3-Way Comparative Analysis (`reference/wiki/` vs `build/okf_bundle_by_equipment/` vs `build/okf_bundle_by_pdf/`):**
+   - Compare concept coverage, parameter completeness, multi-source citation recall, P&ID instrument loop coverage, cross-document conflict detection (`⚠️ CONFLICT`), and structural/table density across all three bundles.
+
 
 
 
