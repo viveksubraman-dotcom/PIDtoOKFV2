@@ -426,11 +426,70 @@ def _parse_section_bullets(body: str, heading: str) -> list[str]:
     return bullets
 
 
+def _extract_sheet_qualifier(src: str) -> str:
+    """Extract intra-document sheet/page/section qualifier (e.g. 'sheet 1', 'page 4', 'cover', 'sketch') if present."""
+    s = src.lower()
+    m = re.search(r"\b(?:sheet|sh\.?|page|pg\.?)\s*([0-9a-z]+)\b", s)
+    if m:
+        return f"sheet-{m.group(1)}"
+    if "cover" in s and "sketch" not in s:
+        return "cover"
+    if "sketch" in s and "cover" not in s:
+        return "sketch"
+    return ""
+
+
+def _normalize_base_source_id(src: str) -> str:
+    """Normalize a source citation to its base document identifier without revision suffixes."""
+    s = src.strip().lower()
+    if not s:
+        return ""
+    s = s.split("/")[-1].removesuffix(".pdf")
+    # Strip parenthetical or inline sheet/page qualifiers
+    s = re.sub(r"\([^)]*(?:sheet|sh\.?|page|pg\.?|cover|sketch)[^)]*\)", "", s)
+    s = re.sub(r"\b(?:sheet|sh\.?|page|pg\.?)\s*[0-9a-z]+\b", "", s)
+    # Strip parenthetical or inline revision qualifiers: 'Rev Z0', 'Rev. 1', '(Rev A)', '_Z1', '-R3'
+    s = re.sub(r"\([^)]*(?:rev(?:ision)?\.?\s*[a-z0-9]+)[^)]*\)", "", s)
+    s = re.sub(r"\b(?:rev(?:ision)?\.?\s*[a-z0-9]+)\b", "", s)
+    s = re.sub(r"(?:_z[0-9a-z]+|[-_]r[0-9]+|[-_]rev[0-9a-z]+)$", "", s)
+    if "_" in s and "-" in s.split("_")[0]:
+        s = s.split("_")[0]
+    m_code = re.search(
+        r"\b((?:ps|dwg|pfd|pid|om|sds|sg|std)-[a-z0-9-]+)\b",
+        s,
+    )
+    base = m_code.group(1) if m_code else s
+    base = re.sub(r"(?:_z[0-9a-z]+|[-_]r[0-9]+|[-_]rev[0-9a-z]+)$", "", base)
+    return re.sub(r"[^a-z0-9]+", "", base)
+
+
+def _is_same_source_or_revision_update(old_src: str, new_src: str) -> bool:
+    """Return True if old_src and new_src refer to the same document (in-place update or newer revision),
+    and False if they refer to different documents or different sheets within the same document."""
+    if not old_src or not new_src:
+        return True
+    if old_src.strip().lower() == new_src.strip().lower():
+        return True
+
+    old_sheet = _extract_sheet_qualifier(old_src)
+    new_sheet = _extract_sheet_qualifier(new_src)
+    if old_sheet and new_sheet and old_sheet != new_sheet:
+        return False
+    if bool(old_sheet) != bool(new_sheet) and (
+        "cover" in (old_sheet + new_sheet) or "sketch" in (old_sheet + new_sheet)
+    ):
+        return False
+
+    old_base = _normalize_base_source_id(old_src)
+    new_base = _normalize_base_source_id(new_src)
+    return bool(old_base and new_base and old_base == new_base)
+
+
 def _merge_parameter_lists(
     existing_params: list[EngineeringParameter],
     new_params: list[EngineeringParameter],
 ) -> tuple[list[EngineeringParameter], list[str]]:
-    """Merge two lists of EngineeringParameter, preserving existing parameters and flagging cross-document conflicts."""
+    """Merge two lists of EngineeringParameter, updating in-place on same-source/revision updates and flagging cross-document or multi-sheet conflicts."""
     merged: list[EngineeringParameter] = [p.model_copy(deep=True) for p in existing_params]
     index_by_key: dict[str, int] = {
         p.parameter.strip().lower(): idx for idx, p in enumerate(merged)
@@ -452,9 +511,12 @@ def _merge_parameter_lists(
         new_src = (new_p.source or "").strip()
 
         if old_val == new_val:
-            combined_src = old_src
-            if new_src and new_src not in old_src:
-                combined_src = f"{old_src}; {new_src}" if old_src else new_src
+            if _is_same_source_or_revision_update(old_src, new_src):
+                combined_src = new_src or old_src
+            else:
+                combined_src = old_src
+                if new_src and new_src not in old_src:
+                    combined_src = f"{old_src}; {new_src}" if old_src else new_src
             merged[idx] = EngineeringParameter(
                 parameter=new_p.parameter or old_p.parameter,
                 value=new_val,
@@ -463,8 +525,8 @@ def _merge_parameter_lists(
                 note=new_p.note or old_p.note,
             )
         else:
-            # Differing values across extractions
-            if old_src and new_src and old_src.lower() != new_src.lower():
+            # Differing values across extractions: check if different document/sheet vs. revision update of same document
+            if not _is_same_source_or_revision_update(old_src, new_src):
                 old_u = "" if not old_p.unit or old_p.unit == "—" else f" {old_p.unit}"
                 new_u = "" if not new_p.unit or new_p.unit == "—" else f" {new_p.unit}"
                 conflict_note = f"{old_src}: {old_val}{old_u}".strip()
@@ -482,6 +544,7 @@ def _merge_parameter_lists(
                     f"whereas {new_src} specifies {new_val}{new_u} — verify with engineer before HAZOP"
                 )
             else:
+                # Same source document (in-place update or newer revision): supersede with new value & source
                 merged[idx] = new_p.model_copy(deep=True)
 
     return merged, conflicts
@@ -653,14 +716,19 @@ def merge_equipment_entity_with_existing(
             seen_hazards.add(h_clean.lower())
             merged_hazards.append(h_clean)
 
-    # Merge sources (deduplicated, preserving order)
+    # Merge sources (deduplicated by base document ID so newer revisions replace superseded revisions)
     merged_sources: list[str] = []
-    seen_sources: set[str] = set()
+    source_idx_by_base: dict[str, int] = {}
     for s in existing_sources + new_entity.sources:
         s_clean = s.strip().removeprefix("reference/raw/")
-        if s_clean and s_clean.lower() not in seen_sources:
-            seen_sources.add(s_clean.lower())
+        if not s_clean:
+            continue
+        base_key = _normalize_base_source_id(s_clean) or s_clean.lower()
+        if base_key not in source_idx_by_base:
+            source_idx_by_base[base_key] = len(merged_sources)
             merged_sources.append(s_clean)
+        else:
+            merged_sources[source_idx_by_base[base_key]] = s_clean
 
     existing_func = _extract_section_text(body, "Function")
     merged_func = new_entity.function_summary or existing_func

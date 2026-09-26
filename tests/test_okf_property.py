@@ -264,4 +264,68 @@ def test_pbt_incremental_merge_monotonic_and_idempotent(p1_names, p2_names, val1
     assert len(merged_twice.hazards) == len(merged_once.hazards)
 
 
+@given(
+    doc_num=st.integers(min_value=1000, max_value=9999),
+    rev_old=st.sampled_from(["Rev 0", "Rev A", "Rev Z0", "_Z0", "-R1"]),
+    rev_new=st.sampled_from(["Rev 1", "Rev B", "Rev Z1", "_Z1", "-R2"]),
+    val_old=st.integers(min_value=1, max_value=50).map(str),
+    val_new=st.integers(min_value=51, max_value=100).map(str),
+)
+def test_pbt_same_document_revision_supersedes_without_conflict(
+    doc_num, rev_old, rev_new, val_old, val_new
+):
+    """Invariant: A newer revision of the same base document updates parameter values in-place without generating a false conflict."""
+    from extracter_agent.models.domain import EngineeringParameter, EquipmentEntity
+    from extracter_agent.okf.synthesizer import (
+        merge_equipment_entity_with_existing,
+        synthesize_equipment_concept,
+    )
+
+    src_old = f"PS-V{doc_num} {rev_old}" if not rev_old.startswith(("_", "-")) else f"PS-V{doc_num}{rev_old}"
+    src_new = f"PS-V{doc_num} {rev_new}" if not rev_new.startswith(("_", "-")) else f"PS-V{doc_num}{rev_new}"
+
+    e_old = EquipmentEntity(
+        tag=f"V-{doc_num}",
+        name="Test Vessel",
+        equipment_class="Vessel",
+        unit="U10",
+        function_summary="Test vessel function.",
+        design_data=[
+            EngineeringParameter(
+                parameter="Design Pressure",
+                value=val_old,
+                unit="kg/cm2g",
+                source=src_old,
+            )
+        ],
+        sources=[f"data_sheets/{src_old.replace(' ', '_')}.pdf"],
+    )
+    doc_old = OKFDocument.parse(synthesize_equipment_concept(e_old).serialize())
+
+    e_new = EquipmentEntity(
+        tag=f"V-{doc_num}",
+        name="Test Vessel",
+        equipment_class="Vessel",
+        unit="U10",
+        function_summary="Test vessel function.",
+        design_data=[
+            EngineeringParameter(
+                parameter="Design Pressure",
+                value=val_new,
+                unit="kg/cm2g",
+                source=src_new,
+            )
+        ],
+        sources=[f"data_sheets/{src_new.replace(' ', '_')}.pdf"],
+    )
+
+    merged = merge_equipment_entity_with_existing(e_new, doc_old)
+    assert len(merged.design_data) == 1
+    assert merged.design_data[0].value == val_new
+    assert merged.design_data[0].source == src_new
+    assert not any("CONFLICT" in h for h in merged.hazards)
+    assert len(merged.sources) == 1
+
+
+
 

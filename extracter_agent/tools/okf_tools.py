@@ -21,6 +21,7 @@ from extracter_agent.models.domain import (
 from extracter_agent.okf.document import OKFDocument
 from extracter_agent.okf.indexer import generate_bundle_indexes, update_bundle_log
 from extracter_agent.okf.synthesizer import (
+    _normalize_base_source_id,
     merge_equipment_entity_with_existing,
     synthesize_equipment_concept,
 )
@@ -299,12 +300,14 @@ def generate_okf_concept_tool(
                     existing_src_list.append(s.strip())
 
             combined_sources: list[str] = []
-            seen_src_names: set[str] = set()
+            src_idx_by_base: dict[str, int] = {}
             for s in existing_src_list + merged_sources:
-                key = s.split("/")[-1].lower()
-                if key not in seen_src_names:
-                    seen_src_names.add(key)
+                key = _normalize_base_source_id(s) or s.split("/")[-1].lower()
+                if key not in src_idx_by_base:
+                    src_idx_by_base[key] = len(combined_sources)
                     combined_sources.append(s)
+                else:
+                    combined_sources[src_idx_by_base[key]] = s
             merged_sources = combined_sources
 
             prior_meta = existing_fm.get("entity_metadata", {})

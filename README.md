@@ -137,9 +137,9 @@ The **Extracter Agent** (`extracter_agent`) is an autonomous Google ADK multi-fi
    - **GCS Raw PDF Cache Verification (`pdf_tools.py`):** Compares both `size_bytes` and base64 MD5 digest (`blob.md5_hash`) against `/tmp/extracter_gcs_raw_cache/`, automatically re-downloading updated PDFs even when replaced in-place under the same filename.
    - **POSIX Child `st_mtime_ns` Cache Invalidation (`domain.py`, `synthesizer.py`):** Tracks `(len(md_files), max(child.stat().st_mtime_ns))` in `_iter_bundle_catalog` and `resolve_bundle_instrument_link` so in-place edits immediately invalidate in-memory caches.
    - **MD5 Digest Verification in GCS Exporter (`exporter.py`):** Verifies base64 MD5 digests in `GCSExporter.export_bundle` so equal-byte-length updates are always uploaded to GCS.
-4. **Incremental File-by-File (Document-Centric) Extraction & Read-Merge-Upsert (`Step 17`):**
+4. **Incremental File-by-File (Document-Centric) Extraction & Revision-Aware Read-Merge-Upsert (`Step 17`):**
    - **Dual Extraction Modes:** Supports both **Entity-Centric Extraction** (by equipment tag, instrument loop, hazard, or plant unit) and **File-by-File Incremental Extraction** (processing raw PDFs one by one from `reference/raw/<subfolder>/<filename>.pdf`).
-   - **Non-Destructive Read-Merge-Upsert (`merge_equipment_entity_with_existing`):** `generate_equipment_okf_tool` and `generate_okf_concept_tool` automatically merge new facts, sources, parameters, instruments, and stream connections with existing `.md` concepts on disk without overwriting prior sources, and automatically flag numerical discrepancies across documents with `⚠️ CONFLICT — <PARAMETER>: ...`.
+   - **Revision-Aware Non-Destructive Read-Merge-Upsert (`merge_equipment_entity_with_existing`, `_is_same_source_or_revision_update`):** `generate_equipment_okf_tool` and `generate_okf_concept_tool` automatically merge new facts, sources, parameters, instruments, and stream connections with existing `.md` concepts on disk. In-place updates or newer revisions of the **same base document** (`Rev Z0` $\rightarrow$ `Rev Z1`) supersede old values in-place without false conflicts, while discrepancies across **different active documents** (Datasheet vs. P&ID) or **different sheets** (`Sheet 1 Cover` vs. `Sheet 4 Sketch`) are flagged with `⚠️ CONFLICT — <PARAMETER>: ...`.
    - **Bundle Inspection Tool (`inspect_existing_okf_concept_tool`):** Allows the agent to inspect existing concept frontmatter/body or query which concepts already cite a given raw source PDF.
    - **136-File Document-Centric Evaluation Benchmark (`evals/datasets/raw_file_by_file_eval.jsonl`):** Covers **100% (`136 / 136`) of the raw PDFs** in `reference/raw/` (`data_sheets`: 55, `pid`: 46, `standards`: 26, `pfd`: 8, `operating_manuals`: 1) mapped to 724 ground-truth concept links in `reference/wiki/`.
 
@@ -171,7 +171,7 @@ A unified [`deploy.sh`](./deploy.sh) script deploys both the **ADK Agent (`agent
 | **Tool Trajectory Precision** | **100.0%** | **100.0%** | **100.0%** | $\ge 95.0\%$ (**PASS**) |
 | **Negative Constraint Adherence** | **100.0%** | **100.0%** | **100.0%** | $100.0\%$ (**PASS**) |
 | **Model Armor Security Interception** | **100.0%** | **100.0%** | **100.0%** | $100.0\%$ (**PASS**) |
-| **Unit & Property-Based Tests (PBT)** | **60 / 60 Passed** | **60 / 60 Passed** | **100.0%** | $100.0\%$ (**PASS**) |
+| **Unit & Property-Based Tests (PBT)** | **61 / 61 Passed** | **61 / 61 Passed** | **100.0%** | $100.0\%$ (**PASS**) |
 
 ### Running Detached Live Evaluations on Cloudtop (Against Deployed Agent Runtime)
 To run or resume the **130-case Entity-Centric (`--dataset wiki`)** or **136-case File-by-File (`--dataset file-by-file`)** evaluation suite against the deployed **Vertex AI Agent Runtime (`projects/114618371568/locations/asia-southeast1/reasoningEngines/8210246838649880576`)**:

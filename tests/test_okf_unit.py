@@ -599,6 +599,52 @@ def test_incremental_equipment_merge_and_conflict_detection(tmp_path):
     assert "Maintain nitrogen blanket during shutdown." in md_text
     assert "⚠️ CONFLICT — Design Pressure" in md_text
 
+    # Pass 3: Newer revision of the same datasheet (PS-V9100 Rev Z1) updates Shell ID (2400 -> 2600) WITHOUT conflict,
+    # while Sheet 1 Cover vs Sheet 4 Sketch on Design Temperature DOES flag a conflict!
+    res3 = generate_equipment_okf_tool(
+        tag="V-9100",
+        name="Primary Flash Drum",
+        equipment_class="Vessel",
+        unit="U91",
+        function_summary="Separates light vapor from liquid feed with ESD level protection.",
+        design_data=[
+            {
+                "parameter": "Shell ID",
+                "value": "2600",
+                "unit": "mm",
+                "source": "PS-V9100 Rev Z1",
+            },
+            {
+                "parameter": "Design Temperature",
+                "value": "120",
+                "unit": "°C",
+                "source": "PS-V9100 (Sheet 1 Cover)",
+            },
+            {
+                "parameter": "Design Temperature",
+                "value": "150",
+                "unit": "°C",
+                "source": "PS-V9100 (Sheet 4 Sketch)",
+            },
+        ],
+        operating_conditions=[],
+        connections=[],
+        hazards=[],
+        source_files=["data_sheets/PS-V9100_DATASHEET_Z1.pdf"],
+        instruments=[],
+        output_bundle_dir=bundle_dir,
+    )
+    assert res3["status"] == "success"
+    assert res3["merged_with_existing"] is True
+    # Superseded datasheet path replaced by Z1, so still 2 total sources (PS-V9100_Z1 + DWG-91-001)
+    assert len(res3["frontmatter"]["sources"]) == 2
+
+    md_text_3 = (Path(bundle_dir) / "equipment" / "V-9100.md").read_text(encoding="utf-8")
+    assert "| Shell ID | 2600 | mm | PS-V9100 Rev Z1 |" in md_text_3
+    assert "⚠️ CONFLICT — Shell ID" not in md_text_3
+    assert "⚠️ CONFLICT — Design Temperature" in md_text_3
+
+
 
 
 
