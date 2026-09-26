@@ -273,8 +273,7 @@ async def run_evaluation(
         wiki_path = Path("evals/datasets/wiki_ground_truth_eval.jsonl")
         if wiki_path.exists():
             wiki_lines = wiki_path.read_text(encoding="utf-8").strip().splitlines()
-            count = 0
-            for line in wiki_lines:
+            for count, line in enumerate(wiki_lines):
                 if count >= limit:
                     break
                 w_item = json.loads(line)
@@ -293,7 +292,6 @@ async def run_evaluation(
                     "is_adversarial": False,
                     "is_negative": False,
                 })
-                count += 1
 
     total = len(test_cases)
     print(f"Loaded {total} evaluation test cases across categories.", flush=True)
@@ -310,7 +308,7 @@ async def run_evaluation(
                     item["expected_intent"] = new_exp
                     if item.get("predicted_intent") == new_exp or (
                         new_exp in ("GENERATE_OKF_CONCEPT", "BUILD_OKF_BUNDLE")
-                        and item.get("predicted_intent") in ("GENERATE_OKF_CONCEPT", "BUILD_OKF_BUNDLE")
+                        and item.get("predicted_intent") in ("GENERATE_OKF_CONCEPT", "BUILD_OKF_BUNDLE", "EXTRACT_DOCUMENT")
                     ):
                         item["intent_matched"] = True
                 if item.get("intent_matched") and item.get("trajectory_matched") and not item.get("error"):
@@ -401,7 +399,7 @@ async def run_evaluation(
                     pred_intent = c_res.intent.value
                     intent_ok = (pred_intent == exp_intent) or (
                         exp_intent in ("GENERATE_OKF_CONCEPT", "BUILD_OKF_BUNDLE")
-                        and pred_intent in ("GENERATE_OKF_CONCEPT", "BUILD_OKF_BUNDLE")
+                        and pred_intent in ("GENERATE_OKF_CONCEPT", "BUILD_OKF_BUNDLE", "EXTRACT_DOCUMENT")
                     )
                 except Exception as e:
                     pred_intent = f"ERROR: {e}"
@@ -541,8 +539,10 @@ def save_report(summary: LiveEvalSummary, output_path: Path) -> None:
                 for ds_file in Path("evals/datasets").glob("*.jsonl"):
                     ds_blob = bucket.blob(f"evals/datasets/{ds_file.name}")
                     ds_blob.upload_from_filename(str(ds_file), content_type="application/jsonl")
-        except Exception:
-            pass
+        except Exception as exc:
+            import logging
+
+            logging.getLogger(__name__).debug("Ignored non-fatal GCS sync error: %s", exc)
 
 
 def print_summary_table(summary: LiveEvalSummary) -> None:

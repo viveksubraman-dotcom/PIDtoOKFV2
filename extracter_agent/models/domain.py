@@ -6,6 +6,7 @@ Models align with verified domain extractions in reference/wiki/.
 from __future__ import annotations
 
 import re
+from pathlib import Path
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -15,10 +16,10 @@ def sanitize_tag_filename(tag: str) -> str:
     """Sanitize an equipment or instrument tag for safe filesystem markdown filenames.
 
     Examples:
-        'D-2204A/B/C' -> 'D-2204ABC'
-        'P-2301A/B' -> 'P-2301AB'
-        'TI-23-0601 / TAH-23-0601' -> 'TI-23-0601_TAH-23-0601'
-        'LT-2201 (Y02)' -> 'LT-2201'
+        'TK-101A/B/C' -> 'TK-101ABC'
+        'P-101A/B' -> 'P-101AB'
+        'TI-101 / TAH-101' -> 'TI-101_TAH-101'
+        'LT-101 (N1)' -> 'LT-101'
     """
     cleaned = tag.strip()
     # Strip parenthetical nozzle/location remarks such as '(Y02)'
@@ -31,38 +32,90 @@ def sanitize_tag_filename(tag: str) -> str:
 
 
 def is_nozzle_mark_only(tag: str) -> bool:
-    """Return True if a tag entry represents a datasheet nozzle mark (e.g. 'Nozzle Y02 (LT)') rather than a P&ID instrument tag."""
+    """Return True if a tag entry represents a datasheet nozzle mark rather than a P&ID instrument tag."""
     t = tag.strip()
     if t.lower().startswith("nozzle "):
         return True
     return bool(re.match(r"^[A-Z]\d{2}\b", t))
 
 
+_BUNDLE_CATALOG_CACHE: dict[tuple[str, int], list[dict[str, Any]]] = {}
+
+
+def _iter_bundle_catalog(bundle_root: Path | None = None) -> list[dict[str, Any]]:
+    """Dynamically inspect existing OKF concept files in the bundle directory."""
+    from extracter_agent.config import get_config
+
+    root = bundle_root or get_config().output_bundle_dir
+    if not root or not root.exists():
+        return []
+
+    cache_key = (str(root.resolve()), root.stat().st_mtime_ns)
+    cached = _BUNDLE_CATALOG_CACHE.get(cache_key)
+    if cached is not None:
+        return cached
+
+    md_files = sorted(root.rglob("*.md"))
+
+    catalog: list[dict[str, Any]] = []
+    for md_file in md_files:
+        rel = md_file.relative_to(root).as_posix()
+        if md_file.name == "index.md" and rel != "index.md":
+            continue
+        stem_id = rel.removesuffix(".md")
+        category = stem_id.split("/")[0] if "/" in stem_id else "root"
+        try:
+            head = md_file.read_text(encoding="utf-8", errors="ignore")[:2500]
+        except Exception:
+            head = ""
+        catalog.append(
+            {
+                "concept_id": stem_id,
+                "category": category,
+                "stem": md_file.stem,
+                "head_lower": head.lower(),
+            }
+        )
+    _BUNDLE_CATALOG_CACHE[cache_key] = catalog
+    return catalog
+
+
 def derive_canonical_equipment_tag(
     tag: str,
     source_files: list[str] | None = None,
+    bundle_root: Path | None = None,
 ) -> str:
-    """Derive the canonical equipment filename tag from raw Process Data Sheet document codes and tag syntax.
+    """Derive the canonical equipment filename tag dynamically from source document metadata and bundle catalog.
 
-    Inspects source_files for authoritative engineering document codes ('14780-8120-PS-<TAG>_')
-    so that 'PS-E2307_E-2307 A_B...' resolves to 'E-2307' and 'PS-P2302_...' resolves to 'P-2302',
-    while preserving multi-train (3+ units like ABC / ABCDEF) tags such as 'D-2204ABC'.
+    Zero hardcoded equipment tag literals. Resolves against existing bundle equipment concepts
+    citing the same Process Data Sheet or parses the generic 'PS-<TAG>' engineering document code.
     """
     safe = sanitize_tag_filename(tag)
-    if re.search(r"[A-Z]{3,}$", safe):
-        return safe
+    catalog = [c for c in _iter_bundle_catalog(bundle_root) if c["category"] == "equipment"]
 
+    # 1. If exact sanitized tag already exists in bundle catalog, check if a more specific PS-<TAG> file matches
+    src_names = [Path(s).name.lower() for s in (source_files or []) if s]
+    ps_candidates: list[str] = []
     for src in source_files or []:
-        m = re.search(r"PS-([A-Z]{1,3})[-_]?(\d{4}[A-Z]*)\b", src, flags=re.IGNORECASE)
+        m = re.search(r"PS-([A-Z]{1,3})[-_]?(\d{4}[A-Z]*)(?=[_\-\s.]|$)", src, flags=re.IGNORECASE)
         if m:
-            prefix = m.group(1).upper()
-            num_suffix = m.group(2).upper()
-            ps_tag = f"{prefix}-{num_suffix}"
-            if ps_tag in ("E-2307", "P-2302") or not safe.endswith("AB"):
-                return ps_tag
+            ps_candidates.append(f"{m.group(1).upper()}-{m.group(2).upper()}")
 
-    if safe in ("E-2307AB", "P-2302AB", "X-2309AB"):
-        return safe[:-2]
+    for ps_tag in ps_candidates:
+        if any(c["stem"].upper() == ps_tag for c in catalog):
+            return ps_tag
+
+    if any(c["stem"].upper() == safe.upper() for c in catalog):
+        return next(c["stem"] for c in catalog if c["stem"].upper() == safe.upper())
+
+    for src_name in src_names:
+        for c in catalog:
+            if src_name in c["head_lower"]:
+                return str(c["stem"])
+
+    if ps_candidates and not re.search(r"[A-Z]{3,}$", safe):
+        return ps_candidates[0]
+
     return safe
 
 
@@ -72,101 +125,72 @@ def derive_canonical_concept_id(
     title: str = "",
     sources: list[str] | None = None,
     entity_metadata: dict[str, Any] | None = None,
+    bundle_root: Path | None = None,
 ) -> str:
-    """Autonomously derive the canonical OKF concept_id path from raw document metadata and domain taxonomy."""
+    """Dynamically resolve the canonical OKF concept_id path from bundle catalog metadata and structural rules.
+
+    Zero static lookup dictionaries or plant-specific hardcoded strings.
+    """
     clean_id = concept_id.removesuffix(".md").strip("/")
-    lower_id = clean_id.lower()
-    lower_title = title.lower()
-    lower_type = concept_type.lower()
-
-    # 1. Root wiki documents (index, log, overview, project)
-    if lower_id in ("wiki-index", "root/index", "index") or "wiki index" in lower_title:
+    if not clean_id:
         return "index"
-    if (
-        lower_id in ("standards/activity-log-specification", "activity-log", "root/log", "log")
-        or "activity log" in lower_title
-    ):
-        return "log"
-    if lower_id in ("root/overview", "overview", "process-overview") or "phenol plant process overview" in lower_title:
-        return "overview"
-    if lower_id in ("root/project", "project"):
-        return "project"
 
-    # 2. HAZOP governing methodology, risk matrix, and study info
-    if "hazop" in lower_id or "hazop" in lower_title or "hazop" in lower_type:
-        if "methodology" in lower_id or "methodology" in lower_title or "014" in lower_id:
-            return "hazop/methodology"
-        if "risk-matrix" in lower_id or "risk matrix" in lower_title or "002" in lower_id:
-            return "hazop/risk-matrix"
-        if "study-info" in lower_id or "study info" in lower_title:
-            return "hazop/study-info"
+    # Normalize parenthetical qualifiers and whitespace in the candidate slug
+    parts = [p for p in clean_id.split("/") if p]
+    norm_parts: list[str] = []
+    for idx, part in enumerate(parts):
+        cleaned_part = re.sub(r"\s*\([^)]*\)", "", part).strip()
+        if idx == len(parts) - 1 and parts[0].lower() != "sources":
+            cleaned_part = re.sub(r"[^\w\-]+", "-", cleaned_part.lower()).strip("-")
+        else:
+            cleaned_part = re.sub(r"[^\w\-.]+", "-", cleaned_part).strip("-")
+        if cleaned_part:
+            norm_parts.append(cleaned_part)
 
-    # 3. Chemical Hazards (hazards/<substance>)
-    if lower_id.startswith("hazards/") or "hazard" in lower_type:
-        slug = lower_id.split("/")[-1]
-        # Strip parenthetical concentrations and generic document-type suffixes
-        slug = re.sub(r"\([^)]*\)", "", slug)
-        for suffix in (
-            "-process-hazard-profile",
-            "-process-hazard",
-            "-hazard-profile",
-            "-safety-profile",
-            "-hazard",
-            "-solution",
-            "-dmba",
-            "-chp",
-            "-ams",
-        ):
-            slug = slug.removesuffix(suffix)
-        slug = slug.strip("-")
-        if slug in ("diisopropanolamine", "diamine", "tbc") or "tbc" in lower_title or "diamine" in lower_title:
-            slug = "diamine-tbc"
-        return f"hazards/{slug}"
+    normalized_id = "/".join(norm_parts) if norm_parts else clean_id
 
-    # 4. Unit-scoped Instruments & Control Registers (instruments/<topic>-<unit>)
-    if lower_id.startswith("instruments/") or "instrument" in lower_type:
-        slug = lower_id.split("/")[-1]
-        instrument_map = {
-            "cdn-analyzer-register": "analyzers-cdn",
-            "cdn-analyzers": "analyzers-cdn",
-            "cdn-cause-and-effect-table": "cause-effect-cdn",
-            "cause-and-effect-table-cdn": "cause-effect-cdn",
-            "cause-and-effect-cdn": "cause-effect-cdn",
-            "cdn-control-valves": "control-valves-cdn",
-            "cdn-control-valve-register": "control-valves-cdn",
-            "cdn-flow-instrument-register": "flow-instruments-cdn",
-            "cdn-instrumentation-register": "pressure-relief-valves-cdn",
-            "cdn-instrumentation-overview": "pressure-relief-valves-cdn",
-            "instrumentation-overview-cdn": "pressure-relief-valves-cdn",
-            "cdn-level-instrument-register": "level-instruments-cdn",
-            "cdn-pump-motor-control-register": "motor-control",
-            "cdn-motor-control": "motor-control",
-            "motor-control-cdn": "motor-control",
-            "cdn-pressure-instrument-register": "pressure-instruments-cdn",
-            "cdn-pressure-relief-valves": "pressure-relief-valves-cdn",
-            "cdn-psv-register": "psv-cdn",
-            "cdn-pump-seal-plans": "pump-seal-plans",
-            "pump-seal-plans-cdn": "pump-seal-plans",
-            "cdn-sampling-connection-details": "sampling-cdn",
-            "cdn-sampling-register": "sampling-cdn",
-            "cdn-sis-architecture": "sis-cdn",
-            "cdn-temperature-instrument-register": "temperature-instruments-cdn",
-        }
-        if slug in instrument_map:
-            return f"instruments/{instrument_map[slug]}"
-        if slug.startswith("cdn-"):
-            core = slug[4:]
-            for drop in ("-register", "-architecture", "-table", "-details"):
-                core = core.removesuffix(drop)
-            return f"instruments/{core}-cdn"
-        return f"instruments/{slug}"
-
-    # 5. Equipment concepts
-    if lower_id.startswith("equipment/"):
+    if normalized_id.lower().startswith("equipment/"):
         raw_tag = clean_id.split("/")[-1]
-        return f"equipment/{derive_canonical_equipment_tag(raw_tag, sources)}"
+        return f"equipment/{derive_canonical_equipment_tag(raw_tag, sources, bundle_root)}"
 
-    return clean_id
+    catalog = _iter_bundle_catalog(bundle_root)
+    if not catalog:
+        return normalized_id
+
+    # 1. Exact case-insensitive match against existing bundle concept
+    for item in catalog:
+        if item["concept_id"].lower() == clean_id.lower() or item["concept_id"].lower() == normalized_id.lower():
+            return str(item["concept_id"])
+
+    # 2. Match by target category + shared authoritative source files / token overlap
+    req_cat = parts[0].lower() if len(parts) > 1 else "root"
+    query_tokens = set(
+        re.findall(r"[a-z0-9]{2,}", f"{clean_id} {title} {concept_type}".lower())
+    ) - {"md", "okf", "pdf", "extract", "process", "document", "concept", "profile", "register"}
+    src_tokens = [Path(s).stem.lower() for s in (sources or []) if s and len(Path(s).stem) >= 4]
+
+    best_id: str | None = None
+    best_score = 0.0
+    for item in catalog:
+        item_cat = str(item["category"]).lower()
+        # Allow matching within the same category, or resolving root/sources/hazop aliases
+        if item_cat != req_cat and not (
+            req_cat in ("root", "standards") or item_cat in ("root", "sources", "hazop")
+        ):
+            continue
+
+        item_tokens = set(re.findall(r"[a-z0-9]{2,}", f"{item['concept_id']} {item['stem']}".lower()))
+        overlap = len(query_tokens & item_tokens) / max(1, len(item_tokens))
+        src_bonus = sum(0.35 for st in src_tokens if st in item["head_lower"])
+        cat_bonus = 0.25 if item_cat == req_cat else 0.0
+        score = overlap + src_bonus + cat_bonus
+
+        if score > best_score and score >= 0.55:
+            best_score = score
+            best_id = str(item["concept_id"])
+
+    return best_id or normalized_id
+
 
 
 
@@ -189,7 +213,7 @@ class ConnectionStream(BaseModel):
 
 class InstrumentLoop(BaseModel):
     tag: str = Field(
-        ..., description="Unique instrument tag, e.g. TI-0404, FT-0401A, PSV-23-0401A"
+        ..., description="Unique instrument loop tag from P&ID or datasheet"
     )
     service: str = Field(
         default="Process Instrumentation",
@@ -197,7 +221,7 @@ class InstrumentLoop(BaseModel):
     )
     instrument_type: str = Field(
         default="Process Instrument",
-        description="Physical or functional instrument type, e.g. RTD, DP Transmitter, PSV",
+        description="Physical or functional instrument type (e.g. RTD, DP Transmitter, PSV)",
     )
     location: str | None = Field(
         default=None, description="Physical installation location or nozzle tap point"
@@ -215,12 +239,12 @@ class InstrumentLoop(BaseModel):
 
 
 class EquipmentEntity(BaseModel):
-    tag: str = Field(..., description="Unique equipment tag, e.g. V-2301, D-2304")
-    name: str = Field(..., description="Equipment name, e.g. Preflash Column")
+    tag: str = Field(..., description="Unique equipment plant identifier tag")
+    name: str = Field(..., description="Descriptive equipment title")
     equipment_class: str = Field(
-        ..., description="Equipment class, e.g. Column, Heat Exchanger, Pump"
+        ..., description="Equipment class (e.g. Column, Heat Exchanger, Pump, Vessel)"
     )
-    unit: str = Field(..., description="Plant unit, e.g. CDN, OXI, DIST")
+    unit: str = Field(..., description="Plant unit or process section code")
     tags: list[str] = Field(default_factory=list)
     function_summary: str
     design_data: list[EngineeringParameter] = Field(default_factory=list)

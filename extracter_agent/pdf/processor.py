@@ -145,7 +145,7 @@ def chunk_document_text(
 def extract_equipment_tag_candidates(text: str) -> list[str]:
     """Extract likely equipment tag candidates matching standard plant tag patterns.
 
-    Identifies patterns like V-2301, D-2304, E-2301, P-2301AB, OX-2201, X-2301.
+    Identifies alphanumeric plant equipment tags matching <PREFIX>-<NUMBER><SUFFIX>.
     Used as candidate hints for model reasoning; does NOT replace cognitive routing.
     """
     pattern = r"\b([A-Z]{1,3}-\d{4}[A-Z]{0,6})\b"
@@ -286,12 +286,12 @@ def extract_pdf_multimodal_summary(
         "- Equipment tag, equipment name/title, unit/section, and document number\n"
         "- Mechanical dimensions (diameter, tangent length, boot ID/length, elevation), supports (saddles/skirt), vessel internals (distributors, partitions, vortex breakers)\n"
         "- Design ratings (internal/external design pressure, design temperature, metallurgy, corrosion allowance)\n"
-        "  * CRITICAL OCR DECIMAL CHECK: Carefully inspect decimal points on Design Pressure and Operating Pressure (e.g. distinguish 0.5 kg/cm²g from 5.0 kg/cm²g, and 3.9 kg/cm²g from 3.5 kg/cm²g). Cross-check the P&ID equipment banner/title block against the Process Data Sheet AS-BUILT table.\n"
+        "  * CRITICAL OCR DECIMAL CHECK: Carefully inspect decimal points on Design Pressure and Operating Pressure. Cross-check the P&ID equipment banner/title block against the Process Data Sheet AS-BUILT table.\n"
         "- Operating conditions (operating pressure, operating temperature, liquid levels NLL/LLL/VHL, specific gravity)\n"
-        "- Nozzles schedule (exact nozzle marks e.g. I01, N02, Y02, U01, sizes, ratings, services), stream connections, line tags, origins and destinations\n"
-        "- Complete instrumentation loops: NEVER collapse stacked or redundant P&ID instrument bubbles into a single tag; explicitly enumerate every sibling transmitter and suffix (e.g., LT-0601, LT-0602, LT-0603; FT-0401A, FT-0401B, FT-0401C; FT-0601, FIC-0601; HIC-0601, HXS-0106/0107)\n"
-        "- Safety Instrumented Systems (SIS/ESD valves UXV/UXY, UC-2301/UC-2302 interlocks, trip actions, alarms, PSVs and setpoints)\n"
-        "- Engineering notes, minimum elevation head notes (e.g. >= 5000 mm, >= 2500 mm, >= 600 mm), standard references, and cross-document conflict notes."
+        "- Nozzles schedule (exact nozzle marks, sizes, ratings, services), stream connections, line tags, origins and destinations\n"
+        "- Complete instrumentation loops: NEVER collapse stacked or redundant P&ID instrument bubbles into a single tag; explicitly enumerate every sibling transmitter, controller, hand switch, and suffix\n"
+        "- Safety Instrumented Systems (SIS/ESD valves, unit interlocks, trip actions, alarms, PSVs and setpoints)\n"
+        "- Engineering notes, minimum static elevation head notes, standard references, and cross-document conflict notes."
     )
     if prompt_hint:
         base_prompt = f"{base_prompt}\nFocus especially on: {prompt_hint}"

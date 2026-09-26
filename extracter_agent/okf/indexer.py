@@ -43,7 +43,9 @@ def _build_master_root_index(
     equip_rows: list[str] = []
     hazard_rows: list[str] = []
     inst_rows: list[str] = []
+    unit_bullets: list[str] = []
     conflict_notes: list[str] = []
+    catalog_title = "Master Plant Knowledge Catalog (OKF v0.2)"
 
     for md_file in sorted(root.rglob("*.md")):
         if md_file.name in (_INDEX_FILENAME, _LOG_FILENAME):
@@ -58,10 +60,14 @@ def _build_master_root_index(
             if len(desc) > 140:
                 desc = desc[:137] + "..."
             meta = fm.get("entity_metadata") or {}
-            if rel.startswith("equipment/"):
+            if rel in ("overview.md", "project.md") and fm.get("title"):
+                catalog_title = f"{fm.get('title')} — Master Knowledge Catalog (OKF v0.2)"
+            if rel.startswith("units/"):
+                unit_bullets.append(f"- **[{title}]({rel})**: {desc}")
+            elif rel.startswith("equipment/"):
                 tag = str(meta.get("tag") or md_file.stem)
-                unit = str(meta.get("unit") or "CDN")
-                eq_class = str(meta.get("equipment_class") or "Vessel")
+                unit = str(meta.get("unit") or "—")
+                eq_class = str(meta.get("equipment_class") or "Equipment")
                 inst_cnt = len(meta.get("instruments") or [])
                 equip_rows.append(
                     f"| [{tag}]({rel}) | {title} | {unit} | {eq_class} | {inst_cnt} loops | {desc} |"
@@ -85,14 +91,17 @@ def _build_master_root_index(
         "",
         "---",
         "",
-        "# Phenol Process Expert — Master Plant Knowledge Catalog (OKF v0.2)",
-        "",
-        "## 1. Plant Unit Architecture & Scope",
-        "- **Unit 21 (ALKY — Cumene Alkylation & Transalkylation):** Benzene/propylene reaction, rectification, and heavies separation (`D-2121`, `D-2122`).",
-        "- **Unit 22 (OXI — Cumene Oxidation):** Combined feed surge (`D-2201` with 610 mm drop-leg boot & Style A coalescer), feed caustic wash (`V-2201`), oxidation reactors (`OX-2201`, `OX-2202`), and off-gas scrubbing/treatment (`D-2202`–`D-2211`).",
-        "- **Unit 23 (CDN — CHP Concentration, Cleavage/Decomposition & Neutralization):** Two-stage vacuum CHP concentration (`V-2301` Preflash Column, `V-2302` Flash Column, `E-2301`–`E-2310`), gravity emergency cumene quench (`D-2301` elevated $\\ge 5000\\text{ mm}$), acid-catalyzed cleavage (`D-2304`), and SIS trip systems (`UC-2301` Concentration & `UC-2302` Decomposition).",
+        f"# {catalog_title}",
         "",
     ]
+    if unit_bullets:
+        catalog_sections.extend(
+            [
+                "## 1. Plant Unit Architecture & Scope",
+                *unit_bullets,
+                "",
+            ]
+        )
 
     if equip_rows:
         catalog_sections.extend(
@@ -121,7 +130,7 @@ def _build_master_root_index(
     if inst_rows:
         catalog_sections.extend(
             [
-                "## 4. Instrumentation, SIS (`UC-2301` / `UC-2302`) & Overpressure Protection Register",
+                "## 4. Instrumentation, Safety Interlocks (SIS) & Overpressure Protection Register",
                 "",
                 "| Subsystem Register | Canonical Path | Scope & Safety Interlock Summary |",
                 "| :--- | :--- | :--- |",

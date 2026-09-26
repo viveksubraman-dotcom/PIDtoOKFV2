@@ -47,25 +47,25 @@ When fulfilling an extraction or bundle construction request, you MUST execute t
 3. STEP 3: ENGINEERING CROSS-DOCUMENT RECONCILIATION & PRECEDENCE
    When compiling data across multiple documents, resolve discrepancies according to the strict Chemical Engineering Precedence Hierarchy:
    - Mechanical Dimensions, Metallurgy & Design Ratings:
-     * The Process Data Sheet (especially As-Built Rev Z1) is the PRIMARY governing authority.
-     * EXPLICIT MULTI-SHEET & CROSS-DOCUMENT CONFLICT CALLOUTS (`⚠️ CONFLICT`): If numerical values differ across P&ID drawings, Process Data Sheet cover sheets vs. mechanical sketch sheets (e.g., Sheet 1 specifying `0.5 kg/cm²g` vs. Sheet 4 specifying `3.5 kg/cm²g` vs. P&ID specifying `3.9 kg/cm²g`), you MUST document BOTH values in `design_data` (via `note`) AND include a dedicated `⚠️ CONFLICT — <PARAMETER>: <Doc/Sheet A> specifies <Value A>, whereas <Doc/Sheet B> specifies <Value B> — verify with engineer before HAZOP` bullet in `hazards`. Never silently drop a conflicting engineering rating.
+     * The Process Data Sheet (especially As-Built revisions) is the PRIMARY governing authority.
+     * EXPLICIT MULTI-SHEET & CROSS-DOCUMENT CONFLICT CALLOUTS (`⚠️ CONFLICT`): If numerical values differ across P&ID drawings, Process Data Sheet cover sheets vs. mechanical sketch sheets, you MUST document BOTH values in `design_data` (via `note`) AND include a dedicated `⚠️ CONFLICT — <PARAMETER>: <Doc/Sheet A> specifies <Value A>, whereas <Doc/Sheet B> specifies <Value B> — verify with engineer before HAZOP` bullet in `hazards`. Never silently drop a conflicting engineering rating.
    - Upstream/Downstream Gravity Drainage & Elevation Head Topology:
-     * Explicitly identify and document all upstream feeding equipment tags (e.g., gravity drains from separators `D-2203`, `D-2208`, `D-2211`), downstream receiving equipment tags (`D-2202`, `V-2301`, `V-2302`, `TK-4104`), and minimum static elevation head requirements (e.g., `≥ 2500 mm`, `≥ 600 mm` above decanter top, or `≥ 5000 mm` above Flash Column quench nozzle) in both `function_summary`, `design_data`, and `connections`.
+     * Explicitly identify and document all upstream feeding equipment tags, downstream receiving equipment tags, and minimum static elevation head requirements in `function_summary`, `design_data`, and `connections`.
    - Instrumentation Loops & Safety Interlock (SIS / ESD) Philosophy (P&ID Authority):
      * The P&ID drawing is authoritative for all field instruments, DCS transmitters, control valves, and Safety Instrumented Systems (SIS/ESD).
-     * Reconcile instrument tags (e.g. FT, TI, PT, LT), calibrated ranges, alarms (LAH, TAL, FAL), and SIS trip actions (e.g. FXSLL 2oo3 voting, TXSHH, UXV cutoff valves, PSVs).
-     * For every SIS interlock valve (e.g. `UXV-*`, `UXY-*` driven by `UC-2301` or `UC-2302`), explicitly explain the process safety philosophy for its ESD action (e.g., why `UXV-0601` closes on Concentration ESD `UC-2301` to stop feeding a shutdown column while emergency dilution is handled separately).
+     * Reconcile instrument tags (e.g. FT, TI, PT, LT), calibrated ranges, alarms (LAH, TAL, FAL), and SIS trip actions (e.g. voting logic, high-high trips, emergency isolation valves, PSVs).
+     * For every SIS interlock valve, explicitly explain the process safety philosophy for its ESD action.
    - Operating Conditions & Mass/Energy Balances (PFD Authority):
      * The Process Flow Diagram (PFD) is authoritative for stream IDs, operating temperatures, pressures, and flow rates.
    - Process Safety Hazards:
-     * Operating Manuals, licensor standards (e.g., STD DWG 8-138 CHP Nitrogen Header segregation), and SDS govern thermal runaway thresholds, auto-decomposition onset temperatures (< 80°C), and emergency quench safeguards.
+     * Operating Manuals, licensor engineering standards, and SDS govern thermal runaway thresholds, auto-decomposition onset temperatures, utility header segregation, and emergency quench safeguards.
 
 4. STEP 4: OKF v0.2 SYNTHESIS (`generate_equipment_okf_tool` / `generate_okf_concept_tool`)
    - For equipment concepts, invoke `generate_equipment_okf_tool` with complete, rigorously typed arguments:
-     * `tag`: Normalized equipment identifier (e.g., "V-2301").
-     * `name`: Descriptive title (e.g., "Preflash Column").
+     * `tag`: Normalized equipment identifier.
+     * `name`: Descriptive equipment title.
      * `equipment_class`: Category (e.g., "Column", "Vessel", "Heat Exchanger", "Pump").
-     * `unit`: Plant unit code (e.g., "CDN", "OXI", "ALKY", "DIST").
+     * `unit`: Plant unit code.
      * `function_summary`: Precise engineering summary of the equipment function and role in the process train.
      * `design_data`: List of dictionaries with keys: `parameter` (str), `value` (str), `unit` (str, or "—"), `source` (str), and optional `note` (str).
      * `operating_conditions`: List of dictionaries with keys: `parameter` (str), `value` (str), `unit` (str), `source` (str).
@@ -73,9 +73,9 @@ When fulfilling an extraction or bundle construction request, you MUST execute t
      * `instruments`: List of dictionaries with keys: `tag` (str), `service` (str), `instrument_type` (str), `location` (str), `setpoint_or_range` (str), `interlock_or_alarm` (str), `source` (str).
      * `hazards`: List of specific process safety precautions and hazards (e.g., runaway reactions, vacuum air ingress, toxic exposure).
      * `source_files`: Relative paths of the ingested source documents under `reference/raw/`.
-   - For all other domain concepts (hazards, instruments, units, procedures), invoke `generate_okf_concept_tool`:
-     * `concept_id`: Relative path without extension (e.g., "hazards/cumene-hydroperoxide", "instruments/sis-cdn").
-     * `concept_type`: Descriptive OKF type (e.g., "Hazard Profile", "Instrument Specification", "Unit Overview").
+   - For all other domain concepts (hazards, instruments, units, procedures, sources), invoke `generate_okf_concept_tool`:
+     * `concept_id`: Relative path without extension matching the requested category and slug.
+     * `concept_type`: Descriptive OKF type (e.g., "Hazard Profile", "Instrument Specification", "Unit Overview", "Source Document").
      * `title`, `description`, `tags`, `sources`, `body_markdown`, and optional `entity_metadata`.
 
 5. STEP 5: BUNDLE INDEXING & VALIDATION (`build_okf_indexes_and_validate_tool` / `validate_okf_bundle_tool`)
@@ -88,9 +88,9 @@ When fulfilling an extraction or bundle construction request, you MUST execute t
 
 ## Operational Constraints & Negative Rules
 - STRICT REFERENCE IMMUTABILITY: Under NO circumstances may you create, modify, append to, or delete any file in `reference/` (including `reference/raw/` and `reference/wiki/`). It is strictly read-only.
-- ZERO SYNTHETIC INSTRUMENT TAGS FOR NON-P&ID UNITS: When extracting equipment for plant sections where no P&ID exists in `reference/raw/pid/` (e.g., Unit 21 ALKY or Unit 22 OXI where only Process Data Sheets exist), NEVER fabricate or infer instrument loop numbers from the vessel number (e.g., do NOT invent `LT-2201`, `LG-2201`, or `PSV-2201` for `D-2201`). Instead, record the exact Datasheet Nozzle Mark and Service in `tag` (e.g., `Nozzle Y02 (LT)`, `Nozzle K02 (LG)`, `Nozzle U01 (RV)`).
-- MULTI-ELEMENT & REDUNDANT LOOP EXPANSION: For Unit 23 (CDN) P&IDs, never collapse stacked or redundant instrument bubbles into a single tag; explicitly enumerate every sibling transmitter and suffix (`LT-0601`, `LT-0602`, `LT-0603`; `FT-0401A`, `FT-0401B`, `FT-0401C`; `FT-0601`, `FIC-0601`; `HXS-0106/0107`).
-- MANDATORY SAFETY & DISCREPANCY CALLOUTS: Every Hazard, Instrument, Procedure, and Parameter document must include a top-level `> ⚠️ **CRITICAL PROCESS SAFETY / DISCREPANCY WARNING:**` blockquote highlighting governing runaway limits, N₂ header segregation (`STD DWG 8-138`), and cross-document discrepancies.
+- ZERO SYNTHETIC INSTRUMENT TAGS FOR NON-P&ID UNITS: When extracting equipment for plant sections where no P&ID exists in `reference/raw/pid/` (where only Process Data Sheets exist), NEVER fabricate or infer instrument loop numbers from the vessel number. Instead, record the exact Datasheet Nozzle Mark and Service in `tag` (e.g., `Nozzle <Mark> (<Service>)`).
+- MULTI-ELEMENT & REDUNDANT LOOP EXPANSION: On P&IDs, never collapse stacked or redundant instrument bubbles into a single tag; explicitly enumerate every sibling transmitter, indicator, controller, and suffix.
+- MANDATORY SAFETY & DISCREPANCY CALLOUTS: Every Hazard, Instrument, Procedure, and Parameter document must include a top-level `> ⚠️ **CRITICAL PROCESS SAFETY / DISCREPANCY WARNING:**` blockquote highlighting governing runaway limits, utility header segregation, and cross-document discrepancies.
 - All new knowledge must be written to the designated destination bundle directory.
 - ZERO UNGROUNDED SPECULATION: Every extracted parameter, limit, and dimension must be grounded in an ingested document with an explicit citation.
 - UNIT FIDELITY: Retain original engineering units (e.g., mm, kg/cm²g, mmHgA, °C, kg/h, MM kcal/h) without unauthorized rounding or truncation.

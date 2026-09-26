@@ -102,9 +102,9 @@ def find_raw_documents_tool(
     """Search and discover raw engineering technical documents in Google Cloud Storage (reference/raw/).
 
     When to use:
-        - When discovering raw PDF files for an equipment tag (e.g. V-2301), drawing number,
+        - When discovering raw PDF files for an equipment tag, drawing number,
           or document category (e.g. data_sheets, pid, pfd) before starting extraction.
-        - Example: find_raw_documents_tool(query="V-2301")
+        - Example: find_raw_documents_tool(query="<EQUIPMENT_TAG>")
 
     When NOT to use:
         - Do NOT use for already processed Markdown files in reference/wiki/.
@@ -112,7 +112,7 @@ def find_raw_documents_tool(
         - Do NOT attempt to modify or delete reference files.
 
     Args:
-        query: Equipment tag, document code, or keyword to search (e.g. "V-2301", "Preflash", "0004").
+        query: Equipment tag, document code, or keyword to search.
         subfolder: Optional subdirectory to scope search (data_sheets, pid, pfd, operating_manuals, standards).
 
     Returns:
@@ -172,7 +172,7 @@ def process_raw_pdf_tool(
     When to use:
         - When ingesting process data sheets, P&IDs, PFDs, or operating manuals
           from the reference/raw directory in GCS to extract chemical engineering knowledge.
-        - Example: process_raw_pdf_tool("14780-8120-PS-V2301_V-2301 PROCESS DATA SHEET_Z1.pdf", "data_sheets")
+        - Example: process_raw_pdf_tool("<PROCESS_DATA_SHEET>.pdf", "data_sheets")
 
     When NOT to use:
         - Do NOT use for already processed Markdown files in reference/wiki/.

@@ -51,10 +51,13 @@ class GCSExporter:
     def export_bundle(
         self,
         bundle_dir: Path | str,
-        prefix: str = "okf-bundles/phenol-plant",
+        prefix: str | None = None,
         dry_run: bool = False,
     ) -> dict[str, Any]:
         """Upload all bundle files from bundle_dir to gs://<bucket_name>/<prefix>/."""
+        from extracter_agent.config import get_config
+
+        resolved_prefix = prefix if prefix is not None else get_config().destination_gcs_prefix
         root = Path(bundle_dir)
         if not root.exists():
             raise FileNotFoundError(f"Bundle directory does not exist: {root}")
@@ -65,7 +68,7 @@ class GCSExporter:
         for file_path in root.rglob("*"):
             if file_path.is_file():
                 rel_path = str(file_path.relative_to(root))
-                blob_name = get_blob_name(prefix, rel_path)
+                blob_name = get_blob_name(resolved_prefix, rel_path)
                 content_type = infer_content_type(file_path)
                 file_size = file_path.stat().st_size
                 total_bytes += file_size
@@ -80,7 +83,7 @@ class GCSExporter:
             existing_sizes: dict[str, int] = {}
             try:
                 if hasattr(bucket, "list_blobs"):
-                    for b in bucket.list_blobs(prefix=prefix.strip("/") + "/"):
+                    for b in bucket.list_blobs(prefix=resolved_prefix.strip("/") + "/"):
                         if hasattr(b, "name") and hasattr(b, "size"):
                             existing_sizes[b.name] = b.size or 0
             except Exception as exc:
@@ -104,10 +107,10 @@ class GCSExporter:
 
         return {
             "bucket": self.bucket_name,
-            "prefix": prefix,
+            "prefix": resolved_prefix,
             "dry_run": dry_run,
             "files_count": len(files_to_upload),
             "total_bytes": total_bytes,
-            "destination_root_uri": f"gs://{self.bucket_name}/{prefix.strip('/')}",
+            "destination_root_uri": f"gs://{self.bucket_name}/{resolved_prefix.strip('/')}",
             "uploaded_uris": uploaded_uris,
         }

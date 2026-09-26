@@ -534,8 +534,31 @@ In chemical engineering facilities, instrumentation is inextricably bound to equ
   - Property-Based Tests (`hypothesis`) verifying idempotence (`f(f(x)) == f(x)`), whitespace/parenthesis-free `/instruments/...` Markdown links across fuzzed strings, and $\le 1$ multimodal payload occurrence across arbitrary page arrays.
 - **Completion Criteria:** 100% `pytest` pass rate, 0 Ruff/Bandit issues, repaired bundle synced to GCS, redeployed `agent_runtime`, and resumed parallel evaluation.
 
+### Step 15: Complete Codebase De-Hardcoding, Corpus-Driven Cross-Linking & 100% Golden Parity
+- **Implementation:**
+  1. **Purge Static Dictionaries & Plant Tags from `extracter_agent/models/domain.py`:**
+     - Delete the 24-entry `instrument_map`, hardcoded tag tuples (`E-2307`, `P-2302`, `X-2309AB`), hardcoded chemical suffix lists (`-dmba`, `-chp`, `-ams`, `diamine-tbc`), and document number literals (`014`, `002`).
+     - Implement general source-citation and bundle-catalog matching (`derive_canonical_equipment_tag` and `derive_canonical_concept_id` accepting `bundle_root: Path | None = None`) that resolves paths by matching shared `sources` PDF citations and normalized titles against existing bundle metadata or generic `<category>/<slug>` formatting.
+     - Generalize all Pydantic `Field(description=...)` strings in `domain.py` so zero Golden dataset tags (`V-2301`, `D-2304`, `TI-0404`, `FT-0401A`, `PSV-23-0401A`, `Preflash Column`, `CDN, OXI, DIST`) are embedded in model schemas.
+  2. **Corpus-Driven Bundle-Indexed Instrument Cross-Linking (`extracter_agent/okf/synthesizer.py` & `extracter_agent/okf/indexer.py`):**
+     - Implement `resolve_bundle_instrument_link(inst_tag, instrument_type, service, bundle_root)` which dynamically inspects the actual `instruments/*.md` files present in `bundle_root` with **zero hardcoded ISA prefix `if/elif` chains**:
+       - Matches exact tag occurrence in register bodies, empirical tag prefix frequency (`\b<PREFIX>[-_0-9]`) across register tables, and token overlap between `(instrument_type, service)` and each register's frontmatter (`title`, `description`, `tags`) and filename stem.
+     - Remove hardcoded default bucket/prefix/model/timestamp literals (`"2026-06-16T00:00:00Z"`, `"okf-bundles/phenol-plant"`, `"extracter_agent/gemini-3.8-flash"`) from `synthesizer.py`, `okf_tools.py`, and `exporter.py`, resolving dynamically via `get_config()` and current UTC ISO-8601 timestamps.
+     - Refactor `_build_master_root_index` in `extracter_agent/okf/indexer.py` to remove all hardcoded `Phenol Process Expert`, `Unit 21 / 22 / 23`, and `UC-2301 / UC-2302` strings, dynamically building the Master Knowledge Catalog from bundle frontmatter.
+  3. **De-Hardcode `cli.py`, `orchestrator.py`, `processor.py`, `okf_tools.py`, `pdf_tools.py` & `guardrails.py`:**
+     - Replace the 320 lines of hardcoded `V-2301`, `E-2301`, and `P-2301AB` dictionaries in `extracter_agent/cli.py` (`run_batch_extraction`) with dynamic PDF discovery and extraction.
+     - Generalize `ORCHESTRATOR_INSTRUCTIONS` (`orchestrator.py`), `extract_pdf_multimodal_summary` (`processor.py`), and all ADK `FunctionTool` docstrings (`okf_tools.py`, `pdf_tools.py`) so zero test-set numbers, filenames, or equipment tags (`0.5 vs 3.9`, `LT-0602`, `FT-0401A`, `HXS-0106`, `V-2301`, `Preflash Column`, `cumene-hydroperoxide`, `sis-cdn`) are hardcoded in prompts or tool declarations.
+     - Upgrade `check_prompt_security` (`guardrails.py`) with structured `SafetyEvaluationResult` schema validation.
+  4. **Bundle Reconciliation (`130/130` Golden Parity & `0` Broken Links) & Dual-Intent Alignment (`139/139`):**
+     - Reconcile the 9 alternate-path files in `build/okf_bundle/` to their canonical paths, prune obsolete `standards/` and duplicate files, dynamically re-link all equipment instrument tables against `build/okf_bundle/instruments/*.md`, regenerate `index.md` / `log.md` (`0` broken links), and sync to GCS.
+- **Unit & Property-Based Tests (PBT):**
+  - `test_zero_hardcoded_domain_maps_or_tags`: Source audit test verifying `domain.py`, `indexer.py`, `synthesizer.py`, `cli.py`, `orchestrator.py`, `processor.py`, `okf_tools.py`, and `pdf_tools.py` contain zero hardcoded plant dictionaries, ISA prefix `if/elif` chains, or dataset-specific entity tags.
+  - `test_pbt_dynamic_instrument_link_never_broken`: `hypothesis` property test verifying that `resolve_bundle_instrument_link(..., bundle_root=...)` always resolves to an existing `.md` file in `bundle_root`.
+- **Completion Criteria:** Zero hardcoded domain maps/tags across the entire codebase, `130 / 130` (`100.0%`) Golden path match, `0` broken Markdown links, `139 / 139` (`100.0%`) evaluation pass rate, and 100% `pytest` pass rate.
+
 ---
 
 ## 8. Plan Progress Tracking & Living Spec Synchronization
 - All milestones, verification metrics, and test results will be continuously recorded under `specs/plan/`.
 - If any data model or interface evolves during implementation, this specification will be updated synchronously to prevent spec drift.
+

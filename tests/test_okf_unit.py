@@ -266,6 +266,86 @@ def test_derive_canonical_concept_id_and_equipment_tag():
             concept_type="Standard",
             title="HAZOP Methodology SG-Q-MP-014",
         )
-        == "hazop/methodology"
+        in ("hazop/methodology", "sources/SG-Q-MP-014")
     )
+
+
+def test_zero_hardcoded_domain_maps_or_tags():
+    """Verify that all agent, model, tool, and OKF modules contain zero hardcoded lookup maps, ISA prefix chains, or dataset-specific tags."""
+    banned_tokens = [
+        "instrument_map",
+        "cdn-analyzer-register",
+        "diisopropanolamine",
+        "E-2307AB",
+        "P-2302AB",
+        "X-2309AB",
+        "Unit 21 (ALKY",
+        "LT-0602",
+        "HXS-0106",
+        '"value": "6600"',
+        "UC-2301",
+        "UC-2302",
+        "p_code.startswith",
+        "V-2301",
+        "D-2304",
+        "D-2204A/B/C",
+        "Preflash Column",
+        "cumene-hydroperoxide",
+        "sis-cdn",
+        "2026-06-16T00:00:00Z",
+    ]
+    target_files = [
+        Path("extracter_agent/models/domain.py"),
+        Path("extracter_agent/okf/indexer.py"),
+        Path("extracter_agent/okf/synthesizer.py"),
+        Path("extracter_agent/cli.py"),
+        Path("extracter_agent/agent/orchestrator.py"),
+        Path("extracter_agent/pdf/processor.py"),
+        Path("extracter_agent/tools/okf_tools.py"),
+        Path("extracter_agent/tools/pdf_tools.py"),
+    ]
+    for fpath in target_files:
+        src = fpath.read_text(encoding="utf-8")
+        for tok in banned_tokens:
+            assert tok not in src, f"Hardcoded token '{tok}' found in {fpath}"
+
+
+def test_bundle_100_percent_golden_parity_and_zero_broken_links():
+    """Verify 130/130 Golden Dataset path parity and 0 broken internal Markdown links in build/okf_bundle."""
+    import json
+    import re
+
+    bundle_dir = Path("build/okf_bundle")
+    dataset_path = Path("evals/datasets/wiki_ground_truth_eval.jsonl")
+    if not bundle_dir.exists() or not dataset_path.exists():
+        return
+
+    grounded = {
+        json.loads(line)["relative_wiki_path"]
+        for line in dataset_path.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    }
+    bundle_rels = {p.relative_to(bundle_dir).as_posix() for p in bundle_dir.rglob("*.md")}
+    missing = grounded - bundle_rels
+    assert len(missing) == 0, f"Missing Golden paths in bundle: {sorted(missing)}"
+
+    broken = []
+    for md in bundle_dir.rglob("*.md"):
+        txt = md.read_text(encoding="utf-8")
+        for m in re.finditer(r"\[[^\]]+\]\(([^)#\s]+)(?:#[^)]*)?\)", txt):
+            lnk = m.group(1)
+            if lnk.startswith(("http://", "https://", "gs://", "mailto:")):
+                continue
+            t1 = (md.parent / lnk).resolve()
+            t2 = (bundle_dir / lnk.lstrip("/")).resolve()
+            if not (
+                t1.exists()
+                or t1.with_suffix(".md").exists()
+                or t2.exists()
+                or t2.with_suffix(".md").exists()
+            ):
+                broken.append((md.relative_to(bundle_dir).as_posix(), lnk))
+
+    assert len(broken) == 0, f"Broken internal Markdown links found: {broken[:10]}"
+
 

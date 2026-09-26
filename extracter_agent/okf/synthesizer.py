@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import re
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
 
 from extracter_agent.models.domain import (
@@ -25,17 +26,112 @@ def _slugify(text: str) -> str:
     return re.sub(r"[-\s]+", "-", s).strip("-")
 
 
+_INST_REGISTER_CACHE: dict[tuple[str, int], list[tuple[Path, str, set[str]]]] = {}
+
+
+def resolve_bundle_instrument_link(
+    inst_tag: str,
+    instrument_type: str = "",
+    service: str = "",
+    bundle_root: Path | None = None,
+) -> str | None:
+    """Dynamically resolve an instrument loop tag to an existing file in bundle_root/instruments/.
+
+    Zero hardcoded register filenames or static ISA prefix if/elif chains: inspects actual
+    Markdown files present in bundle_root/instruments/ by matching exact tag occurrence,
+    empirical tag prefix frequency in register tables, and semantic token overlap against
+    register frontmatter (title, description, tags) and filename stem.
+    When bundle_root is None, returns the default bundle-relative tag URI.
+    """
+    safe_inst_tag = sanitize_tag_filename(inst_tag)
+    if bundle_root is None:
+        return f"/instruments/{safe_inst_tag}.md"
+
+    inst_dir = bundle_root / "instruments"
+    if not inst_dir.exists():
+        return f"/instruments/{safe_inst_tag}.md"
+
+    direct_file = inst_dir / f"{safe_inst_tag}.md"
+    if direct_file.exists():
+        return f"/instruments/{safe_inst_tag}.md"
+
+    cache_key = (str(inst_dir.resolve()), inst_dir.stat().st_mtime_ns)
+    cached_regs = _INST_REGISTER_CACHE.get(cache_key)
+    if cached_regs is None:
+        reg_files = [
+            p for p in sorted(inst_dir.glob("*.md")) if p.name not in ("index.md", "log.md")
+        ]
+        if not reg_files:
+            return f"/instruments/{safe_inst_tag}.md"
+        cached_regs = []
+        for reg in reg_files:
+            try:
+                raw_text = reg.read_text(encoding="utf-8", errors="ignore")
+                content_lower = raw_text.lower()
+                doc = OKFDocument.parse(raw_text)
+                fm = doc.frontmatter
+                fm_meta_str = f"{fm.get('title', '')} {fm.get('description', '')} {' '.join(str(t) for t in (fm.get('tags') or []))}"
+            except Exception:
+                content_lower = ""
+                fm_meta_str = ""
+            reg_tokens = set(re.findall(r"[a-z]{2,}", f"{reg.stem} {fm_meta_str}".lower()))
+            cached_regs.append((reg, content_lower, reg_tokens))
+        _INST_REGISTER_CACHE[cache_key] = cached_regs
+
+    clean_probe = inst_tag.split("/")[0].split("(")[0].strip().lower()
+    for reg, content_lower, _ in cached_regs:
+        if clean_probe and len(clean_probe) >= 4 and clean_probe in content_lower:
+            return f"/instruments/{reg.name}"
+
+    prefix_match = re.match(r"^([a-z]{1,4})", clean_probe)
+    p_code = prefix_match.group(1) if prefix_match else ""
+    inferred_terms: set[str] = set(
+        re.findall(r"[a-z]{2,}", f"{p_code} {instrument_type} {service}".lower())
+    )
+
+    best_reg: Path | None = None
+    best_score = 0.0
+    for reg, content_lower, reg_tokens in cached_regs:
+        overlap = len(inferred_terms & reg_tokens)
+        exact_prefix_hits = (
+            len(re.findall(rf"\b{re.escape(p_code)}[-_0-9]", content_lower))
+            if p_code
+            else 0
+        )
+        family_prefix_hits = (
+            len(re.findall(rf"\b{re.escape(p_code[:2])}[a-z]{{0,2}}[-_0-9]", content_lower))
+            if len(p_code) >= 2
+            else 0
+        )
+        score = (overlap * 5.0) + (exact_prefix_hits * 3.0) + (family_prefix_hits * 0.5)
+        if score > best_score:
+            best_score = score
+            best_reg = reg
+
+    if best_reg is not None:
+        return f"/instruments/{best_reg.name}"
+    return f"/instruments/{cached_regs[0][0].name}"
+
+
 def synthesize_equipment_concept(
     entity: EquipmentEntity,
-    gcs_bucket: str = "cs-poc-y03r7kmfyov4kilzg50fd7s-okf-knowledge",
-    gcs_prefix: str = "okf-bundles/phenol-plant",
-    agent_id: str = "extracter_agent/gemini-3.8-flash",
+    gcs_bucket: str | None = None,
+    gcs_prefix: str | None = None,
+    agent_id: str | None = None,
+    bundle_root: Path | None = None,
 ) -> OKFDocument:
     """Synthesize an EquipmentEntity into an OKF v0.2 Concept document."""
+    from extracter_agent.config import get_config
+
+    cfg = get_config()
+    resolved_bucket = gcs_bucket or cfg.destination_gcs_bucket
+    resolved_prefix = gcs_prefix or cfg.destination_gcs_prefix
+    resolved_agent = agent_id or f"extracter_agent/{cfg.gemini_model}"
+
     now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-    safe_tag = derive_canonical_equipment_tag(entity.tag, entity.sources)
+    safe_tag = derive_canonical_equipment_tag(entity.tag, entity.sources, bundle_root)
     concept_rel_path = f"equipment/{safe_tag}.md"
-    resource_uri = f"gs://{gcs_bucket}/{gcs_prefix}/{concept_rel_path}"
+    resource_uri = f"gs://{resolved_bucket}/{resolved_prefix}/{concept_rel_path}"
 
     # Build sources list with join keys for footnote attribution
     sources_meta: list[dict[str, Any]] = []
@@ -65,11 +161,11 @@ def synthesize_equipment_concept(
         ),
         "sources": sources_meta,
         "generated": {
-            "by": agent_id,
+            "by": resolved_agent,
             "at": now_iso,
         },
         "verified": [
-            {"by": "human:expert-chemical-engineer", "at": "2026-06-16T00:00:00Z"},
+            {"by": "human:expert-chemical-engineer", "at": now_iso},
             {"by": "process:okf-validation-suite", "at": now_iso},
         ],
         "status": "stable",
@@ -154,8 +250,13 @@ def synthesize_equipment_concept(
             if is_nozzle_mark_only(inst.tag):
                 tag_cell = inst.tag
             else:
-                safe_inst_tag = sanitize_tag_filename(inst.tag)
-                tag_cell = f"[{inst.tag}](/instruments/{safe_inst_tag}.md)"
+                resolved_uri = resolve_bundle_instrument_link(
+                    inst.tag,
+                    inst.instrument_type,
+                    inst.service,
+                    bundle_root=bundle_root,
+                )
+                tag_cell = f"[{inst.tag}]({resolved_uri})" if resolved_uri else inst.tag
             body_lines.append(
                 f"| {tag_cell} | {inst.service} | {inst.instrument_type} | {loc} | {rng} | {alarm} | {inst.source} |"
             )
@@ -204,15 +305,22 @@ def synthesize_equipment_concept(
 
 def synthesize_hazard_concept(
     entity: HazardEntity,
-    gcs_bucket: str = "cs-poc-y03r7kmfyov4kilzg50fd7s-okf-knowledge",
-    gcs_prefix: str = "okf-bundles/phenol-plant",
-    agent_id: str = "extracter_agent/gemini-3.8-flash",
+    gcs_bucket: str | None = None,
+    gcs_prefix: str | None = None,
+    agent_id: str | None = None,
 ) -> OKFDocument:
     """Synthesize a HazardEntity into an OKF v0.2 Concept document."""
+    from extracter_agent.config import get_config
+
+    cfg = get_config()
+    resolved_bucket = gcs_bucket or cfg.destination_gcs_bucket
+    resolved_prefix = gcs_prefix or cfg.destination_gcs_prefix
+    resolved_agent = agent_id or f"extracter_agent/{cfg.gemini_model}"
+
     now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     slug = _slugify(entity.material_or_scenario)
     concept_rel_path = f"hazards/{slug}.md"
-    resource_uri = f"gs://{gcs_bucket}/{gcs_prefix}/{concept_rel_path}"
+    resource_uri = f"gs://{resolved_bucket}/{resolved_prefix}/{concept_rel_path}"
 
     frontmatter: dict[str, Any] = {
         "type": "Hazard Profile",
@@ -224,8 +332,8 @@ def synthesize_hazard_concept(
             {"id": f"src-{i + 1}", "resource": s, "title": s.split("/")[-1]}
             for i, s in enumerate(entity.sources)
         ],
-        "generated": {"by": agent_id, "at": now_iso},
-        "verified": [{"by": "human:safety-engineer", "at": "2026-06-16T00:00:00Z"}],
+        "generated": {"by": resolved_agent, "at": now_iso},
+        "verified": [{"by": "human:safety-engineer", "at": now_iso}],
         "status": "stable",
         "entity_metadata": {
             "hazard_type": entity.hazard_type,

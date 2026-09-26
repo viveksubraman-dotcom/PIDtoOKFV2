@@ -178,3 +178,23 @@ def test_pbt_derive_canonical_concept_id_idempotent(slug):
     assert " " not in once
     assert not once.endswith(".md")
 
+
+@given(
+    prefix=st.sampled_from(["LT", "FT", "TT", "PT", "PSV", "FV", "AT", "HXS", "SC", "XC"]),
+    loop_num=st.integers(min_value=100, max_value=9999),
+)
+def test_pbt_dynamic_instrument_link_never_broken(prefix, loop_num):
+    """Invariant: When bundle_root contains instrument register files, resolve_bundle_instrument_link always points to an existing file."""
+    from extracter_agent.okf.synthesizer import resolve_bundle_instrument_link
+
+    bundle_dir = Path("build/okf_bundle")
+    if not (bundle_dir / "instruments").exists():
+        return
+
+    tag = f"{prefix}-{loop_num}"
+    resolved = resolve_bundle_instrument_link(tag, "Process Instrument", "Service", bundle_root=bundle_dir)
+    assert resolved is not None
+    target_file = bundle_dir / resolved.lstrip("/")
+    assert target_file.exists(), f"Resolved link {resolved} does not exist in {bundle_dir}"
+
+

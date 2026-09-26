@@ -31,314 +31,50 @@ def run_batch_extraction(
 
     print(f"[1/4] Starting knowledge extraction pipeline into: {target_dir}")
 
-    # 1. Ingest V-2301 Preflash Column (Process Data Sheet + P&ID)
-    ps_v2301_pdf = (
-        cfg.reference_raw_dir
-        / "data_sheets"
-        / "14780-8120-PS-V2301_V-2301 PROCESS DATA SHEET_Z1.pdf"
+    from extracter_agent.pdf.processor import (
+        extract_equipment_tag_candidates,
+        extract_pdf_pages,
+        get_pdf_metadata,
     )
-    if ps_v2301_pdf.exists():
-        print(f"  Ingesting {ps_v2301_pdf.name}...")
-        generate_equipment_okf_tool(
-            tag="V-2301",
-            name="Preflash Column",
-            equipment_class="Column",
-            unit="CDN",
-            function_summary=(
-                "First-stage vacuum evaporator in the CDN Concentration sub-section. "
-                "Removes the majority of Cumene from the oxidate feed by evaporation under vacuum, "
-                "partially concentrating the CHP. Overhead Cumene vapor is condensed and recycled to Oxidation; "
-                "bottoms flow to Flash Column V-2302 for further concentration."
-            ),
-            design_data=[
-                {
-                    "parameter": "Type",
-                    "value": "Packed Column (horizontal vessel, vertical internals)",
-                    "unit": "—",
-                    "source": "PS-V2301",
-                },
-                {
-                    "parameter": "Shell ID",
-                    "value": "6600",
-                    "unit": "mm",
-                    "source": "PS-V2301",
-                },
-                {
-                    "parameter": "T/T Length",
-                    "value": "21000",
-                    "unit": "mm",
-                    "source": "PS-V2301",
-                },
-                {
-                    "parameter": "Bottom Tangent to Foundation",
-                    "value": "15500",
-                    "unit": "mm",
-                    "source": "PS-V2301",
-                },
-                {
-                    "parameter": "Design Pressure (INT)",
-                    "value": "3.5",
-                    "unit": "kg/cm2g",
-                    "source": "PS-V2301",
-                },
-                {
-                    "parameter": "Design Pressure (EXT - FULL VACUUM)",
-                    "value": "FV",
-                    "unit": "—",
-                    "source": "PS-V2301",
-                },
-                {
-                    "parameter": "Design Temperature (INT)",
-                    "value": "250",
-                    "unit": "°C",
-                    "source": "PS-V2301",
-                },
-                {
-                    "parameter": "Design Temperature (EXT)",
-                    "value": "195",
-                    "unit": "°C",
-                    "source": "PS-V2301",
-                },
-                {
-                    "parameter": "Material (Shell & Head)",
-                    "value": "SA 240 Type 304L",
-                    "unit": "—",
-                    "source": "PS-V2301",
-                },
-                {
-                    "parameter": "Operating Pressure (Top)",
-                    "value": "18.5",
-                    "unit": "mmHgA",
-                    "source": "DWG 0004",
-                },
-                {
-                    "parameter": "Operating Temperature (Top)",
-                    "value": "53",
-                    "unit": "°C",
-                    "source": "DWG 0004",
-                },
-                {
-                    "parameter": "Operating Pressure (Bottom)",
-                    "value": "19.5",
-                    "unit": "mmHgA",
-                    "source": "DWG 0004",
-                },
-                {
-                    "parameter": "Operating Temperature (Bottom)",
-                    "value": "64",
-                    "unit": "°C",
-                    "source": "DWG 0004",
-                },
-            ],
-            operating_conditions=[
-                {
-                    "parameter": "Feed Temperature",
-                    "value": "83",
-                    "unit": "°C",
-                    "source": "PFD-0001",
-                },
-                {
-                    "parameter": "Feed Flow",
-                    "value": "1076643",
-                    "unit": "kg/h",
-                    "source": "PFD-0001",
-                },
-                {
-                    "parameter": "Overhead Flow (to E-2301)",
-                    "value": "135722",
-                    "unit": "kg/h",
-                    "source": "PFD-0001",
-                },
-                {
-                    "parameter": "Bottoms Flow",
-                    "value": "189488",
-                    "unit": "kg/h",
-                    "source": "PFD-0001",
-                },
-            ],
-            connections=[
-                {
-                    "stream_id": "S229",
-                    "temperature": "83",
-                    "pressure": "78 kg/cm2G",
-                    "flow_rate": "1076643",
-                    "description": "Oxidate feed from OXI",
-                    "source": "PFD-0001",
-                },
-                {
-                    "stream_id": "S300",
-                    "temperature": "82",
-                    "pressure": "27 mmHg",
-                    "flow_rate": "135722",
-                    "description": "Overhead vapor to condenser E-2301",
-                    "source": "PFD-0001",
-                },
-                {
-                    "stream_id": "S311",
-                    "temperature": "58",
-                    "pressure": "58",
-                    "flow_rate": "189488",
-                    "description": "Preflash column bottoms to V-2302",
-                    "source": "PFD-0001",
-                },
-            ],
-            hazards=[
-                "CHP is present in column bottoms at elevated concentration — thermal runaway risk above 100°C.",
-                "Column operates under deep vacuum (18.5–19.5 mmHgA) — air ingress risk.",
-            ],
-            source_files=[
-                "data_sheets/14780-8120-PS-V2301_V-2301 PROCESS DATA SHEET_Z1.pdf",
-                "pid/14780-8120-25-23-0004_Z1.pdf",
-                "pfd/14780-8120-20-23-0001_Z1.pdf",
-            ],
-            output_bundle_dir=str(target_dir),
-        )
 
-    # 2. Ingest E-2301 Preflash Condenser
-    ps_e2301_pdf = (
-        cfg.reference_raw_dir
-        / "data_sheets"
-        / "14780-8120-PS-E2301_E-2301 PROCESS DATA SHEET_Z1.pdf"
-    )
-    if ps_e2301_pdf.exists():
-        print(f"  Ingesting {ps_e2301_pdf.name}...")
-        generate_equipment_okf_tool(
-            tag="E-2301",
-            name="Preflash Overhead Condenser",
-            equipment_class="Heat Exchanger",
-            unit="CDN",
-            function_summary="Condenses overhead cumene vapors from Preflash Column V-2301 under vacuum.",
-            design_data=[
+    ds_dir = cfg.reference_raw_dir / "data_sheets"
+    if ds_dir.exists() and not any((target_dir / "equipment").glob("*.md")):
+        for pdf_file in sorted(ds_dir.glob("*.pdf"))[:3]:
+            meta = get_pdf_metadata(pdf_file)
+            pages = extract_pdf_pages(pdf_file)
+            text = "\n".join(p.get("text", "") for p in pages)
+            candidates = extract_equipment_tag_candidates(f"{pdf_file.name} {text}")
+            tag = candidates[0] if candidates else pdf_file.stem.split("_")[0]
+            lines = [ln.strip() for ln in text.splitlines() if ":" in ln or "mm" in ln][:8]
+            design_rows = [
                 {
-                    "parameter": "Type",
-                    "value": "Shell and Tube (TEMA)",
+                    "parameter": f"Extracted Specification {idx + 1}",
+                    "value": ln[:80],
                     "unit": "—",
-                    "source": "PS-E2301",
-                },
+                    "source": pdf_file.name,
+                }
+                for idx, ln in enumerate(lines)
+            ] or [
                 {
-                    "parameter": "Design Duty",
-                    "value": "18.2",
-                    "unit": "MM kcal/h",
-                    "source": "PS-E2301",
-                },
-                {
-                    "parameter": "Shell Design Pressure",
-                    "value": "FV / 3.5",
-                    "unit": "kg/cm2g",
-                    "source": "PS-E2301",
-                },
-                {
-                    "parameter": "Tube Design Pressure",
-                    "value": "7.0",
-                    "unit": "kg/cm2g",
-                    "source": "PS-E2301",
-                },
-            ],
-            operating_conditions=[
-                {
-                    "parameter": "Inlet Vapor Temperature",
-                    "value": "82",
-                    "unit": "°C",
-                    "source": "PS-E2301",
-                },
-                {
-                    "parameter": "Outlet Condensate Temperature",
-                    "value": "45",
-                    "unit": "°C",
-                    "source": "PS-E2301",
-                },
-            ],
-            connections=[
-                {
-                    "stream_id": "S300",
-                    "temperature": "82",
-                    "pressure": "27 mmHg",
-                    "flow_rate": "135722",
-                    "description": "Overhead vapor inlet from V-2301",
-                    "source": "PFD-0001",
-                },
-            ],
-            hazards=[
-                "Vacuum service — thermal stress during steam-out or vacuum break."
-            ],
-            source_files=[
-                "data_sheets/14780-8120-PS-E2301_E-2301 PROCESS DATA SHEET_Z1.pdf"
-            ],
-            output_bundle_dir=str(target_dir),
-        )
-
-    # 3. Ingest P-2301AB Preflash Bottoms Pump
-    ps_p2301_pdf = (
-        cfg.reference_raw_dir
-        / "data_sheets"
-        / "14780-8120-PS-P2301_P-2301 PROCESS DATA SHEET_Z1.pdf"
-    )
-    if ps_p2301_pdf.exists():
-        print(f"  Ingesting {ps_p2301_pdf.name}...")
-        generate_equipment_okf_tool(
-            tag="P-2301AB",
-            name="Preflash Column Bottoms Pump",
-            equipment_class="Pump",
-            unit="CDN",
-            function_summary="Transfers concentrated CHP bottoms stream from V-2301 to Flash Column V-2302.",
-            design_data=[
-                {
-                    "parameter": "Type",
-                    "value": "Centrifugal (API 610 OH2)",
-                    "unit": "—",
-                    "source": "PS-P2301",
-                },
-                {
-                    "parameter": "Rated Flow",
-                    "value": "220",
-                    "unit": "m3/h",
-                    "source": "PS-P2301",
-                },
-                {
-                    "parameter": "Differential Head",
-                    "value": "45",
-                    "unit": "m",
-                    "source": "PS-P2301",
-                },
-                {
-                    "parameter": "Casing Material",
-                    "value": "Type 316L SS",
-                    "unit": "—",
-                    "source": "PS-P2301",
-                },
-            ],
-            operating_conditions=[
-                {
-                    "parameter": "Pumping Temperature",
-                    "value": "64",
-                    "unit": "°C",
-                    "source": "PS-P2301",
-                },
-                {
-                    "parameter": "Suction Pressure",
-                    "value": "0.15",
-                    "unit": "kg/cm2a",
-                    "source": "PS-P2301",
-                },
-            ],
-            connections=[
-                {
-                    "stream_id": "S311",
-                    "temperature": "64",
-                    "pressure": "0.15 kg/cm2a",
-                    "flow_rate": "189488",
-                    "description": "Suction from V-2301 sump",
-                    "source": "PFD-0001",
-                },
-            ],
-            hazards=[
-                "Pumping concentrated CHP — seal failure or deadheading causes rapid thermal decomposition."
-            ],
-            source_files=[
-                "data_sheets/14780-8120-PS-P2301_P-2301 PROCESS DATA SHEET_Z1.pdf"
-            ],
-            output_bundle_dir=str(target_dir),
-        )
+                    "parameter": "Document Page Count",
+                    "value": str(meta.get("page_count", 1)),
+                    "unit": "pages",
+                    "source": pdf_file.name,
+                }
+            ]
+            generate_equipment_okf_tool(
+                tag=tag,
+                name=str(meta.get("title") or pdf_file.stem),
+                equipment_class="Equipment",
+                unit="PLANT",
+                function_summary=f"Dynamically extracted from {pdf_file.name}.",
+                design_data=design_rows,
+                operating_conditions=[],
+                connections=[],
+                hazards=[],
+                source_files=[f"data_sheets/{pdf_file.name}"],
+                output_bundle_dir=str(target_dir),
+            )
 
     # 2. Build OKF progressive disclosure indexes
     print("[2/4] Generating OKF progressive disclosure indexes (index.md & log.md)...")

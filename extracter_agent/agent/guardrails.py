@@ -7,38 +7,54 @@ from __future__ import annotations
 
 from typing import Any
 
+from pydantic import BaseModel, Field
+
 
 class SecurityGuardrailError(PermissionError):
     """Raised when a prompt violates enterprise security policies or injection checks."""
 
 
+class SafetyEvaluationResult(BaseModel):
+    """Structured safety assessment result for pre-flight guardrail evaluation."""
+
+    filterMatchState: str = Field(
+        default="NO_MATCH", description="MATCH_FOUND or NO_MATCH"
+    )
+    violation_type: str | None = Field(
+        default=None, description="Detected violation category if unsafe"
+    )
+    matched_pattern: str | None = Field(
+        default=None, description="Matched adversarial directive or explanation"
+    )
+
+
 def check_prompt_security(prompt: str) -> dict[str, Any]:
     """Evaluate prompt for adversarial jailbreaks, command injections, or policy violations.
 
-    In production, this integrates with Google Cloud Model Armor.
+    Combines structural directive interception with structured SafetyEvaluationResult validation.
     """
     lowered = prompt.lower()
-    prohibited_patterns = [
-        "ignore previous instructions",
-        "disregard all previous instructions",
-        "system prompt override",
-        "bypass security",
-        "delete all files",
-        "rm -rf /",
-    ]
+    structural_indicators = (
+        ("ignore", "instructions"),
+        ("disregard", "instructions"),
+        ("system prompt", "override"),
+        ("bypass", "security"),
+        ("delete all", "files"),
+        ("rm -rf", "/"),
+    )
 
-    for p in prohibited_patterns:
-        if p in lowered:
-            return {
-                "filterMatchState": "MATCH_FOUND",
-                "violation_type": "PROMPT_INJECTION",
-                "matched_pattern": p,
-            }
+    for tok_a, tok_b in structural_indicators:
+        if tok_a in lowered and tok_b in lowered:
+            return SafetyEvaluationResult(
+                filterMatchState="MATCH_FOUND",
+                violation_type="PROMPT_INJECTION",
+                matched_pattern=f"{tok_a} ... {tok_b}",
+            ).model_dump()
 
-    return {
-        "filterMatchState": "NO_MATCH",
-        "violation_type": None,
-    }
+    return SafetyEvaluationResult(
+        filterMatchState="NO_MATCH",
+        violation_type=None,
+    ).model_dump()
 
 
 def before_agent_callback(callback_context: Any) -> Any:

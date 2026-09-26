@@ -63,7 +63,7 @@ def generate_equipment_okf_tool(
 
     When to use:
         - When synthesizing extracted chemical equipment data into an OKF v0.2 concept.
-        - Example: generate_equipment_okf_tool(tag="V-2301", name="Preflash Column", unit="CDN", ...)
+        - Example: generate_equipment_okf_tool(tag="<TAG>", name="<Equipment Title>", unit="<UNIT>", ...)
 
     When NOT to use:
         - Do NOT use for raw unstructured PDF documents.
@@ -71,10 +71,10 @@ def generate_equipment_okf_tool(
         - Do NOT write directly to reference/ directory.
 
     Args:
-        tag: Equipment unique plant identifier, e.g. V-2301, D-2304, D-2204A/B/C.
-        name: Full equipment title, e.g. Preflash Column.
-        equipment_class: Equipment category, e.g. Column, Pump, Heat Exchanger.
-        unit: Plant unit code, e.g. CDN, OXI, ALKY, DIST.
+        tag: Equipment unique plant identifier.
+        name: Full equipment title.
+        equipment_class: Equipment category, e.g. Column, Pump, Heat Exchanger, Vessel.
+        unit: Plant unit or section code.
         function_summary: Engineering description of the equipment function.
         design_data: List of design parameters with parameter, value, unit, and source.
         operating_conditions: List of operating conditions with parameter, value, unit, and source.
@@ -112,10 +112,11 @@ def generate_equipment_okf_tool(
         entity,
         gcs_bucket=cfg.destination_gcs_bucket,
         gcs_prefix=cfg.destination_gcs_prefix,
+        bundle_root=bundle_root,
     )
 
     # Save to bundle using canonical equipment tag derived from raw PS-<TAG> document code
-    safe_tag = derive_canonical_equipment_tag(tag, source_files)
+    safe_tag = derive_canonical_equipment_tag(tag, source_files, bundle_root=bundle_root)
     equip_dir = bundle_root / "equipment"
     equip_dir.mkdir(parents=True, exist_ok=True)
     output_file = equip_dir / f"{safe_tag}.md"
@@ -218,14 +219,14 @@ def generate_okf_concept_tool(
     When to use:
         - When synthesizing chemical engineering domain concepts (hazards, instruments,
           procedures, units, standards) into an OKF v0.2 concept document.
-        - Example: generate_okf_concept_tool(concept_id="hazards/cumene-hydroperoxide", concept_type="Hazard Profile", title="Cumene Hydroperoxide", ...)
+        - Example: generate_okf_concept_tool(concept_id="hazards/<chemical-slug>", concept_type="Hazard Profile", title="<Chemical Title>", ...)
 
     When NOT to use:
         - Do NOT use for raw unstructured PDF documents.
         - Do NOT use for modifying files in reference/ directory.
 
     Args:
-        concept_id: Relative concept path without extension, e.g. 'hazards/cumene-hydroperoxide' or 'instruments/sis-cdn'.
+        concept_id: Relative concept path without extension, e.g. '<category>/<slug>'.
         concept_type: Descriptive OKF concept type, e.g. 'Hazard Profile', 'Instrument Specification'.
         title: Human-readable concept title.
         description: Single-sentence summary for search and progressive disclosure.
@@ -250,6 +251,7 @@ def generate_okf_concept_tool(
         title=title,
         sources=sources,
         entity_metadata=entity_metadata,
+        bundle_root=bundle_root,
     )
     concept_file_path = f"{clean_id}.md"
     resource_uri = f"gs://{cfg.destination_gcs_bucket}/{cfg.destination_gcs_prefix}/{concept_file_path}"
@@ -275,11 +277,11 @@ def generate_okf_concept_tool(
         "tags": sorted(set(tags)),
         "sources": sources_meta,
         "generated": {
-            "by": "extracter_agent/gemini-3.8-flash",
+            "by": f"extracter_agent/{cfg.gemini_model}",
             "at": now_iso,
         },
         "verified": [
-            {"by": "human:expert-chemical-engineer", "at": "2026-06-16T00:00:00Z"},
+            {"by": "human:expert-chemical-engineer", "at": now_iso},
             {"by": "process:okf-validation-suite", "at": now_iso},
         ],
         "status": "stable",
