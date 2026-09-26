@@ -554,11 +554,10 @@ def save_report(summary: LiveEvalSummary, output_path: Path) -> None:
             report_blob = bucket.blob(f"evals/reports/{output_path.name}")
             report_blob.upload_from_filename(str(output_path), content_type="application/json")
 
-            # 2. Upload the live execution log if present
-            live_log = output_path.parent / "full_eval_live.log"
-            if live_log.exists():
-                log_blob = bucket.blob("evals/reports/full_eval_live.log")
-                log_blob.upload_from_filename(str(live_log), content_type="text/plain")
+            # 2. Upload live execution logs if present
+            for log_file in output_path.parent.glob("*.log"):
+                log_blob = bucket.blob(f"evals/reports/{log_file.name}")
+                log_blob.upload_from_filename(str(log_file), content_type="text/plain")
 
             # 3. Ensure the golden benchmark datasets are stored in GCS
             if len(summary.cases) <= 1:
@@ -595,6 +594,11 @@ def print_summary_table(summary: LiveEvalSummary) -> None:
 
 
 if __name__ == "__main__":
+    import signal
+
+    if hasattr(signal, "SIGHUP"):
+        signal.signal(signal.SIGHUP, signal.SIG_IGN)
+
     parser = argparse.ArgumentParser(description="Run Live Vertex AI Evaluation Suite")
     parser.add_argument("--limit", type=int, default=5, help="Number of benchmark cases to evaluate per dataset")
     parser.add_argument("--dataset", type=str, default="wiki", choices=["wiki", "file-by-file", "both"], help="Evaluation dataset mode: wiki (entity-centric), file-by-file (raw PDF document-centric), or both")
