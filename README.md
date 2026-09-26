@@ -133,6 +133,28 @@ The **Extracter Agent** (`extracter_agent`) is an autonomous Google ADK multi-fi
    - **Step 6 (`export_bundle_to_gcs_tool`):** Full-bundle synchronization and GCS manifest verification (`gs://cs-poc-y03r7kmfyov4kilzg50fd7s-okf-knowledge/okf-bundles/phenol-plant/`).
 2. **Vertex AI Preemption Resilience (`Option A`):**
    - Built-in `HttpRetryOptions` (5 attempts, exponential backoff on HTTP `429, 500, 502, 503, 504`) and turn-level stream recovery with `--resume` checkpointing for `gemini-3.8-flash`.
+3. **In-Place Updated Document Resolution & Content-Hash Cache Hardening (`Step 16`):**
+   - **GCS Raw PDF Cache Verification (`pdf_tools.py`):** Compares both `size_bytes` and base64 MD5 digest (`blob.md5_hash`) against `/tmp/extracter_gcs_raw_cache/`, automatically re-downloading updated PDFs even when replaced in-place under the same filename.
+   - **POSIX Child `st_mtime_ns` Cache Invalidation (`domain.py`, `synthesizer.py`):** Tracks `(len(md_files), max(child.stat().st_mtime_ns))` in `_iter_bundle_catalog` and `resolve_bundle_instrument_link` so in-place edits immediately invalidate in-memory caches.
+   - **MD5 Digest Verification in GCS Exporter (`exporter.py`):** Verifies base64 MD5 digests in `GCSExporter.export_bundle` so equal-byte-length updates are always uploaded to GCS.
+
+### 🚀 Deploying Agent Runtime & ADK Web UI (`deploy.sh`)
+
+A unified [`deploy.sh`](./deploy.sh) script deploys both the **ADK Agent (`agent_runtime`)** on Gemini Enterprise Agent Platform and the **Interactive ADK Web UI (`cloud_run`)** on Google Cloud Run (configured with `--no-invoker-iam-check` for strict Rule 10 Domain Restricted Sharing compliance):
+
+```bash
+# Deploy both Agent Runtime (Vertex AI Reasoning Engine) and ADK Web UI (Cloud Run)
+./deploy.sh
+
+# Deploy ONLY the ADK Agent to Gemini Enterprise Agent Platform (agent_runtime)
+./deploy.sh --target agent_runtime
+
+# Deploy ONLY the interactive ADK Web UI to Google Cloud Run (cloud_run)
+./deploy.sh --target cloud_run
+```
+
+- **Live ADK Web UI (Cloud Run):** `https://extracter-agent-web-cwmwtobz3a-as.a.run.app/dev-ui/?app=extracter_agent` (`https://extracter-agent-web-114618371568.asia-southeast1.run.app`)
+- **Live Agent Platform Runtime:** `projects/cs-poc-y03r7kmfyov4kilzg50fd7s/locations/asia-southeast1/reasoningEngines/8210246838649880576`
 
 ### Live Vertex AI Evaluation Results (`Zero Mocks`)
 
@@ -143,7 +165,7 @@ The **Extracter Agent** (`extracter_agent`) is an autonomous Google ADK multi-fi
 | **Tool Trajectory Precision** | **100.0%** | **100.0%** | **100.0%** | $\ge 95.0\%$ (**PASS**) |
 | **Negative Constraint Adherence** | **100.0%** | **100.0%** | **100.0%** | $100.0\%$ (**PASS**) |
 | **Model Armor Security Interception** | **100.0%** | **100.0%** | **100.0%** | $100.0\%$ (**PASS**) |
-| **Unit & Property-Based Tests (PBT)** | **45 / 45 Passed** | **45 / 45 Passed** | **100.0%** | $100.0\%$ (**PASS**) |
+| **Unit & Property-Based Tests (PBT)** | **54 / 54 Passed** | **54 / 54 Passed** | **100.0%** | $100.0\%$ (**PASS**) |
 
 ### Running Detached Live Evaluations on Cloudtop (Against Deployed Agent Runtime)
 To run or resume the full 130-case evaluation suite against the deployed **Vertex AI Agent Runtime (`projects/114618371568/locations/asia-southeast1/reasoningEngines/8210246838649880576`)** inside a detached `tmux` session that survives client disconnects:
@@ -151,7 +173,7 @@ To run or resume the full 130-case evaluation suite against the deployed **Verte
 tmux new-session -d -s extracter_eval \
   "cd /usr/local/google/home/pantana/lab/extracter-agent && \
    PYTHONPATH=. ./.venv/bin/python -u evals/run_live_vertex_eval.py \
-   --use-agent-runtime --limit 130 --resume \
+   --use-agent-runtime --limit 130 --concurrency 4 \
    --output evals/reports/live_vertex_eval_full.json \
    > evals/reports/full_eval_live.log 2>&1"
 ```
@@ -166,4 +188,5 @@ tmux new-session -d -s extracter_eval \
 - **Operational Reports & Diagrams:** [`docs/README.md`](./docs/README.md)
 - **Rules Catalog:** [`_agents/rules/README.md`](./_agents/rules/README.md)
 - **Skills Catalog:** [`_agents/skills/README.md`](./_agents/skills/README.md)
+
 

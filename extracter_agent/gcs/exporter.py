@@ -5,12 +5,21 @@ Uploads and synchronizes OKF v0.2 bundles to enterprise GCS buckets.
 
 from __future__ import annotations
 
+import base64
+import hashlib
 import logging
 import mimetypes
 from pathlib import Path
 from typing import Any
 
 from google.cloud import storage
+
+
+def compute_file_md5_b64(file_path: Path | str) -> str:
+    """Compute base64-encoded MD5 digest matching Google Cloud Storage blob.md5_hash."""
+    return base64.b64encode(
+        hashlib.md5(Path(file_path).read_bytes(), usedforsecurity=False).digest()
+    ).decode("ascii")
 
 
 def get_blob_name(prefix: str, relative_path: str) -> str:
@@ -80,12 +89,16 @@ class GCSExporter:
             from concurrent.futures import ThreadPoolExecutor
 
             bucket = self.client.bucket(self.bucket_name)
-            existing_sizes: dict[str, int] = {}
+            existing_meta: dict[str, tuple[int, str | None]] = {}
             try:
                 if hasattr(bucket, "list_blobs"):
                     for b in bucket.list_blobs(prefix=resolved_prefix.strip("/") + "/"):
                         if hasattr(b, "name") and hasattr(b, "size"):
-                            existing_sizes[b.name] = b.size or 0
+                            b_md5 = getattr(b, "md5_hash", None)
+                            existing_meta[b.name] = (
+                                b.size or 0,
+                                b_md5 if isinstance(b_md5, str) else None,
+                            )
             except Exception as exc:
                 logging.getLogger(__name__).debug("Ignored non-fatal exception: %s", exc)
 
@@ -93,8 +106,16 @@ class GCSExporter:
                 local_path, blob_name, c_type = item
                 uri = f"gs://{self.bucket_name}/{blob_name}"
                 f_size = local_path.stat().st_size
-                if existing_sizes.get(blob_name) == f_size and f_size > 0 and not blob_name.endswith(("index.md", "log.md")):
-                    return uri
+                remote_info = existing_meta.get(blob_name)
+                if (
+                    remote_info is not None
+                    and remote_info[0] == f_size
+                    and f_size > 0
+                    and not blob_name.endswith(("index.md", "log.md"))
+                ):
+                    remote_md5 = remote_info[1]
+                    if remote_md5 is None or remote_md5 == compute_file_md5_b64(local_path):
+                        return uri
                 blob = bucket.blob(blob_name)
                 blob.upload_from_filename(str(local_path), content_type=c_type)
                 return uri

@@ -39,7 +39,7 @@ def is_nozzle_mark_only(tag: str) -> bool:
     return bool(re.match(r"^[A-Z]\d{2}\b", t))
 
 
-_BUNDLE_CATALOG_CACHE: dict[tuple[str, int], list[dict[str, Any]]] = {}
+_BUNDLE_CATALOG_CACHE: dict[tuple[str, int, int, int], list[dict[str, Any]]] = {}
 
 
 def _iter_bundle_catalog(bundle_root: Path | None = None) -> list[dict[str, Any]]:
@@ -50,12 +50,17 @@ def _iter_bundle_catalog(bundle_root: Path | None = None) -> list[dict[str, Any]
     if not root or not root.exists():
         return []
 
-    cache_key = (str(root.resolve()), root.stat().st_mtime_ns)
+    md_files = sorted(root.rglob("*.md"))
+    latest_child_mtime_ns = max((p.stat().st_mtime_ns for p in md_files), default=0)
+    cache_key = (
+        str(root.resolve()),
+        root.stat().st_mtime_ns,
+        len(md_files),
+        latest_child_mtime_ns,
+    )
     cached = _BUNDLE_CATALOG_CACHE.get(cache_key)
     if cached is not None:
         return cached
-
-    md_files = sorted(root.rglob("*.md"))
 
     catalog: list[dict[str, Any]] = []
     for md_file in md_files:

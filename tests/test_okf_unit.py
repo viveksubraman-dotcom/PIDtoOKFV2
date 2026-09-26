@@ -349,3 +349,137 @@ def test_bundle_100_percent_golden_parity_and_zero_broken_links():
     assert len(broken) == 0, f"Broken internal Markdown links found: {broken[:10]}"
 
 
+def test_in_place_md_update_invalidates_catalog_and_instrument_caches():
+    """Verify in-place edits to child .md files immediately invalidate catalog and instrument caches even when parent dir mtime is unchanged."""
+    import os
+
+    from extracter_agent.models.domain import _iter_bundle_catalog
+    from extracter_agent.okf.synthesizer import resolve_bundle_instrument_link
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        root = Path(tmpdir)
+        inst_dir = root / "instruments"
+        inst_dir.mkdir(parents=True)
+        reg_a = inst_dir / "pressure-register.md"
+        reg_b = inst_dir / "flow-register.md"
+        reg_a.write_text(
+            "---\ntype: Instrument Specification\ntitle: Pressure Register\n---\n# Pressure\nContains PT-1001.",
+            encoding="utf-8",
+        )
+        reg_b.write_text(
+            "---\ntype: Instrument Specification\ntitle: Flow Register\n---\n# Flow\nContains FT-1001.",
+            encoding="utf-8",
+        )
+
+        # Warm both caches
+        cat1 = _iter_bundle_catalog(root)
+        assert any("ft-1001" in c["head_lower"] for c in cat1)
+        assert not any("zx-9999" in c["head_lower"] for c in cat1)
+        assert (
+            resolve_bundle_instrument_link("FT-1001", bundle_root=root)
+            == "/instruments/flow-register.md"
+        )
+
+        # Freeze parent dir mtime, modify reg_b in-place and advance only reg_b's mtime_ns
+        dir_stat = inst_dir.stat()
+        root_stat = root.stat()
+        new_mtime_ns = reg_b.stat().st_mtime_ns + 5_000_000
+        reg_b.write_text(
+            "---\ntype: Instrument Specification\ntitle: Flow Register\n---\n# Flow\nContains FT-1001 and ZX-9999.",
+            encoding="utf-8",
+        )
+        os.utime(reg_b, ns=(new_mtime_ns, new_mtime_ns))
+        os.utime(inst_dir, ns=(dir_stat.st_atime_ns, dir_stat.st_mtime_ns))
+        os.utime(root, ns=(root_stat.st_atime_ns, root_stat.st_mtime_ns))
+
+        # Both caches must detect the child file mtime_ns change despite unchanged directory mtime_ns
+        cat2 = _iter_bundle_catalog(root)
+        assert any("zx-9999" in c["head_lower"] for c in cat2)
+        assert (
+            resolve_bundle_instrument_link("ZX-9999", bundle_root=root)
+            == "/instruments/flow-register.md"
+        )
+
+
+def test_gcs_pdf_cache_redownloads_on_md5_or_size_change(monkeypatch):
+    """Verify _download_pdf_from_gcs skips download on matching MD5+size and re-downloads when GCS MD5 changes in-place."""
+    from unittest.mock import MagicMock
+
+    from extracter_agent.tools import pdf_tools
+    from extracter_agent.tools.pdf_tools import _compute_file_md5_b64
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        cache_dir = Path(tmpdir)
+        monkeypatch.setattr(pdf_tools, "_GCS_RAW_CACHE_DIR", cache_dir)
+
+        rel_path = "reference/raw/data_sheets/sample.pdf"
+        cached_file = cache_dir / rel_path
+        cached_file.parent.mkdir(parents=True, exist_ok=True)
+        v1_bytes = b"%PDF-1.4 revision 1 (0.5 kg/cm2g)"
+        v2_bytes = b"%PDF-1.4 revision 2 (3.9 kg/cm2g)"  # exact same byte length!
+        assert len(v1_bytes) == len(v2_bytes)
+        cached_file.write_bytes(v1_bytes)
+        v1_md5 = _compute_file_md5_b64(cached_file)
+
+        downloads: list[str] = []
+
+        class DummyBlob:
+            def download_to_filename(self, fname: str) -> None:
+                downloads.append(fname)
+                Path(fname).write_bytes(v2_bytes)
+
+        mock_client = MagicMock()
+        mock_bucket = MagicMock()
+        mock_bucket.blob.return_value = DummyBlob()
+        mock_client.bucket.return_value = mock_bucket
+        monkeypatch.setattr(pdf_tools.storage, "Client", lambda **kwargs: mock_client)
+
+        # Case 1: Matching size and MD5 -> zero downloads
+        monkeypatch.setattr(
+            pdf_tools,
+            "_GCS_RAW_BLOBS_CACHE",
+            [
+                {
+                    "file_name": "sample.pdf",
+                    "subfolder": "data_sheets",
+                    "relative_path": rel_path,
+                    "blob_name": rel_path,
+                    "gcs_uri": f"gs://test-bucket/{rel_path}",
+                    "size_bytes": len(v1_bytes),
+                    "md5_hash": v1_md5,
+                }
+            ],
+        )
+        p1, _ = pdf_tools._download_pdf_from_gcs("sample.pdf", "data_sheets")
+        assert p1 == cached_file
+        assert len(downloads) == 0
+
+        # Case 2: Same size_bytes, updated md5_hash -> triggers re-download!
+        import base64
+        import hashlib
+
+        v2_md5 = base64.b64encode(
+            hashlib.md5(v2_bytes, usedforsecurity=False).digest()
+        ).decode("ascii")
+        monkeypatch.setattr(
+            pdf_tools,
+            "_GCS_RAW_BLOBS_CACHE",
+            [
+                {
+                    "file_name": "sample.pdf",
+                    "subfolder": "data_sheets",
+                    "relative_path": rel_path,
+                    "blob_name": rel_path,
+                    "gcs_uri": f"gs://test-bucket/{rel_path}",
+                    "size_bytes": len(v2_bytes),
+                    "md5_hash": v2_md5,
+                }
+            ],
+        )
+        p2, _ = pdf_tools._download_pdf_from_gcs("sample.pdf", "data_sheets")
+        assert p2 == cached_file
+        assert len(downloads) == 1
+        assert cached_file.read_bytes() == v2_bytes
+
+
+

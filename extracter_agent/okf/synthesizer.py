@@ -26,7 +26,7 @@ def _slugify(text: str) -> str:
     return re.sub(r"[-\s]+", "-", s).strip("-")
 
 
-_INST_REGISTER_CACHE: dict[tuple[str, int], list[tuple[Path, str, set[str]]]] = {}
+_INST_REGISTER_CACHE: dict[tuple[str, int, int, int], list[tuple[Path, str, set[str]]]] = {}
 
 
 def resolve_bundle_instrument_link(
@@ -55,14 +55,21 @@ def resolve_bundle_instrument_link(
     if direct_file.exists():
         return f"/instruments/{safe_inst_tag}.md"
 
-    cache_key = (str(inst_dir.resolve()), inst_dir.stat().st_mtime_ns)
+    reg_files = [
+        p for p in sorted(inst_dir.glob("*.md")) if p.name not in ("index.md", "log.md")
+    ]
+    if not reg_files:
+        return f"/instruments/{safe_inst_tag}.md"
+
+    latest_reg_mtime_ns = max((p.stat().st_mtime_ns for p in reg_files), default=0)
+    cache_key = (
+        str(inst_dir.resolve()),
+        inst_dir.stat().st_mtime_ns,
+        len(reg_files),
+        latest_reg_mtime_ns,
+    )
     cached_regs = _INST_REGISTER_CACHE.get(cache_key)
     if cached_regs is None:
-        reg_files = [
-            p for p in sorted(inst_dir.glob("*.md")) if p.name not in ("index.md", "log.md")
-        ]
-        if not reg_files:
-            return f"/instruments/{safe_inst_tag}.md"
         cached_regs = []
         for reg in reg_files:
             try:

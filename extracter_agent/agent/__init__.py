@@ -15,6 +15,8 @@ from extracter_agent.agent.orchestrator import (
     extracter_agent,
 )
 
+root_agent = extracter_agent
+
 __all__ = [
     "INTENT_SYSTEM_PROMPT",
     "CognitiveClassifier",
@@ -24,4 +26,5 @@ __all__ = [
     "check_prompt_security",
     "create_extracter_agent",
     "extracter_agent",
+    "root_agent",
 ]

@@ -40,3 +40,33 @@ def test_pbt_infer_content_type_invariants(ext, filename):
         assert "text/yaml" in content_type
     elif ext == ".json":
         assert "application/json" in content_type
+
+
+@given(
+    payload=st.binary(min_size=1, max_size=256),
+    mut_idx=st.integers(min_value=0, max_value=255),
+    delta=st.integers(min_value=1, max_value=255),
+)
+def test_pbt_md5_cache_invalidation_on_any_mutation(
+    payload: bytes, mut_idx: int, delta: int
+):
+    """Invariant: Any single-byte mutation (preserving exact file size) alters the base64 MD5 fingerprint."""
+    import tempfile
+
+    from extracter_agent.gcs.exporter import compute_file_md5_b64
+
+    idx = mut_idx % len(payload)
+    mutated = bytearray(payload)
+    mutated[idx] = (mutated[idx] + delta) % 256
+    mutated_bytes = bytes(mutated)
+    assert len(mutated_bytes) == len(payload)
+    assert mutated_bytes != payload
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        f1 = Path(tmpdir) / "v1.bin"
+        f2 = Path(tmpdir) / "v2.bin"
+        f1.write_bytes(payload)
+        f2.write_bytes(mutated_bytes)
+        assert f1.stat().st_size == f2.stat().st_size
+        assert compute_file_md5_b64(f1) != compute_file_md5_b64(f2)
+

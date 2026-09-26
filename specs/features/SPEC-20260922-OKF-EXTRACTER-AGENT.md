@@ -556,9 +556,29 @@ In chemical engineering facilities, instrumentation is inextricably bound to equ
   - `test_pbt_dynamic_instrument_link_never_broken`: `hypothesis` property test verifying that `resolve_bundle_instrument_link(..., bundle_root=...)` always resolves to an existing `.md` file in `bundle_root`.
 - **Completion Criteria:** Zero hardcoded domain maps/tags across the entire codebase, `130 / 130` (`100.0%`) Golden path match, `0` broken Markdown links, `139 / 139` (`100.0%`) evaluation pass rate, and 100% `pytest` pass rate.
 
+### Step 16: In-Place Updated Document Resolution, Content-Hash Cache Hardening & Cloud Run ADK Web UI Deployment
+- **Actions:**
+  1. **GCS Raw PDF Download Cache Hardening (`extracter_agent/tools/pdf_tools.py`):**
+     - Enhance `_list_gcs_raw_blobs(force_refresh: bool = False)` to capture `md5_hash` (`blob.md5_hash`) and `updated` (`str(blob.updated or "")`) metadata alongside `size_bytes`.
+     - Enhance `_download_pdf_from_gcs` to verify both local file size and base64-encoded MD5 digest (`_compute_file_md5_b64`) against the GCS blob's `size_bytes` and `md5_hash`; automatically re-download when an in-place updated PDF is detected in GCS.
+  2. **Subdirectory File `mtime_ns` Cache Invalidation (`extracter_agent/models/domain.py` & `extracter_agent/okf/synthesizer.py`):**
+     - Include `(len(md_files), max((p.stat().st_mtime_ns for p in md_files), default=0))` in the cache keys for `_iter_bundle_catalog` (`domain.py`) and `resolve_bundle_instrument_link` (`synthesizer.py`) so in-place edits to existing `.md` files on POSIX filesystems immediately invalidate in-memory caches.
+  3. **MD5 Digest Verification in Batch GCS Exporter (`extracter_agent/gcs/exporter.py`):**
+     - Track `existing_meta: dict[str, tuple[int, str | None]]` (`(b.size or 0, getattr(b, "md5_hash", None))`) in `GCSExporter.export_bundle` and compare local base64 MD5 digests so same-byte-length in-place updates are always uploaded to GCS.
+  4. **Cloud Run ADK Web UI Deployment & Unified `deploy.sh` Script (`deploy.sh`, `extracter_agent/requirements.txt`):**
+     - Provide `extracter_agent/requirements.txt` for containerized Cloud Run / Agent Platform builds.
+     - Author `deploy.sh` supporting `--target all|agent_runtime|cloud_run` to deploy the ADK Agent (`adk deploy agent_engine`) and the interactive ADK Web UI (`adk deploy cloud_run --with_ui`) to Google Cloud Run (`extracter-agent-web` in `asia-southeast1`) connected to `--session_service_uri=agentengine://${AGENT_ENGINE_ID}` and compliant with Rule 10 (`--no-invoker-iam-check`).
+- **Unit & Property-Based Tests (PBT):**
+  - `test_gcs_pdf_cache_redownloads_on_md5_or_size_change`: Unit test verifying `_download_pdf_from_gcs` re-downloads when GCS `md5_hash` or `size_bytes` changes.
+  - `test_in_place_md_update_invalidates_catalog_and_instrument_caches`: Unit test verifying that modifying an existing `.md` file in-place immediately invalidates `_iter_bundle_catalog` and `resolve_bundle_instrument_link` caches.
+  - `test_exporter_uploads_same_size_modified_content`: Unit test verifying `GCSExporter.export_bundle` re-uploads a file whose byte size is unchanged when its MD5 digest differs from the remote GCS blob's `md5_hash`.
+  - `test_pbt_md5_cache_invalidation_on_any_mutation`: `hypothesis` property test verifying that any byte mutation (including equal-length substitutions) alters the `(size, md5_b64)` fingerprint and triggers cache invalidation / re-upload.
+- **Completion Criteria:** All Step 16 unit and property-based tests passing, ADK Web UI deployed and verified on Google Cloud Run (`extracter-agent-web`), `deploy.sh` executable and documented in `README.md`.
+
 ---
 
 ## 8. Plan Progress Tracking & Living Spec Synchronization
 - All milestones, verification metrics, and test results will be continuously recorded under `specs/plan/`.
 - If any data model or interface evolves during implementation, this specification will be updated synchronously to prevent spec drift.
+
 

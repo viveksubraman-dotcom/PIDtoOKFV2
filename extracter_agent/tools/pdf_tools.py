@@ -5,6 +5,8 @@ Strictly complies with Rule 11 (FunctionTool docstring contracts, type safety).
 
 from __future__ import annotations
 
+import base64
+import hashlib
 import logging
 import re
 import tempfile
@@ -27,10 +29,17 @@ _GCS_RAW_BLOBS_CACHE: list[dict[str, Any]] | None = None
 _GCS_RAW_CACHE_DIR = Path(tempfile.gettempdir()) / "extracter_gcs_raw_cache"
 
 
-def _list_gcs_raw_blobs() -> list[dict[str, Any]]:
+def _compute_file_md5_b64(path: Path) -> str:
+    """Compute base64-encoded MD5 digest matching Google Cloud Storage blob.md5_hash."""
+    return base64.b64encode(
+        hashlib.md5(path.read_bytes(), usedforsecurity=False).digest()
+    ).decode("ascii")
+
+
+def _list_gcs_raw_blobs(force_refresh: bool = False) -> list[dict[str, Any]]:
     """List and cache raw PDF object metadata from Google Cloud Storage."""
     global _GCS_RAW_BLOBS_CACHE
-    if _GCS_RAW_BLOBS_CACHE is not None:
+    if not force_refresh and _GCS_RAW_BLOBS_CACHE is not None:
         return _GCS_RAW_BLOBS_CACHE
 
     cfg = get_config()
@@ -44,6 +53,7 @@ def _list_gcs_raw_blobs() -> list[dict[str, Any]]:
             parts = rel_under_raw.split("/")
             sub = parts[0] if len(parts) > 1 else ""
             fname = parts[-1]
+            raw_md5 = getattr(blob, "md5_hash", None)
             items.append(
                 {
                     "file_name": fname,
@@ -52,6 +62,8 @@ def _list_gcs_raw_blobs() -> list[dict[str, Any]]:
                     "blob_name": blob.name,
                     "gcs_uri": f"gs://{cfg.destination_gcs_bucket}/{blob.name}",
                     "size_bytes": blob.size or 0,
+                    "md5_hash": raw_md5 if isinstance(raw_md5, str) else None,
+                    "updated": str(getattr(blob, "updated", "") or ""),
                 }
             )
     if items:
@@ -59,10 +71,14 @@ def _list_gcs_raw_blobs() -> list[dict[str, Any]]:
     return items
 
 
-def _download_pdf_from_gcs(pdf_filename: str, subfolder: str) -> tuple[Path | None, str | None]:
-    """Download a raw PDF from GCS into the local temporary cache directory."""
+def _download_pdf_from_gcs(
+    pdf_filename: str,
+    subfolder: str,
+    force_refresh: bool = False,
+) -> tuple[Path | None, str | None]:
+    """Download a raw PDF from GCS into the local temporary cache directory with size and MD5 verification."""
     cfg = get_config()
-    blobs = _list_gcs_raw_blobs()
+    blobs = _list_gcs_raw_blobs(force_refresh=force_refresh)
     clean_name = Path(pdf_filename).name
     norm_target = re.sub(r"[^a-z0-9]", "", clean_name.lower())
 
@@ -86,7 +102,18 @@ def _download_pdf_from_gcs(pdf_filename: str, subfolder: str) -> tuple[Path | No
         return None, None
 
     dest_path = _GCS_RAW_CACHE_DIR / matched_blob["relative_path"]
-    if not dest_path.exists() or dest_path.stat().st_size == 0:
+    needs_download = not dest_path.exists() or dest_path.stat().st_size == 0
+    if not needs_download:
+        expected_size = matched_blob.get("size_bytes") or 0
+        expected_md5 = matched_blob.get("md5_hash")
+        if (expected_size > 0 and dest_path.stat().st_size != expected_size) or (
+            isinstance(expected_md5, str)
+            and expected_md5
+            and _compute_file_md5_b64(dest_path) != expected_md5
+        ):
+            needs_download = True
+
+    if needs_download:
         dest_path.parent.mkdir(parents=True, exist_ok=True)
         client = storage.Client(project=cfg.google_cloud_project)
         bucket = client.bucket(cfg.destination_gcs_bucket)
