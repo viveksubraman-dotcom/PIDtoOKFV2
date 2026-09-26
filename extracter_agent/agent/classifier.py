@@ -54,11 +54,15 @@ class CognitiveClassifier:
                 http_status_codes=[429, 500, 502, 503, 504],
             )
             http_opts = types.HttpOptions(retry_options=retry_opts)
-            if os.getenv("GOOGLE_GENAI_USE_VERTEXAI", "").lower() in ("true", "1"):
+            use_vertex = (
+                os.getenv("GOOGLE_GENAI_USE_VERTEXAI", "").lower() in ("true", "1")
+                or os.getenv("GOOGLE_GENAI_USE_ENTERPRISE", "").lower() in ("true", "1")
+            )
+            if use_vertex:
                 self._client = genai.Client(
                     vertexai=True,
                     project=cfg.google_cloud_project,
-                    location=cfg.google_cloud_location,
+                    location=cfg.gemini_location,
                     http_options=http_opts,
                 )
             else:

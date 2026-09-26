@@ -85,3 +85,31 @@ def test_pbt_search_raw_documents_invariants(query):
         assert full_path.exists()
 
 
+@given(
+    infra_region=st.sampled_from(["asia-southeast1", "us-central1", "europe-west1", "asia-east1"]),
+    gemini_loc=st.sampled_from(["global", "us-central1"]),
+)
+def test_pbt_gemini_location_decoupled_from_infra_region(infra_region, gemini_loc):
+    """Invariant: Gemini model endpoint location is strictly governed by GEMINI_LOCATION, independent of GOOGLE_CLOUD_LOCATION."""
+    import os
+    from unittest.mock import patch
+
+    from extracter_agent.agent.orchestrator import create_extracter_agent
+    from extracter_agent.config import get_config
+
+    with patch.dict(
+        os.environ,
+        {
+            "GOOGLE_CLOUD_LOCATION": infra_region,
+            "GEMINI_LOCATION": gemini_loc,
+            "GOOGLE_GENAI_USE_VERTEXAI": "true",
+        },
+        clear=False,
+    ):
+        cfg = get_config()
+        assert cfg.google_cloud_location == infra_region
+        assert cfg.gemini_location == gemini_loc
+        agent = create_extracter_agent()
+        assert agent.model.client_kwargs == {"location": gemini_loc}
+
+

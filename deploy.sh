@@ -30,7 +30,8 @@ if [[ -f ".env" ]]; then
 fi
 
 PROJECT_ID="${GOOGLE_CLOUD_PROJECT:-cs-poc-y03r7kmfyov4kilzg50fd7s}"
-REGION="${GOOGLE_CLOUD_LOCATION:-asia-southeast1}"
+REGION="${NONPROD_REGION:-asia-southeast1}"
+MODEL_LOCATION="${GEMINI_LOCATION:-global}"
 AGENT_DIR="extracter_agent"
 AGENT_DISPLAY_NAME="${SERVICE_NAME:-extracter-agent}"
 WEB_SERVICE_NAME="${CLOUD_RUN_WEB_SERVICE:-extracter-agent-web}"
@@ -87,6 +88,7 @@ deploy_agent_runtime() {
   echo "[1/2] Deploying ADK Agent to Gemini Enterprise Agent Platform (agent_runtime)"
   echo "  Project:          ${PROJECT_ID}"
   echo "  Region:           ${REGION}"
+  echo "  Model Location:   ${MODEL_LOCATION}"
   echo "  Agent Engine ID:  ${AGENT_ENGINE_ID}"
   echo "  Display Name:     ${AGENT_DISPLAY_NAME}"
   echo "=============================================================================="
@@ -107,6 +109,7 @@ deploy_adk_web_cloud_run() {
   echo "[2/2] Deploying ADK Web UI (--with_ui) to Google Cloud Run (cloud_run)"
   echo "  Project:          ${PROJECT_ID}"
   echo "  Region:           ${REGION}"
+  echo "  Model Location:   ${MODEL_LOCATION}"
   echo "  Service Name:     ${WEB_SERVICE_NAME}"
   echo "  Session URI:      ${session_uri}"
   echo "  Artifact URI:     ${artifact_uri}"
@@ -123,6 +126,8 @@ deploy_adk_web_cloud_run() {
     --artifact_service_uri="${artifact_uri}" \
     --env "PYTHONPATH=/app/agents" \
     --env "GOOGLE_GENAI_USE_VERTEXAI=true" \
+    --env "GOOGLE_CLOUD_LOCATION=${MODEL_LOCATION}" \
+    --env "GEMINI_LOCATION=${MODEL_LOCATION}" \
     --env "GEMINI_MODEL=${MODEL_NAME}" \
     --env "USE_GCS_STORAGE=true" \
     --env "SOURCE_GCS_RAW_PREFIX=${RAW_PREFIX}" \

@@ -155,6 +155,7 @@ A unified [`deploy.sh`](./deploy.sh) script deploys both the **ADK Agent (`agent
 
 - **Live ADK Web UI (Cloud Run):** `https://extracter-agent-web-cwmwtobz3a-as.a.run.app/dev-ui/?app=extracter_agent` (`https://extracter-agent-web-114618371568.asia-southeast1.run.app`)
 - **Live Agent Platform Runtime:** `projects/cs-poc-y03r7kmfyov4kilzg50fd7s/locations/asia-southeast1/reasoningEngines/8210246838649880576`
+- **Model Endpoint Location:** `GEMINI_LOCATION=global` (routes `gemini-3.8-flash` requests to `locations/global/publishers/google/models/gemini-3.8-flash` while keeping Cloud Run and Agent Engine sessions in `NONPROD_REGION=asia-southeast1`).
 
 ### Live Vertex AI Evaluation Results (`Zero Mocks`)
 
@@ -165,7 +166,7 @@ A unified [`deploy.sh`](./deploy.sh) script deploys both the **ADK Agent (`agent
 | **Tool Trajectory Precision** | **100.0%** | **100.0%** | **100.0%** | $\ge 95.0\%$ (**PASS**) |
 | **Negative Constraint Adherence** | **100.0%** | **100.0%** | **100.0%** | $100.0\%$ (**PASS**) |
 | **Model Armor Security Interception** | **100.0%** | **100.0%** | **100.0%** | $100.0\%$ (**PASS**) |
-| **Unit & Property-Based Tests (PBT)** | **54 / 54 Passed** | **54 / 54 Passed** | **100.0%** | $100.0\%$ (**PASS**) |
+| **Unit & Property-Based Tests (PBT)** | **56 / 56 Passed** | **56 / 56 Passed** | **100.0%** | $100.0\%$ (**PASS**) |
 
 ### Running Detached Live Evaluations on Cloudtop (Against Deployed Agent Runtime)
 To run or resume the full 130-case evaluation suite against the deployed **Vertex AI Agent Runtime (`projects/114618371568/locations/asia-southeast1/reasoningEngines/8210246838649880576`)** inside a detached `tmux` session that survives client disconnects:

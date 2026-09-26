@@ -100,6 +100,8 @@ When fulfilling an extraction or bundle construction request, you MUST execute t
 
 def create_extracter_agent() -> Agent:
     """Factory to construct the ADK Root Extracter Agent."""
+    import os
+
     from google.adk.models.google_llm import Gemini
     from google.genai import types
 
@@ -110,9 +112,15 @@ def create_extracter_agent() -> Agent:
         exp_base=2.0,
         http_status_codes=[429, 500, 502, 503, 504],
     )
+    use_vertex = (
+        os.getenv("GOOGLE_GENAI_USE_VERTEXAI", "").lower() in ("true", "1")
+        or os.getenv("GOOGLE_GENAI_USE_ENTERPRISE", "").lower() in ("true", "1")
+    )
+    client_kwargs = {"location": cfg.gemini_location} if use_vertex else None
     llm_model = Gemini(
         model=cfg.gemini_model,
         retry_options=retry_opts,
+        client_kwargs=client_kwargs,
     )
     return Agent(
         name="extracter_orchestrator",

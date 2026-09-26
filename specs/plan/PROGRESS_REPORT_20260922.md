@@ -30,14 +30,14 @@ All 7 core implementation steps defined in the SDD specification have been compl
 | **Step 13** | Multi-Source Cross-Document Ingestion & Multimodal Visual Synthesis | `evals/test_multi_source_extraction.py`, `extracter_agent/pdf/processor.py`, `extracter_agent/tools/pdf_tools.py`, `build/okf_bundle/equipment/D-2301.md` | 1 passed | 1 passed | **Done (100% Live Vertex AI)** |
 | **Step 14** | Autonomous Domain Slug Taxonomy, Multimodal Cache, Link Sanitization, Master Indexer & 4-Worker Parallel Eval | `extracter_agent/models/domain.py`, `extracter_agent/okf/synthesizer.py`, `extracter_agent/okf/indexer.py`, `extracter_agent/pdf/processor.py`, `extracter_agent/gcs/exporter.py`, `evals/run_live_vertex_eval.py` | 4 passed | 2 passed | **Done (47/47 Tests, 0 Lint/SAST)** |
 | **Step 15** | Complete Codebase De-Hardcoding, Dynamic Bundle-Indexed Cross-Linking & 100% Golden Parity | `extracter_agent/models/domain.py`, `extracter_agent/okf/synthesizer.py`, `extracter_agent/okf/indexer.py`, `extracter_agent/cli.py`, `extracter_agent/agent/`, `extracter_agent/pdf/processor.py`, `evals/run_live_vertex_eval.py` | 2 passed | 1 passed | **Done (50/50 Tests, 100% Golden Parity, 0 Broken Links)** |
-| **Step 16** | In-Place Updated Document Resolution, Content-Hash Cache Hardening & Cloud Run ADK Web UI Deployment | `extracter_agent/tools/pdf_tools.py`, `extracter_agent/models/domain.py`, `extracter_agent/okf/synthesizer.py`, `extracter_agent/gcs/exporter.py`, `extracter_agent/agent.py`, `extracter_agent/requirements.txt`, `deploy.sh` | 3 passed | 1 passed | **Done (54/54 Tests, ADK Web Live on Cloud Run)** |
+| **Step 16** | In-Place Updated Document Resolution, Content-Hash Cache Hardening, Cloud Run ADK Web UI & Global Gemini Endpoint Routing | `extracter_agent/tools/pdf_tools.py`, `extracter_agent/models/domain.py`, `extracter_agent/okf/synthesizer.py`, `extracter_agent/gcs/exporter.py`, `extracter_agent/config.py`, `extracter_agent/agent/`, `extracter_agent/pdf/processor.py`, `deploy.sh` | 4 passed | 2 passed | **Done (56/56 Tests, ADK Web Live on Cloud Run)** |
 
 ---
 
 ## 2. Quality & Test Metrics
 
-- **Total Test Cases:** 54 passing tests (`PYTHONPATH=. .venv/bin/python -m pytest tests/ evals/test_eval_benchmarks.py -q` — 100% pass rate).
-- **Property-Based Invariants Verified (17 `hypothesis` invariants):**
+- **Total Test Cases:** 56 passing tests (`PYTHONPATH=. .venv/bin/python -m pytest tests/ evals/test_eval_benchmarks.py -q` — 100% pass rate).
+- **Property-Based Invariants Verified (18 `hypothesis` invariants):**
   1. `test_pbt_okf_frontmatter_invariants`: Serialization round-trip holds across all valid frontmatters.
   2. `test_pbt_trust_tier_invariants`: Trust tier monotonicity holds (`human:` strictly yields `human-reviewed`).
   3. `test_pbt_intent_enum_membership`: Strict validation against Canonical Intent Topology enum.
@@ -51,10 +51,11 @@ All 7 core implementation steps defined in the SDD specification have been compl
   11. `test_pbt_dynamic_instrument_link_never_broken`: Dynamic bundle-indexed instrument resolution always points to an existing register file in `bundle_root/instruments/`.
   12. `test_pbt_orchestrator_prompt_schema_coverage_invariant`: 100% of required entity schema attributes are documented in orchestrator instructions.
   13. `test_pbt_search_raw_documents_invariants`: Document search is exception-safe and all returned paths physically exist.
-  14. `test_pbt_get_blob_name_invariants`: GCS key formatting combines paths without illegal double slashes.
-  15. `test_pbt_infer_content_type_invariants`: Valid MIME types generated for all OKF extensions.
-  16. `test_pbt_md5_cache_invalidation_on_any_mutation`: Any single-byte mutation (even preserving exact file length) alters the base64 MD5 digest and triggers cache invalidation / re-upload.
-  17. `test_pbt_guardrail_injection_detection_invariant` & `test_pbt_guardrail_benign_clean_invariant`: 100% interception of adversarial prompt injections with zero false positives.
+  14. `test_pbt_gemini_location_decoupled_from_infra_region`: Gemini model endpoint location (`GEMINI_LOCATION=global`) is strictly decoupled from regional GCP infrastructure (`GOOGLE_CLOUD_LOCATION=asia-southeast1`).
+  15. `test_pbt_get_blob_name_invariants`: GCS key formatting combines paths without illegal double slashes.
+  16. `test_pbt_infer_content_type_invariants`: Valid MIME types generated for all OKF extensions.
+  17. `test_pbt_md5_cache_invalidation_on_any_mutation`: Any single-byte mutation (even preserving exact file length) alters the base64 MD5 digest and triggers cache invalidation / re-upload.
+  18. `test_pbt_guardrail_injection_detection_invariant` & `test_pbt_guardrail_benign_clean_invariant`: 100% interception of adversarial prompt injections with zero false positives.
 
 - **Static Code Quality (Ruff):** 100% clean (`All checks passed!`).
 - **Static Security (Bandit):** 0 issues identified (`0 Low, 0 Medium, 0 High`).
@@ -100,6 +101,7 @@ All 7 core implementation steps defined in the SDD specification have been compl
     - **POSIX Child `st_mtime_ns` Cache Invalidation (`extracter_agent/models/domain.py` & `extracter_agent/okf/synthesizer.py`):** Includes `(len(md_files), max(p.stat().st_mtime_ns))` in `_BUNDLE_CATALOG_CACHE` and `_INST_REGISTER_CACHE` keys so in-place `.md` edits on Linux (`ext4`) immediately invalidate caches.
     - **MD5 Digest Verification in Batch GCS Exporter (`extracter_agent/gcs/exporter.py`):** Compares `compute_file_md5_b64(local_path)` against `blob.md5_hash` in `GCSExporter.export_bundle` so equal-byte-length edits (e.g., `0.5` $\rightarrow$ `3.9`) are never skipped.
     - **Cloud Run ADK Web UI & Unified `deploy.sh` (`deploy.sh`, `extracter_agent/agent.py`, `extracter_agent/requirements.txt`):** Deployed interactive ADK Web UI (`--with_ui`) to Google Cloud Run (`extracter-agent-web`, URL: `https://extracter-agent-web-cwmwtobz3a-as.a.run.app/dev-ui/?app=extracter_agent`) connected to `agentengine://projects/cs-poc-y03r7kmfyov4kilzg50fd7s/locations/asia-southeast1/reasoningEngines/8210246838649880576` and `gs://cs-poc-y03r7kmfyov4kilzg50fd7s-okf-knowledge` with `--no-invoker-iam-check` (Rule 10 compliant).
+    - **Global Gemini Endpoint Routing (`GEMINI_LOCATION=global`) Across Agent & Cloud Run (`extracter_agent/config.py`, `extracter_agent/agent/orchestrator.py`, `extracter_agent/agent/classifier.py`, `extracter_agent/pdf/processor.py`, `deploy.sh`):** Decoupled Vertex AI publisher model endpoint location (`GEMINI_LOCATION=global` for `locations/global/publishers/google/models/gemini-3.8-flash`) from regional GCP infrastructure (`GOOGLE_CLOUD_LOCATION=asia-southeast1` / `NONPROD_REGION=asia-southeast1`).
 
 ---
 

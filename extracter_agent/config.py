@@ -34,6 +34,9 @@ class AppConfig(BaseModel):
     google_cloud_location: str = Field(
         default_factory=lambda: os.getenv("GOOGLE_CLOUD_LOCATION", "asia-southeast1")
     )
+    gemini_location: str = Field(
+        default_factory=lambda: os.getenv("GEMINI_LOCATION", "global")
+    )
     gemini_model: str = Field(
         default_factory=lambda: os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
     )
@@ -74,12 +77,7 @@ class AppConfig(BaseModel):
     )
 
 
-_config: AppConfig | None = None
-
-
 def get_config() -> AppConfig:
-    """Retrieve the singleton AppConfig instance."""
-    global _config
-    if _config is None:
-        _config = AppConfig()
-    return _config
+    """Retrieve the active AppConfig instance from current environment variables."""
+    return AppConfig()
+
