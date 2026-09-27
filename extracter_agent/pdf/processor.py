@@ -271,18 +271,9 @@ def _extract_single_pdf_window_multimodal(
         )
     )
     use_vertex = (
-        os.getenv("GOOGLE_GENAI_USE_VERTEXAI", "").lower() in ("true", "1")
+        os.getenv("GOOGLE_GENAI_USE_VERTEXAI", "true").lower() in ("true", "1")
         or os.getenv("GOOGLE_GENAI_USE_ENTERPRISE", "").lower() in ("true", "1")
     )
-    if use_vertex:
-        client = genai.Client(
-            vertexai=True,
-            project=cfg.google_cloud_project,
-            location=cfg.gemini_location,
-            http_options=http_opts,
-        )
-    else:
-        client = genai.Client(http_options=http_opts)
     part = types.Part.from_bytes(data=pdf_bytes, mime_type="application/pdf")
 
     base_prompt = (
@@ -308,6 +299,15 @@ def _extract_single_pdf_window_multimodal(
     )
     for attempt in range(3):
         try:
+            if use_vertex:
+                client = genai.Client(
+                    vertexai=True,
+                    project=cfg.google_cloud_project,
+                    location=cfg.gemini_location,
+                    http_options=http_opts,
+                )
+            else:
+                client = genai.Client(http_options=http_opts)
             resp = client.models.generate_content(
                 model=cfg.gemini_model,
                 contents=[part, base_prompt],

@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>P&amp;ID-to-OKF v0.2 Autonomous Compiler | Mining &amp; Heavy-Asset Executive Cockpit</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,600;0,700;1,600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=Roboto+Mono:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+
+<header class="app-header">
+  <div class="brand-cluster">
+    <svg class="brand-logo-icon" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+    </svg>
+    <span class="brand-title">P&amp;ID-to-OKF v0.2 Compiler</span>
+    <span class="header-sep">|</span>
+    <div class="header-sys-badge"><span class="sys-dot-live"></span><span>SYS: ONLINE &bull; GEMINI 3.8 FLASH GLOBAL</span></div>
+  </div>
+
+  <nav class="header-nav" id="main-header-nav" role="tablist">
+    <a class="nav-item active" id="tab-macro"        data-tab="macro"        href="#macro"        role="tab" aria-selected="true"  aria-controls="pane-macro">Macro &amp; Value</a>
+    <a class="nav-item"        id="tab-schematic"    data-tab="schematic"    href="#schematic"    role="tab" aria-selected="false" aria-controls="pane-schematic">Plant Schematic</a>
+    <a class="nav-item"        id="tab-personas"     data-tab="personas"     href="#personas"     role="tab" aria-selected="false" aria-controls="pane-personas">Persona Transformation</a>
+    <a class="nav-item"        id="tab-ecosystem"    data-tab="ecosystem"    href="#ecosystem"    role="tab" aria-selected="false" aria-controls="pane-ecosystem">Live Extracter Workbench</a>
+    <a class="nav-item"        id="tab-architecture" data-tab="architecture" href="#architecture" role="tab" aria-selected="false" aria-controls="pane-architecture">Logical &amp; OKF Graph</a>
+  </nav>
+
+  <div class="header-actions">
+    <a class="btn" href="/architecture-diagram" title="View Dual-Mode Ingestion Blueprint">Ingestion SVG</a>
+    <a class="btn btn-primary" href="/dev-ui/?app=extracter_agent" title="Launch Google ADK Developer UI">ADK Dev UI (/dev-ui/) &rsaquo;</a>
+    <div class="user-avatar" title="Signed in: Argolis Admin">VS</div>
+  </div>
+</header>
+
+<main class="main-content">
+
+  <!-- ===================================================== SCREEN 1: MACRO -->
+  <div id="pane-macro" class="screen-pane active">
+    <div class="eyebrow">Heavy-Asset Process Engineering &bull; Open Knowledge Format (OKF v0.2) &bull; Agents = f(Physical Discrepancy)</div>
+    <h1 class="hero-title">Autonomous Engineering Knowledge Compiler:<br>From Dark P&amp;IDs &amp; Datasheets to Verified OKF v0.2</h1>
+    <p class="hero-desc">
+      Brownfield chemical, refining, and mineral processing plants operate on thousands of disconnected AutoCAD P&amp;IDs, multi-sheet vendor datasheets, and licensor operating manuals. Standard OCR and vector-chunk RAG pipelines drop critical nozzle schedules, collapse redundant safety interlocks, and silently average conflicting pressure ratings across revisions. Built on Google ADK and Vertex AI Gemini 3.8 Flash (Global), this compiler ingests 136 raw engineering PDFs and compiles 130 cross-linked, schema-verified OKF v0.2 concepts with 100% conflict detection and zero broken links.
+    </p>
+
+    <h2 class="section-title">Engineering Complexity vs. Manual Compilation Capacity (2014&ndash;2026)</h2>
+    <p class="section-subtitle">The structural divergence where brownfield revamps, MOC backlog, and multi-sheet vendor revisions permanently exceeded manual SME spreadsheet cross-checking capacity.</p>
+
+    <div class="inversion-chart-card">
+      <div class="chart-legend">
+        <div class="legend-item"><span class="dot-blue"></span> BROWNFIELD P&amp;ID / MOC COMPLEXITY</div>
+        <div class="legend-item"><span class="dot-red"></span> MANUAL SME VERIFICATION CAPACITY</div>
+      </div>
+      <svg viewBox="0 0 900 260" style="width:100%; height:230px; overflow:visible;" role="img" aria-label="Engineering complexity inversion timeline">
+        <line x1="40" y1="210" x2="860" y2="210" stroke="#ECEFF1" stroke-width="1"/>
+        <line x1="40" y1="135" x2="860" y2="135" stroke="#ECEFF1" stroke-width="1" stroke-dasharray="3,3"/>
+        <line x1="40" y1="60"  x2="860" y2="60"  stroke="#ECEFF1" stroke-width="1" stroke-dasharray="3,3"/>
+        <path d="M 50 100 C 250 112, 380 142, 460 165 C 540 188, 720 215, 850 225" fill="none" stroke="#D93025" stroke-width="3.5" stroke-linecap="round"/>
+        <path d="M 50 225 C 220 215, 380 188, 460 165 C 540 142, 700 105, 850 85" fill="none" stroke="#1A73E8" stroke-width="3.5" stroke-linecap="round"/>
+        <circle cx="460" cy="165" r="9" fill="#FFFFFF" stroke="#202124" stroke-width="3"/>
+        <circle cx="460" cy="165" r="4" fill="#202124"/>
+        <g transform="translate(400, 115)">
+          <rect width="120" height="36" rx="4" fill="#FFFFFF" stroke="#DADCE0" stroke-width="1"/>
+          <text x="60" y="14" text-anchor="middle" font-family="'Plus Jakarta Sans', sans-serif" font-size="8.5" font-weight="700" fill="#D93025" letter-spacing="0.5">HAZOP / MOC INVERSION</text>
+          <text x="60" y="28" text-anchor="middle" font-family="'Roboto Mono', monospace" font-size="11" font-weight="700" fill="#202124">REV Z0 &rarr; Z1</text>
+        </g>
+        <text x="50"  y="242" text-anchor="middle" font-family="'Roboto Mono', monospace" font-size="11" font-weight="600" fill="#5F6368">2014</text>
+        <text x="250" y="242" text-anchor="middle" font-family="'Roboto Mono', monospace" font-size="11" font-weight="600" fill="#5F6368">2017</text>
+        <text x="460" y="242" text-anchor="middle" font-family="'Roboto Mono', monospace" font-size="11" font-weight="600" fill="#5F6368">2020</text>
+        <text x="670" y="242" text-anchor="middle" font-family="'Roboto Mono', monospace" font-size="11" font-weight="600" fill="#5F6368">2023</text>
+        <text x="850" y="242" text-anchor="middle" font-family="'Roboto Mono', monospace" font-size="11" font-weight="600" fill="#5F6368">2026</text>
+      </svg>
+    </div>
+
+    <h2 class="section-title">Empirical 3-Way Evaluation Benchmark (139 Wiki + 145 File-by-File Cases)</h2>
+    <p class="section-subtitle">Measured rubric recall, cross-document conflict precision, and Model Armor security block rate on the UOP Cumene-to-Phenol Plant corpus.</p>
+    <div class="itc-slide-card" id="s1-benchmark-bars"></div>
+
+    <h2 class="section-title">Structural Headwinds in Process Plant Documentation</h2>
+    <p class="section-subtitle">Three empirical failure modes discovered across the 136 raw engineering PDFs in the Cumene-to-Phenol plant dossier.</p>
+    <div class="headwinds-grid" id="s1-headwinds"></div>
+
+    <h2 class="section-title">Lever Exhaustion Matrix</h2>
+    <p class="section-subtitle">Why spreadsheet takeoffs, static OCR, and naive vector RAG fail on safety-critical P&amp;IDs and multi-sheet datasheets.</p>
+    <div class="levers-grid" id="s1-levers"></div>
+
+    <div class="outcomes-bar-title">Agentic OKF v0.2 Compiler Outcomes (Verified on ut-interaction-demo)</div>
+    <div class="outcomes-container" id="s1-outcomes"></div>
+  </div>
+
+  <!-- ================================================= SCREEN 2: SCHEMATIC -->
+  <div id="pane-schematic" class="screen-pane">
+    <div class="schematic-top-bar">
+      <div>
+        <div class="eyebrow">Cumene-to-Phenol Process Topology &bull; UOP CDN Train II</div>
+        <h1 class="hero-title" style="margin-bottom:0;">12-Node Plant &amp; Conflict Reconciliation Schematic</h1>
+      </div>
+      <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+        <span class="badge badge-stable tnum" id="span-stepper-counter">NODE 5/12 &bull; D-2304</span>
+        <button class="btn" id="btn-prev-span" title="Previous plant node (ArrowLeft)">&lsaquo; Prev Node</button>
+        <button class="btn" id="btn-next-span" title="Next plant node (ArrowRight)">Next Node &rsaquo;</button>
+        <div class="badge badge-critical" style="padding:6px 14px;">
+          <span style="width:8px; height:8px; border-radius:50%; background:var(--m3-critical); display:inline-block;"></span>
+          21 Active Doc Conflicts Flagged
+        </div>
+      </div>
+    </div>
+
+    <div class="schematic-canvas-card">
+      <div class="schematic-grid-bg" id="schematic-container">
+        <canvas id="schematic-particle-canvas" style="position:absolute; top:0; left:0; width:100%; height:100%; z-index:2; pointer-events:none;"></canvas>
+
+        <div class="schematic-zones-grid">
+          <!-- Zone 1: Oxidation & Vacuum Concentration -->
+          <div class="schematic-zone-box" style="height:260px;">
+            <div class="zone-title">Unit 22 &amp; 23A // Oxidation &amp; Vacuum Concentration</div>
+            <div style="display:flex; flex-direction:column; gap:24px; position:absolute; left:20px; top:60px;">
+              <div class="schematic-node" id="node-r2201" data-node="r2201" style="width:110px; height:42px;">
+                <span>Unit 22 Oxid</span>
+                <span style="font-size:9.5px; color:var(--m3-text-secondary);">22.6 wt% CHP</span>
+              </div>
+              <div class="schematic-node node-primary" id="node-v2301" data-node="v2301" style="width:110px; height:44px;">
+                <span>V-2301 Preflash</span>
+                <span style="font-size:9.5px; color:var(--m3-critical);">18.5 mmHgA</span>
+              </div>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:24px; position:absolute; left:165px; top:60px;">
+              <div class="schematic-node" id="node-v2302" data-node="v2302" style="width:105px; height:42px;">
+                <span>V-2302 Flash</span>
+                <span style="font-size:9.5px; color:var(--m3-text-secondary);">83 wt% CHP</span>
+              </div>
+              <div class="schematic-node" id="node-d2301" data-node="d2301" style="width:105px; height:44px; border-color:var(--m3-critical);">
+                <span>D-2301 Surge</span>
+                <span style="font-size:9.5px; color:var(--m3-critical);">3.5 vs 3.9 bar</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Zone 2: Exothermic Cleavage / Decomposition (Critical Zone) -->
+          <div class="schematic-zone-box" style="height:260px;">
+            <div class="zone-title">Unit 23B // Acid-Catalyzed CHP Decomposition (Critical Zone)</div>
+            <div style="position:absolute; left:24px; top:56px;">
+              <div class="node-crusher-critical" id="node-d2304" data-node="d2304" style="width:136px; height:102px;">
+                <div class="crusher-dot"></div>
+                <div style="font-size:12px; font-weight:700; color:#D93025; line-height:1.2;">D-2304 Decomposer</div>
+                <div style="font-size:8.5px; font-weight:700; color:#C5221F; text-transform:uppercase; letter-spacing:0.3px;">BURST CONFLICT</div>
+                <div class="tnum" style="font-size:11px; font-family:var(--font-mono); font-weight:700; color:#D93025; margin-top:2px;">12.16 vs 11.0 kg/cm&sup2;g</div>
+              </div>
+            </div>
+            <div style="position:absolute; left:195px; top:56px;">
+              <div class="schematic-node" id="node-e2307" data-node="e2307" style="width:120px; height:44px; border-color:var(--m3-critical);">
+                <span>E-2307 Cooler</span>
+                <span style="font-size:9.5px; color:var(--m3-critical);">13.0 vs 1.3 bar</span>
+              </div>
+            </div>
+            <div style="position:absolute; left:195px; top:118px;">
+              <div class="schematic-node node-primary" id="node-p2302" data-node="p2302" style="width:120px; height:44px;">
+                <span>P-2302A/B Circ</span>
+                <span style="font-size:9.5px; color:var(--m3-critical);">2020 vs 3020 m&sup3;/h</span>
+              </div>
+            </div>
+            <div style="position:absolute; left:345px; top:60px;">
+              <div class="schematic-node" id="node-d2308" data-node="d2308" style="width:118px; height:44px;">
+                <span>D-2308 Neutralizer</span>
+                <span style="font-size:9.5px; color:var(--m3-text-secondary);">NLL 550 vs 500mm</span>
+              </div>
+            </div>
+            <div style="position:absolute; left:345px; top:122px;">
+              <div class="schematic-node" id="node-d2312" data-node="d2312" style="width:118px; height:44px; border:1.5px solid var(--m3-critical); color:var(--m3-critical);">
+                <span>D-2312 Additive</span>
+                <span style="font-size:9.5px; font-weight:700;">HMDA vs TBC</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Zone 3: Fractionation -->
+          <div class="schematic-zone-box" style="height:190px;">
+            <div class="zone-title">Unit 24 // Fractionation Train</div>
+            <div style="display:flex; flex-direction:column; gap:18px; position:absolute; left:24px; top:56px;">
+              <div class="schematic-node node-primary" id="node-v2401" data-node="v2401" style="width:165px; height:46px; border-width:2px;">
+                <span>Unit 24 Fractionation</span>
+                <span style="font-size:9.5px; color:var(--m3-text-secondary);">Phenol + Acetone + AMS</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Zone 4: SIS & ePHA Governance -->
+          <div class="schematic-zone-box" style="grid-column: 3 / 4; height:180px; margin-top:10px;">
+            <div class="zone-title">SIS Interlocks &amp; HAZOP Governance</div>
+            <div style="display:flex; gap:16px; position:absolute; left:20px; top:58px;">
+              <div class="schematic-node" id="node-sis_cdn" data-node="sis_cdn" style="border:1.5px solid var(--m3-success); color:var(--m3-success); width:115px; height:46px;">
+                <span>SIS UC-2301..03</span>
+                <span style="font-size:9.5px;">2oo3 XSHH Trips</span>
+              </div>
+              <div class="schematic-node" id="node-hazop_cdn" data-node="hazop_cdn" style="border:1px solid var(--m3-primary); color:var(--m3-primary); width:115px; height:46px;">
+                <span>HAZOP Matrix</span>
+                <span style="font-size:9.5px;">15 GHS SDS</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Slide-out Node Inspector Drawer -->
+    <aside class="node-drawer-overlay" id="schematic-inspector-drawer" aria-label="Plant Node OKF Inspector">
+      <div class="drawer-header-bar">
+        <div>
+          <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
+            <span class="badge badge-stable" id="drawer-isa95-tag">UNIT-23</span>
+            <span class="badge badge-critical" id="drawer-badge-health">CRITICAL</span>
+          </div>
+          <h3 style="font-family:var(--font-serif); font-size:18px; font-weight:700;" id="drawer-node-title">Node</h3>
+        </div>
+        <div style="display:flex; align-items:center; gap:10px;">
+          <div id="drawer-gauge-wrap"><svg id="radial-risk-gauge" width="52" height="52" viewBox="0 0 52 52" role="img" aria-label="Node conflict risk gauge"></svg></div>
+          <button class="icon-btn" id="btn-close-drawer" title="Close inspector">&times;</button>
+        </div>
+      </div>
+      <div class="drawer-body-content">
+        <div>
+          <div class="drawer-section-label"><span>Extracted OKF v0.2 Parameters</span><span style="color:var(--m3-primary);">DATASHEET VS P&amp;ID</span></div>
+          <div class="drawer-data-card gee-band-table" id="drawer-telemetry-metrics"></div>
+        </div>
+        <div>
+          <div class="drawer-section-label">Governing ADK Compiler &amp; Tool</div>
+          <div class="drawer-data-card">
+            <div class="drawer-keyval-row"><span class="drawer-key">Compiler Mode:</span><span class="drawer-val" id="drawer-swarm-id" style="color:var(--m3-primary);"></span></div>
+            <div class="drawer-keyval-row"><span class="drawer-key">ADK Tool:</span><span class="drawer-val" id="drawer-swarm-coord"></span></div>
+            <div class="drawer-keyval-row"><span class="drawer-key">Reconciler:</span><span class="drawer-val" id="drawer-solver-id" style="color:var(--m3-critical);"></span></div>
+          </div>
+        </div>
+        <div>
+          <div class="drawer-section-label">Thermodynamic &amp; Discrepancy Derivation</div>
+          <div class="drawer-formula-box" id="drawer-formula-code"></div>
+        </div>
+        <div class="card-safety-barrier">
+          <div class="safety-barrier-inner">
+            <div>
+              <div style="font-family:var(--font-mono); font-size:10px; font-weight:700; color:var(--m3-critical);">STRICT OT &amp; RULE 14 SAFETY BOUNDARY</div>
+              <div style="font-size:12px; font-weight:700;" id="drawer-sap-id">CONFLICT-D2304</div>
+            </div>
+            <span class="badge badge-critical">READ-ONLY ADVISORY</span>
+          </div>
+        </div>
+        <div style="display:flex; gap:10px;">
+          <button class="btn btn-primary" style="flex:1; padding:10px;" id="btn-drawer-to-studio">Inspect OKF v0.2 Markdown in Workbench &rsaquo;</button>
+          <button class="btn" style="padding:10px;" id="btn-drawer-dismiss">Dismiss</button>
+        </div>
+      </div>
+    </aside>
+
+    <div class="outcomes-bar-title" style="margin-top:8px;">Plant Equipment &amp; Discrepancy Telemetry Cards (Click Any Card to Inspect)</div>
+    <div class="telemetry-grid" id="s2-telemetry"></div>
+  </div>
+
+  <!-- ================================================== SCREEN 3: PERSONAS -->
+  <div id="pane-personas" class="screen-pane">
+    <div class="eyebrow">&bull; Engineering Workforce Transformation</div>
+    <h1 class="hero-title" style="margin-bottom:6px;">From Manual PDF Highlighting to Autonomous Knowledge Governance</h1>
+    <p class="hero-desc" style="margin-bottom:20px;">
+      Four core process plant personas elevated from manual multi-week P&amp;ID-to-datasheet cross-checking to instant, citation-grounded decision making backed by the OKF v0.2 Knowledge Bundle.
+    </p>
+
+    <div class="persona-nav-strip" id="persona-tabs" role="tablist"></div>
+
+    <div class="card" style="padding:28px;">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:20px; flex-wrap:wrap; gap:12px;">
+        <div class="persona-identity-row">
+          <div class="persona-hero-img" id="persona-hero-img">
+            <span id="persona-hero-initials">PS</span>
+          </div>
+          <div>
+            <div style="display:flex; gap:8px; align-items:center; margin-bottom:6px;">
+              <span class="badge badge-primary" id="persona-code-badge"></span>
+              <span class="badge badge-optimal">Active Engineering Cockpit</span>
+            </div>
+            <h2 style="font-family:var(--font-serif); font-size:24px; font-weight:700;" id="persona-title-display"></h2>
+            <div style="font-size:13px; color:var(--m3-text-secondary);" id="persona-mandate-display"></div>
+          </div>
+        </div>
+        <button class="btn btn-primary" id="btn-persona-studio">Open Live Extracter Workbench &rsaquo;</button>
+      </div>
+
+      <div class="jtbd-box">
+        <div class="jtbd-label">Core Job-To-Be-Done (JTBD)</div>
+        <div class="jtbd-text" id="persona-jtbd-display"></div>
+      </div>
+
+      <div class="persona-grid-2col">
+        <div class="reality-box" style="border-top:3px solid var(--m3-critical);">
+          <div class="reality-head" style="color:var(--m3-critical);">
+            Today's Broken Reality (Manual Document Takeoff)
+          </div>
+          <p class="card-body-text" id="persona-broken-text"></p>
+        </div>
+        <div class="reality-box" style="border-top:3px solid var(--m3-success); background:#F8FCF9;">
+          <div class="reality-head" style="color:var(--m3-success);">
+            Agentic OKF v0.2 Reality (Autonomous Read-Merge-Upsert)
+          </div>
+          <p class="card-body-text" id="persona-agentic-text" style="color:var(--m3-text-primary);"></p>
+        </div>
+      </div>
+
+      <h3 class="section-title" style="font-size:16px; margin-top:20px; margin-bottom:12px;">Assigned ADK FunctionTool Squad (Click Any Tool to Inspect)</h3>
+      <div id="squad-list-container"></div>
+    </div>
+  </div>
+
+  <!-- ================================================= SCREEN 4: ECOSYSTEM / WORKBENCH -->
+  <div id="pane-ecosystem" class="screen-pane">
+    <div id="view-ecosystem-overview" class="ecosystem-view active">
+      <div class="eyebrow">&bull; Dual-Mode Live P&amp;ID-to-OKF Extracter Workbench</div>
+      <h1 class="hero-title" style="margin-bottom:6px;">Interactive OKF v0.2 Knowledge Compiler &amp; Bundle Inspector</h1>
+      <p class="hero-desc" style="margin-bottom:24px;">
+        Inspect all 130 compiled OKF v0.2 concepts and 136 raw engineering PDFs side-by-side, execute live Mode A (Entity-Centric) and Mode B (File-by-File Incremental) extractions on Vertex AI Gemini 3.8 Flash (Global), or test the Model Armor pre-flight security guardrail.
+      </p>
+
+      <!-- Live Interactive Workbench Card -->
+      <div class="workbench-shell">
+        <div class="workbench-mode-bar">
+          <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <button class="filter-chip active" data-wb-mode="mode_a">Mode A: Entity-Centric (130 OKF Concepts)</button>
+            <button class="filter-chip" data-wb-mode="mode_b">Mode B: File-by-File Incremental (136 Raw PDFs)</button>
+            <button class="filter-chip" data-wb-mode="security">Red-Team Test: Model Armor Guardrail</button>
+          </div>
+          <div style="display:flex; gap:8px; align-items:center;">
+            <span class="badge badge-optimal" id="wb-guardrail-badge">MODEL ARMOR: PASS</span>
+            <span class="badge badge-primary tnum">139 MD FILES &bull; 0 BROKEN LINKS</span>
+          </div>
+        </div>
+
+        <div class="workbench-controls-grid">
+          <div>
+            <label class="wb-field-label" for="wb-concept-select">Select Compiled OKF v0.2 Concept (130 Golden Concepts)</label>
+            <select class="wb-select" id="wb-concept-select"></select>
+          </div>
+          <div>
+            <label class="wb-field-label" for="wb-pdf-select">Select Governing Raw Engineering PDF (136 PDFs in reference/raw/)</label>
+            <select class="wb-select" id="wb-pdf-select"></select>
+          </div>
+          <div style="display:flex; gap:8px;">
+            <button class="btn" id="btn-wb-open-pdf" title="Open raw engineering PDF in browser">View Raw PDF</button>
+            <button class="btn btn-primary" id="btn-wb-run-live">Run ADK Compiler &rsaquo;</button>
+          </div>
+        </div>
+
+        <div style="margin-bottom:20px;">
+          <label class="wb-field-label" for="wb-prompt-input">Active ADK Orchestrator Prompt (Editable for Live Vertex AI Execution or Security Testing)</label>
+          <input type="text" class="wb-input" id="wb-prompt-input" value="Mode A Entity-Centric: Extract and compile OKF v0.2 concept 'equipment/D-2304' reconciling Process Data Sheet, P&ID, and PFD sources.">
+        </div>
+
+        <div class="workbench-split-grid">
+          <!-- Left Pane: 6-Step ADK Tool Execution Trajectory -->
+          <div class="wb-pane">
+            <div class="wb-pane-header">
+              <span class="wb-pane-title">1. Autonomous 6-Step ADK Execution Trajectory</span>
+              <span class="badge badge-stable">extracter_orchestrator</span>
+            </div>
+            <div class="wb-trace-list" id="wb-trace-container"></div>
+            <div style="margin-top:auto; padding-top:10px; border-top:1px solid var(--m3-border);">
+              <div class="wb-field-label" style="margin-bottom:6px;">Outbound Wiki Cross-Links (Click to Traverse Bundle)</div>
+              <div style="display:flex; gap:6px; flex-wrap:wrap;" id="wb-crosslinks-row"></div>
+            </div>
+          </div>
+
+          <!-- Right Pane: Compiled OKF v0.2 Markdown & Conflict Callouts -->
+          <div class="wb-pane">
+            <div class="wb-pane-header">
+              <span class="wb-pane-title" id="wb-output-title">build/okf_bundle/equipment/D-2304.md</span>
+              <span class="badge badge-optimal">is_valid_okf: true</span>
+            </div>
+            <div class="wb-conflict-alert" id="wb-conflict-banner" style="display:none;"></div>
+            <pre class="wb-code-viewer" id="wb-markdown-output"></pre>
+          </div>
+        </div>
+      </div>
+
+      <h2 class="section-title" style="margin-top:0; margin-bottom:6px;">ADK Orchestrator &amp; 8 Deterministic FunctionTools</h2>
+      <p class="section-subtitle">Click any component below to inspect its governing contract, Python implementation, and failure guardrails.</p>
+      <div id="topology-stack"></div>
+    </div>
+
+    <!-- Agent / Tool Deep-Dive View -->
+    <div id="view-agent-deepdive" class="ecosystem-view agent-deepdive-panel">
+      <div class="deepdive-nav-bar">
+        <button class="btn-back-topology" id="btn-back-topology">
+          &lsaquo; Back to Live Extracter Workbench
+        </button>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span style="font-size:12px; color:var(--m3-text-secondary); font-weight:600;">Component Switcher:</span>
+          <select id="agent-quick-select" class="deepdive-select"></select>
+        </div>
+      </div>
+
+      <div class="deepdive-top-grid">
+        <div class="deepdive-header-card">
+          <div class="deepdive-badges-cluster">
+            <span class="badge-agent-id" id="dd-badge-id"></span>
+            <span class="badge-apqc-pill" id="dd-badge-apqc"></span>
+            <span class="badge badge-optimal" id="dd-badge-status"></span>
+          </div>
+          <h1 class="deepdive-hero-title" id="dd-title"></h1>
+          <div class="deepdive-process-sub" id="dd-process"></div>
+        </div>
+        <div class="value-unlocked-card">
+          <div class="value-unlocked-header">VERIFIED BENCHMARK METRIC</div>
+          <div class="value-unlocked-amount tnum" id="dd-value-amount"></div>
+          <div class="value-unlocked-period" id="dd-value-period"></div>
+        </div>
+      </div>
+
+      <div class="deepdive-main-grid">
+        <div class="deepdive-left-col">
+          <div class="business-logic-card">
+            <div class="card-header-label" style="color:var(--m3-primary);"><span>Component Engineering Contract</span></div>
+            <div class="biz-stake-line" id="dd-biz-stake"></div>
+            <div class="biz-row"><div class="biz-row-label">Decision it owns</div><div class="biz-row-value" id="dd-biz-owns"></div></div>
+            <div class="biz-row"><div class="biz-row-label">Answers to</div><div class="biz-row-value" id="dd-biz-answers"></div></div>
+            <div class="biz-row"><div class="biz-row-label">Engineering impact</div><div class="biz-row-value" id="dd-biz-pl"></div></div>
+            <div class="biz-row"><div class="biz-row-label" style="color:var(--m3-critical);">What it cannot do</div><div class="biz-row-value" id="dd-biz-cannot"></div></div>
+            <div class="biz-row"><div class="biz-row-label">Failure handling</div><div class="biz-row-value" id="dd-biz-failure"></div></div>
+          </div>
+
+          <div class="deepdive-code-card">
+            <div class="card-header-label">
+              <span>Production Implementation</span>
+              <span id="dd-code-lang" style="color:var(--m3-text-tertiary); font-weight:500;"></span>
+            </div>
+            <pre class="code-editor-box" id="dd-code-box"></pre>
+          </div>
+        </div>
+
+        <div class="deepdive-right-col">
+          <a class="btn btn-primary" style="width:100%; padding:12px;" href="/dev-ui/?app=extracter_agent">
+            Invoke Live in ADK Dev UI (/dev-ui/) &rsaquo;
+          </a>
+          <a class="btn" style="width:100%; padding:12px;" href="/architecture-diagram">
+            View Full Ingestion Architecture SVG &rsaquo;
+          </a>
+          <div class="deepdive-provenance-card" style="margin-top:8px;">
+            <div class="card-header-label"><span>Verified GCP Runtime Environment</span></div>
+            <div class="drawer-keyval-row"><span class="drawer-key">GCP Project:</span><span class="drawer-val">ut-interaction-demo</span></div>
+            <div class="drawer-keyval-row"><span class="drawer-key">Cloud Run Region:</span><span class="drawer-val">asia-southeast1</span></div>
+            <div class="drawer-keyval-row"><span class="drawer-key">Model Endpoint:</span><span class="drawer-val">gemini-3.8-flash (global)</span></div>
+            <div class="drawer-keyval-row"><span class="drawer-key">GCS Knowledge Store:</span><span class="drawer-val">gs://ut-interaction-demo-okf-knowledge</span></div>
+            <div class="drawer-keyval-row"><span class="drawer-key">Pytest / Ruff / Bandit:</span><span class="drawer-val" style="color:var(--m3-success);">100% PASSING</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================================================ SCREEN 5: ARCHITECTURE & GRAPH -->
+  <div id="pane-architecture" class="screen-pane">
+    <div class="security-top-meta">
+      <div>
+        <div class="eyebrow" style="color:var(--m3-success);">&block; Logical &amp; Knowledge Graph Architecture</div>
+        <h1 class="hero-title" style="margin-bottom:6px;">From Raw PDF Bytes to the Cross-Linked OKF v0.2 Graph</h1>
+        <p style="font-size:13.5px; color:var(--m3-text-secondary); max-width:820px;">
+          Seven logical layers between the engineering prompt an operator submits and the verified OKF v0.2 Markdown concept returned. Four architectural controls bind every layer.
+        </p>
+      </div>
+      <div style="text-align:right;">
+        <span class="badge badge-primary" style="margin-bottom:4px;">RULE 14 IMMUTABLE &bull; MODEL ARMOR</span>
+        <div style="font-size:11px; font-family:var(--font-mono); color:var(--m3-text-tertiary);">gs://ut-interaction-demo-okf-knowledge/okf-bundles/phenol-plant</div>
+      </div>
+    </div>
+
+    <div class="arch-legend-row">
+      <div class="arch-legend-item"><span class="arch-legend-swatch" style="background:var(--m3-primary);"></span> Request descending</div>
+      <div class="arch-legend-item"><span class="arch-legend-swatch" style="background:var(--m3-success);"></span> Verified OKF v0.2 evidence returning</div>
+      <div class="arch-legend-item"><span class="arch-legend-swatch" style="background:var(--m3-critical);"></span> Binding architectural control</div>
+    </div>
+
+    <div class="arch-stack-grid">
+      <div class="arch-stack" id="arch-stack"></div>
+      <div class="arch-control-rail">
+        <div class="arch-control-title">Controls that bind every layer</div>
+        <div id="arch-controls" style="display:flex; flex-direction:column; gap:12px;"></div>
+      </div>
+    </div>
+
+    <div class="datagraph-section">
+      <div class="datagraph-head">
+        <div>
+          <h2 style="font-family:var(--font-serif); font-size:21px; font-weight:700; margin-bottom:4px;">Interactive OKF v0.2 Knowledge Graph (125 Domain Nodes &bull; 866 Cross-Links)</h2>
+          <p style="font-size:12.5px; color:var(--m3-text-secondary); max-width:680px;">
+            Every equipment vessel, instrument register, chemical hazard, operating procedure, and source document in <code>build/okf_bundle/</code> rendered as an interactive property graph. Red nodes indicate active cross-document conflicts (<code>CONFLICT</code>).
+          </p>
+        </div>
+        <div class="datagraph-stat-row">
+          <div><div class="datagraph-stat-value tnum">136</div><div class="datagraph-stat-label">Raw PDFs</div></div>
+          <div><div class="datagraph-stat-value tnum">130</div><div class="datagraph-stat-label">OKF Concepts</div></div>
+          <div><div class="datagraph-stat-value tnum" style="color:var(--m3-critical);">21</div><div class="datagraph-stat-label">Conflicts</div></div>
+          <div><div class="datagraph-stat-value tnum" style="color:var(--m3-success);">0</div><div class="datagraph-stat-label">Broken Links</div></div>
+        </div>
+      </div>
+
+      <div class="datagraph-toolbar" id="datagraph-toolbar"></div>
+
+      <div class="datagraph-body">
+        <div class="datagraph-canvas-wrap">
+          <svg id="datagraph-svg" role="img" aria-label="Interactive graph of the OKF v0.2 knowledge bundle: concepts as nodes, wiki cross-links as edges."></svg>
+          <div class="datagraph-legend">
+            <div class="dg-legend-item"><span class="dg-legend-dot" style="background:#D93025;"></span> Conflict Flagged (21)</div>
+            <div class="dg-legend-item"><span class="dg-legend-dot" style="background:#1A73E8;"></span> Equipment &amp; Procedures</div>
+            <div class="dg-legend-item"><span class="dg-legend-dot" style="background:#1E8E3E;"></span> Instruments &amp; SIS</div>
+            <div class="dg-legend-item"><span class="dg-legend-dot" style="background:#174EA6;"></span> Process Units</div>
+            <div class="dg-legend-item"><span class="dg-legend-dot" style="background:#80868B;"></span> Source Dossiers</div>
+          </div>
+          <div class="datagraph-hint">Click any node to inspect its raw PDFs, cross-links &amp; conflicts &middot; filter by category above</div>
+        </div>
+        <div class="datagraph-detail" id="datagraph-detail"></div>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<div id="dispatch-toast" role="status" aria-live="polite">Ready</div>
+
+<script src="/static/data.js"></script>
+<script src="/static/app.js"></script>
+</body>
+</html>

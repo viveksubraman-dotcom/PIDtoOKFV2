@@ -46,7 +46,15 @@ def _iter_bundle_catalog(bundle_root: Path | None = None) -> list[dict[str, Any]
     """Dynamically inspect existing OKF concept files in the bundle directory."""
     from extracter_agent.config import get_config
 
-    root = bundle_root or get_config().output_bundle_dir
+    cfg = get_config()
+    root = bundle_root or cfg.output_bundle_dir
+    if (
+        (not root or not root.exists() or not any(root.rglob("*.md")))
+        and bundle_root is None
+        and cfg.reference_wiki_dir
+        and cfg.reference_wiki_dir.exists()
+    ):
+        root = cfg.reference_wiki_dir
     if not root or not root.exists():
         return []
 

@@ -81,9 +81,13 @@ def test_intent_classification_result_validation():
     assert len(res.target_entities) == 1
 
 
-def test_app_config_defaults():
-    """Test application config defaults."""
+def test_app_config_defaults(monkeypatch):
+    """Test application config defaults when environment overrides are unset."""
+    monkeypatch.delenv("GOOGLE_CLOUD_PROJECT", raising=False)
+    monkeypatch.delenv("GIT_REPO_URL", raising=False)
+    monkeypatch.delenv("DEPLOYMENT_TARGET", raising=False)
     cfg = get_config()
     assert cfg.google_cloud_project == "cs-poc-y03r7kmfyov4kilzg50fd7s"
     assert cfg.git_repo_url == "https://github.com/pantana-na/extracter-agent.git"
     assert cfg.deployment_target == "agent_runtime"
+
