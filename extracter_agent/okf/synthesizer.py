@@ -756,16 +756,25 @@ def merge_equipment_entity_with_existing(
     )
 
 
-def _extract_table_span(
+def _extract_all_table_spans(
     lines: list[str],
-) -> tuple[int, int, list[str], str, list[list[str]]] | None:
-    """Locate the first Markdown table in lines and return (start_idx, end_idx, headers, sep_line, rows)."""
+) -> list[tuple[int, int, list[str], str, list[list[str]], str]]:
+    """Locate all Markdown tables in lines and return [(start_idx, end_idx, headers, sep_line, rows, subheading), ...]."""
+    spans: list[tuple[int, int, list[str], str, list[list[str]], str]] = []
+    current_sub = ""
     i = 0
     while i < len(lines):
         s = lines[i].strip()
+        if s.startswith("### "):
+            current_sub = s
         if s.startswith("|") and s.endswith("|") and i + 1 < len(lines):
             sep = lines[i + 1].strip()
-            if sep.startswith("|") and sep.endswith("|") and "-" in sep and re.match(r"^\|[\s:\-|]+\|$", sep):
+            if (
+                sep.startswith("|")
+                and sep.endswith("|")
+                and "-" in sep
+                and re.match(r"^\|[\s:\-|]+\|$", sep)
+            ):
                 headers = [c.strip() for c in s.split("|")[1:-1]]
                 rows: list[list[str]] = []
                 j = i + 2
@@ -777,9 +786,22 @@ def _extract_table_span(
                     if any(cells):
                         rows.append(cells)
                     j += 1
-                return i, j, headers, sep, rows
+                spans.append((i, j, headers, sep, rows, current_sub))
+                i = j
+                continue
         i += 1
-    return None
+    return spans
+
+
+def _extract_table_span(
+    lines: list[str],
+) -> tuple[int, int, list[str], str, list[list[str]]] | None:
+    """Locate the first Markdown table in lines and return (start_idx, end_idx, headers, sep_line, rows)."""
+    all_spans = _extract_all_table_spans(lines)
+    if not all_spans:
+        return None
+    i, j, headers, sep, rows, _ = all_spans[0]
+    return i, j, headers, sep, rows
 
 
 def _normalize_row_key(cell: str) -> str:
@@ -788,83 +810,190 @@ def _normalize_row_key(cell: str) -> str:
     return unlinked.strip().lower()
 
 
+def _merge_two_tables(
+    old_headers: list[str],
+    old_rows: list[list[str]],
+    new_headers: list[str],
+    new_sep: str,
+    new_rows: list[list[str]],
+) -> list[str]:
+    """Merge rows of two Markdown tables, aligning columns by header name when column counts differ."""
+    if len(old_headers) == len(new_headers) and len(new_headers) >= 2:
+        union_headers = list(new_headers)
+        union_sep = new_sep
+        proj_old_rows = [list(r) for r in old_rows]
+        proj_new_rows = [list(r) for r in new_rows]
+    else:
+        old_norm = [_normalize_row_key(h) for h in old_headers]
+        new_norm = [_normalize_row_key(h) for h in new_headers]
+        union_headers = list(new_headers)
+        union_norm = list(new_norm)
+        for oh, onh in zip(old_headers[1:], old_norm[1:]):
+            if onh and onh not in union_norm:
+                union_headers.append(oh)
+                union_norm.append(onh)
+        union_sep = "| " + " | ".join(["---"] * len(union_headers)) + " |"
+
+        proj_old_rows = []
+        for r in old_rows:
+            if not r:
+                continue
+            pr = ["—"] * len(union_headers)
+            pr[0] = r[0]
+            for c_idx in range(1, min(len(r), len(old_norm))):
+                onh = old_norm[c_idx]
+                if onh in union_norm:
+                    u_idx = union_norm.index(onh)
+                    pr[u_idx] = r[c_idx]
+            proj_old_rows.append(pr)
+
+        proj_new_rows = []
+        for r in new_rows:
+            if not r:
+                continue
+            pr = ["—"] * len(union_headers)
+            for c_idx in range(min(len(r), len(new_headers))):
+                pr[c_idx] = r[c_idx]
+            proj_new_rows.append(pr)
+
+    src_col = next(
+        (
+            idx
+            for idx, h in enumerate(union_headers)
+            if any(k in h.lower() for k in ("source", "drawing", "ref", "doc"))
+        ),
+        None,
+    )
+    merged_rows: list[list[str]] = [list(r) for r in proj_old_rows]
+    row_idx_by_key: dict[str, int] = {
+        _normalize_row_key(r[0]): idx for idx, r in enumerate(merged_rows) if r
+    }
+    for nr in proj_new_rows:
+        if not nr:
+            continue
+        rkey = _normalize_row_key(nr[0])
+        if rkey not in row_idx_by_key:
+            row_idx_by_key[rkey] = len(merged_rows)
+            merged_rows.append(list(nr))
+        else:
+            idx = row_idx_by_key[rkey]
+            old_r = merged_rows[idx]
+            if (
+                src_col is not None
+                and len(old_r) > src_col
+                and len(nr) > src_col
+            ):
+                old_src = old_r[src_col].strip()
+                new_src = nr[src_col].strip()
+                old_src_parts = [s.strip() for s in old_src.split(";") if s.strip()]
+                if len(old_src_parts) <= 1 and _is_same_source_or_revision_update(old_src, new_src):
+                    updated_same = list(nr)
+                    for c_i in range(1, len(updated_same)):
+                        if c_i < len(old_r) and updated_same[c_i].strip() in ("", "—") and old_r[c_i].strip() not in ("", "—"):
+                            updated_same[c_i] = old_r[c_i]
+                    merged_rows[idx] = updated_same
+                elif new_src in old_src_parts and len(old_src_parts) > 1:
+                    merged_rows[idx] = list(old_r)
+                else:
+                    updated_r = list(nr)
+                    for c_i in range(1, len(updated_r)):
+                        if c_i == src_col or c_i >= len(old_r):
+                            continue
+                        ov = old_r[c_i].strip()
+                        nv = updated_r[c_i].strip()
+                        if (nv in ("", "—") and ov not in ("", "—")) or (nv and nv in ov):
+                            updated_r[c_i] = ov
+                        elif (
+                            ov not in ("", "—")
+                            and nv not in ("", "—")
+                            and ov != nv
+                            and ov not in nv
+                        ):
+                            updated_r[c_i] = f"{nv} ({old_src}: {ov})" if old_src and old_src != "—" else f"{nv} ({ov})"
+                    if new_src and new_src != "—" and new_src not in old_src_parts:
+                        updated_r[src_col] = f"{old_src}; {new_src}" if old_src and old_src != "—" else new_src
+                    else:
+                        updated_r[src_col] = old_src
+                    merged_rows[idx] = updated_r
+            else:
+                updated_r = list(nr)
+                for c_i in range(1, len(updated_r)):
+                    if c_i < len(old_r) and updated_r[c_i].strip() in ("", "—") and old_r[c_i].strip() not in ("", "—"):
+                        updated_r[c_i] = old_r[c_i]
+                merged_rows[idx] = updated_r
+
+    return [
+        "| " + " | ".join(union_headers) + " |",
+        union_sep,
+        *("| " + " | ".join(r) + " |" for r in merged_rows),
+    ]
+
+
 def _merge_section_content(old_sec: str, new_sec: str) -> str:
-    """Merge Markdown tables and bullet items between an existing section and a newly extracted section."""
+    """Merge Markdown tables (including multi-table sub-sections and mismatched column counts) and bullet items between an existing section and a newly extracted section."""
     old_lines = old_sec.splitlines()
     new_lines = new_sec.splitlines()
 
-    old_tbl = _extract_table_span(old_lines)
-    new_tbl = _extract_table_span(new_lines)
+    old_tables = _extract_all_table_spans(old_lines)
+    new_tables = _extract_all_table_spans(new_lines)
 
-    if old_tbl and new_tbl:
-        _, _, old_headers, _, old_rows = old_tbl
-        new_start, new_end, new_headers, new_sep, new_rows = new_tbl
-        if len(old_headers) == len(new_headers) and len(new_headers) >= 2:
-            src_col = next(
-                (
-                    idx
-                    for idx, h in enumerate(new_headers)
-                    if any(k in h.lower() for k in ("source", "drawing", "ref", "doc"))
-                ),
-                None,
-            )
-            merged_rows: list[list[str]] = [list(r) for r in old_rows]
-            row_idx_by_key: dict[str, int] = {
-                _normalize_row_key(r[0]): idx for idx, r in enumerate(merged_rows) if r
-            }
-            for nr in new_rows:
-                if not nr:
-                    continue
-                rkey = _normalize_row_key(nr[0])
-                if rkey not in row_idx_by_key:
-                    row_idx_by_key[rkey] = len(merged_rows)
-                    merged_rows.append(list(nr))
-                else:
-                    idx = row_idx_by_key[rkey]
-                    old_r = merged_rows[idx]
+    matched_old_indices: set[int] = set()
+    if old_tables and new_tables:
+        # Process replacements in reverse order of new_tables so line indices in new_lines stay valid
+        replacements: list[tuple[int, int, list[str]]] = []
+        for n_idx, (n_start, n_end, n_headers, n_sep, n_rows, n_sub) in enumerate(new_tables):
+            if len(n_headers) < 2:
+                continue
+            chosen_o_idx: int | None = None
+            # 1. Match by identical ### subheading if present
+            if n_sub:
+                for o_idx, (_, _, o_headers, _, _, o_sub) in enumerate(old_tables):
+                    if o_idx not in matched_old_indices and len(o_headers) >= 2 and o_sub.lower() == n_sub.lower():
+                        chosen_o_idx = o_idx
+                        break
+            # 2. Match by normalized first-column header
+            if chosen_o_idx is None:
+                n_k0 = _normalize_row_key(n_headers[0])
+                for o_idx, (_, _, o_headers, _, _, o_sub) in enumerate(old_tables):
                     if (
-                        src_col is not None
-                        and len(old_r) > src_col
-                        and len(nr) > src_col
+                        o_idx not in matched_old_indices
+                        and len(o_headers) >= 2
+                        and _normalize_row_key(o_headers[0]) == n_k0
+                        and (not o_sub or not n_sub or o_sub.lower() == n_sub.lower())
                     ):
-                        old_src = old_r[src_col].strip()
-                        new_src = nr[src_col].strip()
-                        old_src_parts = [s.strip() for s in old_src.split(";") if s.strip()]
-                        if len(old_src_parts) <= 1 and _is_same_source_or_revision_update(old_src, new_src):
-                            merged_rows[idx] = list(nr)
-                        elif new_src in old_src_parts and len(old_src_parts) > 1:
-                            # Already merged this exact source into a multi-source row; keep merged row idempotent
-                            merged_rows[idx] = list(old_r)
-                        else:
-                            updated_r = list(nr)
-                            for c_i in range(1, len(updated_r)):
-                                if c_i == src_col or c_i >= len(old_r):
-                                    continue
-                                ov = old_r[c_i].strip()
-                                nv = updated_r[c_i].strip()
-                                if (nv in ("", "—") and ov not in ("", "—")) or (nv and nv in ov):
-                                    updated_r[c_i] = ov
-                                elif (
-                                    ov not in ("", "—")
-                                    and nv not in ("", "—")
-                                    and ov != nv
-                                    and ov not in nv
-                                ):
-                                    updated_r[c_i] = f"{nv} ({old_src}: {ov})"
-                            if new_src and new_src not in old_src_parts:
-                                updated_r[src_col] = f"{old_src}; {new_src}" if old_src else new_src
-                            else:
-                                updated_r[src_col] = old_src
-                            merged_rows[idx] = updated_r
-                    else:
-                        merged_rows[idx] = list(nr)
+                        chosen_o_idx = o_idx
+                        break
+            # 3. Single-table fallback when both sections have exactly 1 table
+            if (
+                chosen_o_idx is None
+                and len(old_tables) == 1
+                and len(new_tables) == 1
+                and 0 not in matched_old_indices
+                and len(old_tables[0][2]) >= 2
+            ):
+                chosen_o_idx = 0
 
-            rebuilt_table = [
-                "| " + " | ".join(new_headers) + " |",
-                new_sep,
-                *("| " + " | ".join(r) + " |" for r in merged_rows),
-            ]
-            new_lines = new_lines[:new_start] + rebuilt_table + new_lines[new_end:]
+            if chosen_o_idx is not None:
+                matched_old_indices.add(chosen_o_idx)
+                _, _, o_headers, _, o_rows, _ = old_tables[chosen_o_idx]
+                rebuilt = _merge_two_tables(o_headers, o_rows, n_headers, n_sep, n_rows)
+                replacements.append((n_start, n_end, rebuilt))
+
+        for n_start, n_end, rebuilt in reversed(replacements):
+            new_lines = new_lines[:n_start] + rebuilt + new_lines[n_end:]
+
+    # Preserve any unmerged tables from old_sec (e.g. secondary ### sub-tables or when new_sec had no tables)
+    existing_subs_lower = {
+        ln.strip().lower() for ln in new_lines if ln.strip().startswith("### ")
+    }
+    for o_idx, (o_start, o_end, _, _, _, o_sub) in enumerate(old_tables):
+        if o_idx not in matched_old_indices:
+            if new_lines and new_lines[-1].strip() != "":
+                new_lines.append("")
+            if o_sub and o_sub.strip().lower() not in existing_subs_lower:
+                new_lines.append(o_sub)
+                existing_subs_lower.add(o_sub.strip().lower())
+            new_lines.extend(old_lines[o_start:o_end])
 
     # Also preserve any distinct blockquote callouts (> ) or bullet lines (- , * ) from old_sec
     existing_preserved_lower = {
@@ -882,6 +1011,7 @@ def _merge_section_content(old_sec: str, new_sec: str) -> str:
         new_lines.extend(missing_old_lines)
 
     return "\n".join(new_lines)
+
 
 
 def merge_markdown_bodies(existing_body: str, new_body: str) -> str:

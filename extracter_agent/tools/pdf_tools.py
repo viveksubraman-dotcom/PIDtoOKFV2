@@ -71,6 +71,109 @@ def _list_gcs_raw_blobs(force_refresh: bool = False) -> list[dict[str, Any]]:
     return items
 
 
+def _match_pdf_candidate(
+    pdf_filename: str,
+    subfolder: str,
+    candidates: list[dict[str, Any]],
+) -> dict[str, Any] | None:
+    """Resolve a target PDF filename or citation against candidate metadata with strict drawing-code boundary rules.
+
+    Prevents base numeric drawing codes (e.g. '0012') from colliding with alpha-suffixed
+    sibling drawings (e.g. '0012A') that sort earlier in ASCII order ('A' < '_'), and
+    supports shortened citations where middle title words are omitted (e.g. '<CODE>_Z1.pdf').
+    """
+    if not candidates:
+        return None
+
+    clean_name = Path(pdf_filename).name.strip()
+    clean_lower = clean_name.lower()
+    clean_stem = Path(clean_name).stem.strip()
+    clean_stem_lower = clean_stem.lower()
+    norm_target = re.sub(r"[^a-z0-9]", "", clean_lower)
+
+    # Leading document/drawing code before first underscore (e.g. '14780-8120-25-23-0012')
+    query_code = clean_stem_lower.split("_")[0].strip()
+    query_tokens = [
+        t for t in re.split(r"[^a-z0-9]+", clean_stem_lower) if len(t) >= 2
+    ]
+
+    def _subfolder_Pool(pool: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        if not subfolder:
+            return pool
+        scoped = [c for c in pool if c.get("subfolder") == subfolder]
+        return scoped if scoped else pool
+
+    ordered_pools = (
+        [[c for c in candidates if c.get("subfolder") == subfolder], candidates]
+        if subfolder
+        else [candidates]
+    )
+
+    # 1. Exact filename match
+    for pool in ordered_pools:
+        for c in pool:
+            if c["file_name"].lower() == clean_lower:
+                return c
+
+    # 2. Exact leading document-code prefix match (before '_')
+    if len(query_code) >= 3:
+        for pool in ordered_pools:
+            prefix_matches: list[tuple[int, str, dict[str, Any]]] = []
+            for c in pool:
+                c_stem_lower = Path(c["file_name"]).stem.lower()
+                c_code = c_stem_lower.split("_")[0].strip()
+                if c_code == query_code:
+                    c_tokens = set(re.split(r"[^a-z0-9]+", c_stem_lower))
+                    extra_overlap = sum(1 for qt in query_tokens if qt in c_tokens)
+                    prefix_matches.append((extra_overlap, c["file_name"].lower(), c))
+            if prefix_matches:
+                prefix_matches.sort(key=lambda item: (item[0], item[1]))
+                return prefix_matches[-1][2]
+
+    # 3. Alphanumeric boundary match on query_code or clean_stem_lower
+    # Ensures '0012' matches '...-0012_...' and NEVER '...-0012a_...'
+    for probe in (clean_stem_lower, query_code):
+        if len(probe) < 3:
+            continue
+        boundary_pat = re.compile(rf"(?<![a-z0-9]){re.escape(probe)}(?![a-z0-9])")
+        for pool in ordered_pools:
+            boundary_matches: list[tuple[int, str, dict[str, Any]]] = []
+            for c in pool:
+                c_stem_lower = Path(c["file_name"]).stem.lower()
+                if boundary_pat.search(c_stem_lower):
+                    c_tokens = set(re.split(r"[^a-z0-9]+", c_stem_lower))
+                    overlap = sum(1 for qt in query_tokens if qt in c_tokens)
+                    boundary_matches.append((overlap, c["file_name"].lower(), c))
+            if boundary_matches:
+                boundary_matches.sort(key=lambda item: (item[0], item[1]))
+                return boundary_matches[-1][2]
+
+    # 4. All query tokens present as exact tokens in candidate stem
+    if query_tokens:
+        for pool in ordered_pools:
+            token_matches: list[tuple[int, dict[str, Any]]] = []
+            for c in pool:
+                c_tokens = {
+                    t for t in re.split(r"[^a-z0-9]+", Path(c["file_name"]).stem.lower()) if t
+                }
+                if all(qt in c_tokens for qt in query_tokens):
+                    token_matches.append((-len(c["file_name"]), c))
+            if token_matches:
+                token_matches.sort(key=lambda item: item[0], reverse=True)
+                return token_matches[0][1]
+
+    # 5. Substring / normalized alphanumeric fallback
+    for pool in _subfolder_Pool(candidates), candidates:
+        for c in pool:
+            if clean_lower in c["file_name"].lower():
+                return c
+        for c in pool:
+            if norm_target and norm_target in re.sub(r"[^a-z0-9]", "", c["file_name"].lower()):
+                return c
+
+    return None
+
+
 def _download_pdf_from_gcs(
     pdf_filename: str,
     subfolder: str,
@@ -79,24 +182,7 @@ def _download_pdf_from_gcs(
     """Download a raw PDF from GCS into the local temporary cache directory with size and MD5 verification."""
     cfg = get_config()
     blobs = _list_gcs_raw_blobs(force_refresh=force_refresh)
-    clean_name = Path(pdf_filename).name
-    norm_target = re.sub(r"[^a-z0-9]", "", clean_name.lower())
-
-    matched_blob: dict[str, Any] | None = None
-    for b in blobs:
-        if b["file_name"] == clean_name and (not subfolder or b["subfolder"] == subfolder):
-            matched_blob = b
-            break
-    if not matched_blob:
-        for b in blobs:
-            if b["file_name"] == clean_name or clean_name.lower() in b["file_name"].lower():
-                matched_blob = b
-                break
-    if not matched_blob:
-        for b in blobs:
-            if norm_target in re.sub(r"[^a-z0-9]", "", b["file_name"].lower()):
-                matched_blob = b
-                break
+    matched_blob = _match_pdf_candidate(pdf_filename, subfolder, blobs)
 
     if not matched_blob:
         return None, None
@@ -188,16 +274,87 @@ def find_raw_documents_tool(
     }
 
 
+def _select_document_pages(
+    pages: list[dict[str, Any]],
+    max_pages: int = 150,
+    start_page: int = 1,
+    page_query: str | None = None,
+) -> list[dict[str, Any]]:
+    """Select up to max_pages from pages, supporting start_page, page_query filtering, and high-density chapter sampling for very large manuals."""
+    start_idx = max(0, start_page - 1)
+    candidates = [dict(p) for p in pages[start_idx:]]
+    if not candidates:
+        return []
+
+    if page_query and page_query.strip():
+        q_tokens = [
+            t.lower() for t in re.split(r"[\s,;]+", page_query.strip()) if len(t) >= 2
+        ]
+        if q_tokens:
+            matched = [
+                p
+                for idx, p in enumerate(candidates)
+                if idx < 3 or any(qt in p.get("text", "").lower() for qt in q_tokens)
+            ]
+            if matched:
+                return matched[:max_pages]
+
+    if len(candidates) <= max_pages or max_pages < 50:
+        return candidates[:max_pages]
+
+    # For very large documents (> max_pages, e.g. 388-page operating manuals):
+    # Retain leading TOC/index pages (first 14 pages) + highest engineering-density pages in page order
+    lead_count = min(14, max_pages // 4)
+    lead_pages = candidates[:lead_count]
+    remaining_budget = max(0, max_pages - lead_count)
+    tail_Pool = candidates[lead_count:]
+
+    eng_markers = (
+        "°c",
+        "kg/cm",
+        "mmhg",
+        "wt%",
+        "kcal",
+        "table",
+        "start-up",
+        "startup",
+        "shutdown",
+        "troubleshooting",
+        "emergency",
+        "interlock",
+        "design",
+        "operating",
+        "nozzle",
+        "orifice",
+    )
+    scored_tail: list[tuple[int, int, dict[str, Any]]] = []
+    for p in tail_Pool:
+        txt_lower = p.get("text", "").lower()
+        marker_hits = sum(2 for m in eng_markers if m in txt_lower)
+        digit_density = min(10, len(re.findall(r"\b\d+(?:\.\d+)?\b", txt_lower)) // 5)
+        score = marker_hits + digit_density
+        scored_tail.append((score, p["page_number"], p))
+
+    scored_tail.sort(key=lambda item: (item[0], -item[1]), reverse=True)
+    selected_tail = sorted(
+        (item[2] for item in scored_tail[:remaining_budget]),
+        key=lambda p: p["page_number"],
+    )
+    return lead_pages + selected_tail
+
+
 def process_raw_pdf_tool(
     pdf_filename: str,
     subfolder: str = "data_sheets",
-    max_pages: int = 10,
+    max_pages: int = 150,
     enable_multimodal: bool = True,
+    start_page: int = 1,
+    page_query: str | None = None,
 ) -> dict[str, Any]:
     """Extract text, tables, and document metadata from a raw engineering PDF in GCS (reference/raw/).
 
     When to use:
-        - When ingesting process data sheets, P&IDs, PFDs, or operating manuals
+        - When ingesting process data sheets, P&IDs, PFDs, standards, or operating manuals
           from the reference/raw directory in GCS to extract chemical engineering knowledge.
         - Example: process_raw_pdf_tool("<PROCESS_DATA_SHEET>.pdf", "data_sheets")
 
@@ -208,9 +365,11 @@ def process_raw_pdf_tool(
 
     Args:
         pdf_filename: The filename or relative path of the PDF.
-        subfolder: The subdirectory under reference/raw (e.g. data_sheets, pid, pfd).
-        max_pages: Maximum pages to process from the start of the document.
-        enable_multimodal: Whether to run Gemini multimodal vision for vector drawings or scanned tables (default: True).
+        subfolder: The subdirectory under reference/raw (e.g. data_sheets, pid, pfd, operating_manuals, standards).
+        max_pages: Maximum pages to process (default: 150, covering full multi-sheet datasheets, 136-page valve packages, and standards).
+        enable_multimodal: Whether to run Gemini multimodal vision for vector drawings, data sheets, or scanned tables (default: True).
+        start_page: 1-indexed starting page number (default: 1).
+        page_query: Optional keyword filter to prioritize specific sections or tags within large manuals.
 
     Returns:
         A dictionary containing metadata, source GCS URI, extracted pages, vector drawing status, and identified equipment tag candidates.
@@ -234,9 +393,17 @@ def process_raw_pdf_tool(
         elif Path(pdf_filename).exists():
             target_path = Path(pdf_filename)
         else:
-            matches = list(raw_dir.rglob(f"*{pdf_filename}*"))
-            if matches:
-                target_path = matches[0]
+            local_candidates = [
+                {
+                    "file_name": p.name,
+                    "subfolder": p.parent.name if p.parent != raw_dir else "",
+                    "path": p,
+                }
+                for p in sorted(raw_dir.rglob("*.pdf"))
+            ]
+            matched_local = _match_pdf_candidate(pdf_filename, subfolder, local_candidates)
+            if matched_local is not None:
+                target_path = matched_local["path"]
             else:
                 return {
                     "status": "error",
@@ -247,17 +414,24 @@ def process_raw_pdf_tool(
     try:
         meta = get_pdf_metadata(target_path)
         pages = extract_pdf_pages(target_path)
-        limited_pages = pages[:max_pages]
+        limited_pages = _select_document_pages(
+            pages=pages,
+            max_pages=max_pages,
+            start_page=start_page,
+            page_query=page_query,
+        )
 
         full_text = " ".join(p["text"] for p in limited_pages)
         has_native_text = len(full_text.strip()) > 0
         # Check if drawing is an AutoCAD vector graphic with empty text stream
         is_vector = is_vector_drawing(target_path)
+        effective_subfolder = (target_path.parent.name or subfolder).lower()
 
         # Multimodal visual analysis trigger:
         # 1. Vector drawings (P&IDs, PFDs) with no font text stream
-        # 2. Or data sheets / drawings where text is completely empty (<100 chars)
-        # 3. Or multi-page data sheets where a key specification page has 0 text
+        # 2. Or documents where extracted text is empty (<100 chars)
+        # 3. Or all engineering data_sheets (which contain embedded raster tables/sketches inside UOP text borders),
+        #    multi-sheet standards (>10 pages with appendix tables/diagrams), and any document with low-text (<100 chars) pages
         multimodal_text = None
         if enable_multimodal and (is_vector or len(full_text.strip()) < 100):
             multimodal_text = extract_pdf_multimodal_summary(
@@ -273,10 +447,15 @@ def process_raw_pdf_tool(
                 }
             )
             full_text = f"{full_text}\n{multimodal_text}"
-        elif enable_multimodal and any(len(p["text"].strip()) < 50 for p in limited_pages) and subfolder == "data_sheets":
+        elif enable_multimodal and (
+            effective_subfolder == "data_sheets"
+            or subfolder == "data_sheets"
+            or (effective_subfolder == "standards" and meta["page_count"] > 10)
+            or any(len(p["text"].strip()) < 100 for p in limited_pages)
+        ):
             multimodal_text = extract_pdf_multimodal_summary(
                 target_path,
-                prompt_hint=f"Focus on mechanical equipment data sheet tables and schedules in {target_path.stem}",
+                prompt_hint=f"Focus on mechanical and instrument equipment data sheet tables, vessel sketches, appendix matrices, and schedules in {target_path.stem}",
             )
             injected_once = False
             for p in limited_pages:
@@ -288,6 +467,13 @@ def process_raw_pdf_tool(
                         p["text"] = f"[Page {p['page_number']}: Raster table included in Multimodal Visual Extraction above]"
                     p["char_count"] = len(p["text"])
                     p["word_count"] = len(p["text"].split())
+            if not injected_once and limited_pages and multimodal_text:
+                last_p = limited_pages[-1]
+                last_p["text"] = (
+                    f"{last_p['text']}\n\n[Multimodal Visual Extraction of {target_path.name} Tables]:\n{multimodal_text}"
+                )
+                last_p["char_count"] = len(last_p["text"])
+                last_p["word_count"] = len(last_p["text"].split())
             full_text = f"{full_text}\n{multimodal_text}"
 
         # Extract tag candidates from both text and filename
@@ -324,4 +510,5 @@ def process_raw_pdf_tool(
             "error": f"Failed to process PDF {target_path}: {e}",
             "pages": [],
         }
+
 

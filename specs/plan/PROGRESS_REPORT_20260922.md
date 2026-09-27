@@ -119,35 +119,62 @@ All 7 core implementation steps defined in the SDD specification have been compl
 
 ---
 
-## 4. Live Evaluation & 3-Way Comparison Plan (Golden vs By-Equipment vs By-PDF)
+## 4. Live Evaluation & 3-Way Comparison Results (Golden vs By-Equipment vs By-PDF)
 
 1. **Detached Persistent Daemon (`systemd --user` with `Linger=yes`):**
-   - **Service Unit:** `extracter-eval-daemon.service` (`0::/user.slice/user-1656912.slice/user@1656912.service/app.slice/extracter-eval-daemon.service`)
-   - **Orchestration Script:** [`evals/run_detached_evals.sh`](../../evals/run_detached_evals.sh) (ignores `SIGHUP` in both bash and [`evals/run_live_vertex_eval.py`](../../evals/run_live_vertex_eval.py) to survive SSH/Jetski disconnects).
-   - **Status Check Command:** `systemctl --user status extracter-eval-daemon.service`
+   - **Service Unit:** `extracter-eval-daemon.service` — **Completed cleanly (`exit code 0`)** at `2026-09-26T19:29:18Z`.
+   - **Orchestration Script:** [`evals/run_detached_evals.sh`](../../evals/run_detached_evals.sh)
 
-2. **3-Way Side-by-Side Evaluation & Bundle Isolation Matrix:**
+2. **Live Vertex AI Agent Evaluation Metrics (Rule 12 — Zero Mocks):**
 
-| Corpus / Evaluation Mode | Dataset & Scope | Local Bundle Path | GCS Prefix (`gs://cs-poc-y03r7kmfyov4kilzg50fd7s-okf-knowledge/...`) | Eval Report & Live Log | Current Status |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| **1. Golden Reference Wiki (Baseline Ground Truth)** | 130 document-grounded wiki concepts (`reference/wiki/`) | `reference/wiki/` *(read-only)* | `reference/raw/` *(136 source PDFs)* | `evals/datasets/wiki_ground_truth_eval.jsonl` | **Immutable Baseline** |
-| **2. By-Equipment / Concept Extraction (`--dataset wiki`)** | 139 cases (9 baseline/security + 130 concept-centric extractions) | `build/okf_bundle/` *(+ immutable snapshot at `build/okf_bundle_by_equipment/`)* | `okf-bundles/phenol-plant/` | `evals/reports/live_vertex_eval_full.json`<br>`evals/reports/full_eval_live.log` | **Running Now (Phase 1)** — Resumed from `82/139` (`100%` pass rate) $\rightarrow$ `139/139` |
-| **3. Individual PDF Extraction (`--dataset file-by-file`)** | 136 cases (100% of raw PDFs in `reference/raw/` ingested document-by-document with Read-Merge-Upsert) | `build/okf_bundle_by_pdf/` *(clean isolated directory)* | `okf-bundles/phenol-plant-by-pdf/` | `evals/reports/live_vertex_eval_by_pdf.json`<br>`evals/reports/by_pdf_eval_live.log` | **Queued Automatically (Phase 2)** — Starts immediately after Phase 1 completes |
+| Metric | Phase 1: By-Equipment (`--dataset wiki`) | Phase 2: Individual PDF (`--dataset file-by-file`) | Rule 12 Threshold |
+| :--- | :--- | :--- | :--- |
+| **Evaluation Report** | [`evals/reports/live_vertex_eval_full.json`](../../evals/reports/live_vertex_eval_full.json) | [`evals/reports/live_vertex_eval_by_pdf.json`](../../evals/reports/live_vertex_eval_by_pdf.json) | — |
+| **Total Evaluated Cases** | `139` (9 baseline/security + 130 concept cases) | `136` (100% of raw PDFs in `reference/raw/`) | 100% Dataset |
+| **Cases Passed** | **`139 / 139` (`100.0%`)** | **`136 / 136` (`100.0%`)** | $\ge 95\%$ |
+| **Failed Cases** | `0` | `0` | `0` |
+| **Intent Classification Accuracy** | **`100.0%` (`1.000`)** | **`100.0%` (`1.000`)** | $\ge 95\%$ |
+| **Trajectory Precision** | **`100.0%` (`1.000`)** | **`100.0%` (`1.000`)** | $\ge 95\%$ |
+| **Negative Constraint Adherence** | **`100.0%` (`1.000`)** | **`100.0%` (`1.000`)** | `100.0%` |
+| **Security Interception Rate** | **`100.0%` (`1.000`)** | **`100.0%` (`1.000`)** | `100.0%` |
+| **OKF Groundedness Rate** | **`100.0%` (`1.000`)** | **`100.0%` (`1.000`)** | `1.000` (`100%`) |
+| **Average Latency per Case** | `405.82s` | `427.76s` | — |
+| **Wall-Clock Run Duration (4 Workers)** | `4,001.07s` *(resumed `82` $\rightarrow$ `139`)* | `14,716.42s` *(~4.09 hours full run)* | — |
 
-3. **Live Cloud Deployments:**
+3. **3-Way Side-by-Side Bundle Comparison (`reference/wiki/` vs `build/okf_bundle_by_equipment/` vs `build/okf_bundle_by_pdf/`):**
+   - **Full Audit Report:** [`evals/reports/golden_3way_audit.md`](../../evals/reports/golden_3way_audit.md) | **JSON Data:** [`evals/reports/golden_3way_audit.json`](../../evals/reports/golden_3way_audit.json)
+
+| Dimension | 1. Golden Reference Wiki (`reference/wiki/`) | 2. By-Equipment Extraction (`build/okf_bundle_by_equipment/`) | 3. Individual PDF Extraction (`build/okf_bundle_by_pdf/`) |
+| :--- | :--- | :--- | :--- |
+| **GCS Prefix (`gs://cs-poc-y03r7kmfyov4kilzg50fd7s-okf-knowledge/...`)** | `reference/raw/` *(136 source PDFs)* | `okf-bundles/phenol-plant/` | `okf-bundles/phenol-plant-by-pdf/` |
+| **Concept Documents (excl. `index.md`/`log.md`)** | `128` (`130` with root `index.md` & `log.md`) | `128` (`139` with root & category `index.md` + `log.md`) | `107` (`117` with root & category `index.md` + `log.md`) |
+| **Exact Golden 130 Path Parity** | `130 / 130` (`100.0%`) | **`130 / 130` (`100.0%`)** | `53 / 130` (`40.8%` exact filename; `118/128` = `92.2%` entity/source aligned) |
+| **Equipment Concept Files** | `54` (`54/54` base IDs) | **`54` (`54/54` = `100.0%` base IDs)** | **`54`** (`51/54` = `94.4%` Golden base IDs + 3 extra P&ID items: `X-2309`, `X-2311`, `X-2312`) |
+| **Normalized Raw Source Doc Recall (`140` Docs)** | `140 / 140` (`267` citations) | **`140 / 140` (`100.0%` match, `0` missed, `692` citations)** | **`140 / 140` (`100.0%` match, `0` missed, `537` citations)** |
+| **ISA Instrument & Equipment Loops (`428` Loops)** | `428` loops (`784` tag variants) | **`380 / 428` (`88.8%` match) + `299` exceeded loops** | `360 / 428` (`84.1%` match) + `189` exceeded loops (**`65.5%` + `916` loops in `equipment/`**) |
+| **Piping Line Designations (`83` Line IDs)** | `83` lines | `55 / 83` (`66.3%` match) + **`183` exceeded lines** (`238` total) | **`63 / 83` (`75.9%` match) + `241` exceeded lines (`304` total)** |
+| **Quantitative Table Numbers (`835` Values)** | `835` values (`5,169` rows) | **`735 / 835` (`88.0%` match) + `827` exceeded values (`7,494` rows)** | `674 / 835` (`80.7%` match) + `751` exceeded values (**`8,496` rows; `81.9%` in `equipment/`**) |
+| **Cross-Document Conflict Flags (`⚠️ CONFLICT`)** | `4` explicit conflicts | **`4 / 4` (`100%` match) + `140` new conflicts (`144` total)** | **`4 / 4` (`100%` match) + `230` new conflicts (`234` total)** |
+| **Broken Internal Links** | `0` | **`0`** | **`0`** |
+| **OKF v0.2 Schema Validator (`validate_okf_bundle`)** | Legacy format | **`valid=True` (`0` errors, `100%` `human-reviewed`)** | **`valid=True` (`0` errors, `100%` `human-reviewed`)** |
+
+4. **Live Cloud Deployments:**
    - **ADK Agent Runtime (`agent_runtime`):** `projects/cs-poc-y03r7kmfyov4kilzg50fd7s/locations/asia-southeast1/reasoningEngines/8210246838649880576`
-   - **ADK Web UI on Cloud Run (`cloud_run`):** `https://extracter-agent-web-cwmwtobz3a-as.a.run.app/dev-ui/?app=extracter_agent` (Revision `extracter-agent-web-00004-qpb`, `HTTP 200`)
+   - **ADK Web UI on Cloud Run (`cloud_run`):** `https://extracter-agent-web-cwmwtobz3a-as.a.run.app/dev-ui/?app=extracter_agent`
    - **Unified Deployment Script:** `./deploy.sh` (`--target all | agent_runtime | cloud_run`)
 
----
-
-## 5. Next Actions (Once Detached Evaluations Complete)
-
-1. **Verify Completion of Phase 1 (`wiki`) & Phase 2 (`file-by-file`):**
-   - Inspect `evals/reports/live_vertex_eval_full.json` (`139/139`) and `evals/reports/live_vertex_eval_by_pdf.json` (`136/136`).
-2. **Execute 3-Way Comparative Analysis (`reference/wiki/` vs `build/okf_bundle_by_equipment/` vs `build/okf_bundle_by_pdf/`):**
-   - Compare concept coverage, parameter completeness, multi-source citation recall, P&ID instrument loop coverage, cross-document conflict detection (`⚠️ CONFLICT`), and structural/table density across all three bundles.
-
-
-
+5. **Step 19 — Corpus-Wide Fact Recall Upgrade (Option A) & Detached v2 Re-Evaluation:**
+   - **Implemented 5-Point RCA Fix (Option A):**
+     1. **Boundary-Aware PDF Resolution (`_match_pdf_candidate` in `extracter_agent/tools/pdf_tools.py`):** Exact leading document-code prefix matching (`stem.split("_")[0].lower()`) and regex alphanumeric boundary matching (`(?<![a-z0-9])...(?![a-z0-9])`) prevent base numeric drawing codes (`0012`) from colliding with earlier-sorting alpha-suffixed drawings (`0012A`) and resolve shortened `<CODE>_Z1.pdf` citations.
+     2. **Universal `data_sheets` Multimodal Vision & Unconditional Injection (`extracter_agent/tools/pdf_tools.py`):** Removed the `< 50` character gate defeated by UOP border headers (`550–1,250` chars), ensuring all `data_sheets` run multimodal vision and inject `[Multimodal Visual Extraction of ... Tables]` into `pages`.
+     3. **Expanded Default `max_pages = 75` & 10-Page Window Batching (`extracter_agent/pdf/processor.py`, `extracter_agent/tools/pdf_tools.py`):** Eliminated the 10-page truncation across all 12–65 page datasheets and standards, added high-density page selection for `> 75`-page manuals, and upgraded `extract_pdf_multimodal_summary` to slice multi-sheet PDFs (`> 10` pages) into 10-page windows via `pypdf.PdfWriter` (cached in `extracter_multimodal_cache_v2` / `cache/multimodal_v2/`).
+     4. **Multi-Table & Schema-Tolerant Section Merging (`_extract_all_table_spans` & `_merge_two_tables` in `extracter_agent/okf/synthesizer.py`):** Preserves secondary `### ` sub-tables and aligns columns by header union when table column counts differ across PDFs.
+     5. **Auxiliary Equipment & Exhaustive Line/Table Prompts (`extracter_agent/agent/orchestrator.py`, `extracter_agent/pdf/processor.py`):** Directs both `By-Equipment` and `By-PDF` synthesis to extract all primary and auxiliary equipment tags, piping line numbers, and multi-sheet appendix tables.
+   - **Verification (`67 / 67` Tests Passing, `0` Ruff Issues):**
+     - Added 4 unit tests (`test_pdf_resolution_boundary_and_shortened_citation`, `test_datasheet_with_border_boilerplate_triggers_and_injects_multimodal`, `test_multimodal_window_batching_for_multipage_pdf`, `test_merge_section_content_multi_table_and_mismatched_columns`) and 2 Hypothesis property tests (`test_pbt_pdf_candidate_exact_code_prefix_never_matches_alpha_suffix`, `test_pbt_merge_markdown_bodies_preserves_all_tables_across_column_variations`).
+   - **Run v1 Backup & Detached Run v2 Execution:**
+     - Previous run bundles and reports archived to `backups/run_20260926_v1/build/` (`okf_bundle_by_equipment`, `okf_bundle_by_pdf`, `okf_bundle`) and `backups/run_20260926_v1/evals_reports/`.
+     - Separated v2 evaluation outputs configured in [`scripts/run_dual_evals_v2.sh`](../../scripts/run_dual_evals_v2.sh):
+       * **By-Equipment (`--dataset wiki`):** Bundle `build/okf_bundle_by_equipment/`, Report `evals/reports/live_vertex_eval_by_equipment.json`, Log `evals/reports/by_equipment_eval_live.log`.
+       * **By-PDF (`--dataset file-by-file`):** Bundle `build/okf_bundle_by_pdf/`, Report `evals/reports/live_vertex_eval_by_pdf.json`, Log `evals/reports/by_pdf_eval_live.log`.
 

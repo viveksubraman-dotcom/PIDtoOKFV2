@@ -38,7 +38,15 @@ When enriching an existing `.md` concept on disk (`merge_existing=True`), the sy
 | **Same Document Updated In-Place or Newer Revision Ingested** | `PS-D2304 Rev Z0` (`3.0 kg/cm²g`) followed by `PS-D2304 Rev Z1` (`3.5 kg/cm²g`), or `DWG-0004_Rev0.pdf` $\rightarrow$ `DWG-0004_Rev1.pdf` | **Updates value in-place (`NO CONFLICT`):** Replaces the old parameter/table value with the new revision's value, updates the citation to `Rev Z1`, and replaces the superseded revision in `frontmatter.sources`. |
 | **Different Active Documents Disagree** | Process Data Sheet `PS-D2304` specifies `3.5 kg/cm²g`, whereas P&ID `DWG-23-0004` specifies `5.0 kg/cm²g` | **Flags `⚠️ CONFLICT`:** Preserves both values in the parameter table (`note`) and appends `⚠️ CONFLICT — Design Pressure: PS-D2304 specifies 3.5 kg/cm²g, whereas DWG-23-0004 specifies 5.0 kg/cm²g — verify with engineer before HAZOP` to `## Hazards & Safeguards`. |
 | **Different Sheets Within the Same PDF Disagree** | `PS-D2304 Sheet 1 (Cover)` specifies `3.5 kg/cm²g`, whereas `PS-D2304 Sheet 4 (Vessel Sketch)` specifies `3.9 kg/cm²g` | **Flags `⚠️ CONFLICT`:** Preserves both sheet values and emits an explicit `⚠️ CONFLICT` callout in `## Hazards & Safeguards`. |
-| **Multiple PDFs Contribute to a Shared Register / Concept** | `pid/DWG-0004.pdf` adds `PT-0401`, `PI-0402` to `instruments/pressure-instruments.md`; later `pid/DWG-0005.pdf` adds `PT-0501`, `PI-0502` | **Non-Destructive Section & Table Merge (`merge_markdown_bodies`):** Preserves all `## <Heading>` sections, merges Markdown table rows by first-column key (`Tag`, `Parameter`, `Stream`), retains safety callouts (`> ⚠️`), and merges `sources`. |
+| **Multiple PDFs Contribute to a Shared Register / Concept** | `pid/DWG-0004.pdf` adds `PT-0401`, `PI-0402` to `instruments/pressure-instruments.md`; later `pid/DWG-0005.pdf` adds `PT-0501`, `PI-0502` | **Non-Destructive Section & Table Merge (`merge_markdown_bodies`):** Preserves all `## <Heading>` sections, merges Markdown table rows by first-column key (`Tag`, `Parameter`, `Stream`), aligns mismatched table column headers by union, retains secondary `### ` sub-tables and safety callouts (`> ⚠️`), and merges `sources`. |
+
+### PDF Page Processing Architecture & 150-Page Maximum Limitation
+To balance exhaustive engineering table/parameter recall against single-call LLM context and output token budgets, `process_raw_pdf_tool` ([`extracter_agent/tools/pdf_tools.py`](./extracter_agent/tools/pdf_tools.py)) and `extract_pdf_multimodal_summary` ([`extracter_agent/pdf/processor.py`](./extracter_agent/pdf/processor.py)) enforce a **150-page maximum per-call processing cap** (`max_pages: int = 150`) alongside **8-page parallel multimodal windowing**:
+
+| Extraction Layer | Page Processing Mechanism | **150-Page Maximum Limitation** & Large-Manual Behavior (`> 150` Pages) |
+| :--- | :--- | :--- |
+| **1. Native Text Extraction (`pypdf`)** | Reads embedded PDF text streams page-by-page without chunk slicing (`1` entry per page in `pages: list[dict]`) up to `max_pages = 150` (each page text capped at `4,000` chars). | - **PDFs $\le 150$ pages (`135 / 136` files in `reference/raw/`):** **100% of pages** are extracted in full.<br>- **PDFs $> 150$ pages (e.g., 388-page `OM-Phenol Unit UOP-2015.pdf`):** Capped at **150 pages per tool call**. By default, `_select_document_pages` retains the leading **14-page Table of Contents / Index** plus the **136 highest engineering-density pages** (scored by equipment tags, numeric operating limits, procedure steps, and tables). Agents can also pass `page_query="<keyword or tag>"` or `start_page=<N>` to target any specific range beyond page 150. |
+| **2. Multimodal Vision Extraction (`gemini-3.8-flash`)** | - **$\le 8$ pages:** Sent in a single multimodal call (`max_output_tokens = 65,536`).<br>- **$> 8$ pages (multi-sheet data sheets, standards, manuals):** Sliced via `pypdf.PdfWriter` into **8-page sub-PDF windows** (`Pages 1–8`, `Pages 9–16`, ...) and extracted concurrently (`ThreadPoolExecutor(max_workers=4)`). | - **Multi-sheet Data Sheets & Standards:** Unconditionally run through 8-page multimodal visual windowing up to the **150-page maximum limit** (`max_total_pages = 150`), ensuring border-only CAD/UOP form sheets and dense multi-page appendices (e.g., 39-page `6N32` Relief Valve Summary, 46-page `D2301` Tray Calculations) are never truncated.<br>- **Prose Manuals $> 150$ pages:** Multimodal vision is bounded to the leading TOC/overview windows plus low-text/diagram pages (up to 8 windows = 64 pages), while native text covers up to 150 pages per call. |
 
 ---
 
@@ -331,7 +339,7 @@ PYTHONPATH=. .venv/bin/python evals/builders/build_file_by_file_eval_dataset.py
 Every implementation step is verified by deterministic **Unit Tests** and generative **Property-Based Tests (PBT)** using `hypothesis`, plus **Ruff** linting and **Bandit** SAST scanning:
 
 ```bash
-# Run all 63 Unit, Property-Based (Hypothesis), and Evaluation Dataset Integrity Tests
+# Run all 71 Unit, Property-Based (Hypothesis), and Evaluation Dataset Integrity Tests
 PYTHONPATH=. .venv/bin/pytest tests/ evals/test_eval_benchmarks.py -q
 
 # Run Ruff static code quality & formatting check
@@ -345,7 +353,7 @@ PYTHONPATH=. .venv/bin/pytest tests/ evals/test_eval_benchmarks.py -q
 
 | Metric | Verified Result | Target Standard |
 | :--- | :---: | :---: |
-| **Unit, Property-Based (`hypothesis`) & Dataset Integrity Tests** | **63 / 63 Passed (`100.0%`)** | `100.0%` (**PASS**) |
+| **Unit, Property-Based (`hypothesis`) & Dataset Integrity Tests** | **71 / 71 Passed (`100.0%`)** | `100.0%` (**PASS**) |
 | **Golden Wiki Path Parity (`build/okf_bundle/`)** | **130 / 130 (`100.0%`)** | `100.0%` (**PASS**) |
 | **Raw PDF File-by-File Dataset Coverage (`reference/raw/`)** | **136 / 136 PDFs (`100.0%`)** | `100.0%` (**PASS**) |
 | **Broken Internal Markdown Links** | **`0` Broken Links** | `0` (**PASS**) |
@@ -374,20 +382,21 @@ PYTHONPATH=. .venv/bin/pytest tests/ evals/test_eval_benchmarks.py -q
 │   │   ├── domain.py                # Equipment, Instrument, Stream & Intent Pydantic schemas
 │   │   └── okf_schema.py            # Open Knowledge Format (OKF v0.2) frontmatter & bundle models
 │   ├── pdf/
-│   │   └── processor.py             # PyMuPDF parser + 300 DPI Gemini multimodal vision + SHA-256 cache
+│   │   └── processor.py             # PyMuPDF/pypdf parser + 8-page windowed Gemini multimodal vision (150-page max)
 │   ├── okf/
 │   │   ├── document.py              # OKF v0.2 YAML frontmatter + Markdown serializer/parser
 │   │   ├── synthesizer.py           # Equipment & Markdown table Read-Merge-Upsert + revision/conflict engine
 │   │   ├── indexer.py               # Master knowledge catalog (index.md) & audit log (log.md) compiler
 │   │   └── validator.py             # OKF v0.2 schema, trust-tier & internal link validator
 │   ├── tools/
-│   │   ├── pdf_tools.py             # find_raw_documents_tool & process_raw_pdf_tool (MD5-verified GCS cache)
+│   │   ├── pdf_tools.py             # find_raw_documents_tool & process_raw_pdf_tool (MD5-verified GCS cache, 150-page max)
 │   │   ├── okf_tools.py             # inspect/generate/validate OKF tools with automatic GCS sync
 │   │   └── gcs_tools.py             # export_bundle_to_gcs_tool
 │   └── gcs/
 │       └── exporter.py              # 16-worker parallel GCS uploader with MD5 digest verification
 ├── evals/                           # Live Evaluation Suite & Dataset Builders
 │   ├── run_live_vertex_eval.py      # Live evaluation runner (--dataset wiki|file-by-file|both)
+│   ├── run_detached_evals.sh        # Detached background daemon runner for By-Equipment & By-PDF evals
 │   ├── test_eval_benchmarks.py      # Automated dataset integrity & benchmark tests
 │   ├── builders/
 │   │   ├── build_wiki_eval_dataset.py         # Compiles 130-case entity-centric eval dataset
@@ -395,7 +404,7 @@ PYTHONPATH=. .venv/bin/pytest tests/ evals/test_eval_benchmarks.py -q
 │   └── datasets/
 │       ├── wiki_ground_truth_eval.jsonl       # 130 entity-centric ground-truth cases
 │       └── raw_file_by_file_eval.jsonl        # 136 raw PDF file-by-file ground-truth cases
-├── tests/                           # Unit & Property-Based Test Suite (63 tests)
+├── tests/                           # Unit & Property-Based Test Suite (67 tests + 4 eval benchmark tests = 71 total)
 │   ├── test_okf_unit.py             # OKF synthesis, incremental merge, cache & zero-hardcoding tests
 │   ├── test_okf_property.py         # Hypothesis property tests for OKF, merge idempotence & revisions
 │   ├── test_agent_unit.py           # ADK orchestrator, tools, guardrails & table merge tests
@@ -408,7 +417,7 @@ PYTHONPATH=. .venv/bin/pytest tests/ evals/test_eval_benchmarks.py -q
 ├── specs/                           # Spec-Driven Development (SDD) Artifacts
 │   ├── README.md                    # Specification index
 │   ├── baseline/system-overview.md  # System baseline specification
-│   ├── features/SPEC-20260922-OKF-EXTRACTER-AGENT.md  # Full feature specification & 17-step plan
+│   ├── features/SPEC-20260922-OKF-EXTRACTER-AGENT.md  # Full feature specification & 19-step plan
 │   └── plan/PROGRESS_REPORT_20260922.md               # Living milestone & test progress report
 ├── docs/                            # Architecture diagrams, SAST audit reports & GCP cost models
 └── terraform/                       # Google Cloud Infrastructure Manager Terraform IaC

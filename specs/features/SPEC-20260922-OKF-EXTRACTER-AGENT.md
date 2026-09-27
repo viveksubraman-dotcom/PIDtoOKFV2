@@ -631,11 +631,48 @@ In chemical engineering facilities, instrumentation is inextricably bound to equ
   - `test_pbt_equipment_tag_base_id_preservation_invariant`: `hypothesis` property test verifying across arbitrary generated equipment tags (`<PREFIX>-<DIGITS><SUFFIX>`) and arbitrary distractor `PS-<OTHER>` source files that `derive_canonical_equipment_tag` always preserves the exact `<PREFIX>-<DIGITS>` base equipment identity.
 - **Completion Criteria:** All unit and property-based tests passing (`66/66`), zero concept collisions in `build/okf_bundle/`, updated ADK agent deployed to `agent_runtime`, updated ADK Web UI deployed to Cloud Run (`extracter-agent-web`), and all changes committed and pushed to GitHub.
 
+### Step 19: Corpus-Wide Fact Recall Upgrade — Boundary-Aware PDF Resolution, Universal Datasheet Vision, Page-Window Batching & Schema-Tolerant Table Merging (Option A)
+- **Problem Statement (RCA Findings):**
+  3-way Golden Standard fact auditing across `By-Equipment` and `By-PDF` bundles identified 5 root causes of corpus-wide missing instrument loops, piping line numbers, and engineering table values:
+  1. Substring & ASCII sort-order collision in `_download_pdf_from_gcs` (`'A'` `0x41` < `'_'` `0x5F`), causing queries for base drawing numbers (`...-0012` or shortened `...-0012_Z1.pdf`) to resolve to `0012A` or fail to match when middle title tokens are omitted.
+  2. UOP border header boilerplate (`550–1,250` chars) defeating the `any(len(p["text"].strip()) < 50)` multimodal trigger on `34 / 55` (`62%`) of `data_sheets/`, leaving embedded raster tables/sketches unextracted.
+  3. Hardcoded `max_pages: int = 10` truncation in `process_raw_pdf_tool`, cutting off `893` pages across `17 / 136` multi-page PDFs (`12–388` pages).
+  4. Single-call multimodal output bottleneck on multi-sheet packages (`> 10` pages), summarizing instead of transcribing all sheets.
+  5. Single-table and identical-column-count restriction in `_merge_section_content` (`synthesizer.py`), plus omitted auxiliary equipment tags on multi-equipment P&IDs and package datasheets in `By-PDF` mode.
+- **Actions:**
+  1. **Boundary-Aware Document Code & Token Resolution (`extracter_agent/tools/pdf_tools.py`):**
+     - Implement `_match_pdf_candidate(pdf_filename: str, subfolder: str, candidates: list[dict[str, Any]]) -> dict[str, Any] | None` used by both `_download_pdf_from_gcs` and local filesystem resolution in `process_raw_pdf_tool`.
+     - Prioritize: (a) exact filename match, (b) exact leading document-code prefix match (`stem.split("_")[0].lower()`), preventing `<NUM>` from matching `<NUM>A`, (c) regex alphanumeric boundary match (`(?<![a-z0-9])...(?![a-z0-9])`), and (d) multi-token inclusion match when middle title words are omitted (e.g., `<DOC_CODE>_Z1.pdf`).
+  2. **Universal `data_sheets` Multimodal Vision & Unconditional Injection (`extracter_agent/tools/pdf_tools.py`):**
+     - Trigger `extract_pdf_multimodal_summary` for all `subfolder == "data_sheets"` (in addition to `is_vector` drawings and pages with `< 100` chars), bypassing the `< 50` char UOP border header trap.
+     - Ensure that when `multimodal_text` is generated for a document whose pages all have `>= 50` chars of border text, the `[Multimodal Visual Extraction of ... Tables]` block is unconditionally appended to `limited_pages` rather than silently skipped.
+  3. **Expanded Default `max_pages` & Page-Window Batching for Multi-Sheet PDFs (`extracter_agent/pdf/processor.py` & `extracter_agent/tools/pdf_tools.py`):**
+     - Increase default `max_pages` in `process_raw_pdf_tool` from `10` to `75` (covering 134/136 PDFs in full, including all 12–65 page datasheets and standards) and add `start_page: int = 1` and `page_query: str | None = None`. For documents exceeding `max_pages` (e.g., 136-page control valve packages or 388-page operating manuals), automatically select the index/TOC pages plus the highest-density technical specification/procedure pages (or `page_query`-matched pages).
+     - Upgrade `extract_pdf_multimodal_summary` in `extracter_agent/pdf/processor.py` with page-window batching (`window_size: int = 10`):
+       * For PDFs with `<= 10` pages, execute a single multimodal call using the existing `{path.stem}_{pdf_sha}.md` cache key (preserving 100% cache hit compatibility).
+       * For multi-sheet PDFs with `> 10` pages, slice pages needing visual extraction into `<= 10`-page sub-PDF windows via `pypdf.PdfWriter`, cache each window deterministically under `{path.stem}_p{start}-{end}_{window_sha}.md` (locally and in GCS), and concatenate all window extractions.
+  4. **Multi-Table & Schema-Tolerant Section Merging (`extracter_agent/okf/synthesizer.py`):**
+     - Implement `_extract_all_table_spans(lines)` in `extracter_agent/okf/synthesizer.py`.
+     - Upgrade `_merge_section_content` to:
+       * Align and merge tables even when `len(old_headers) != len(new_headers)` if they share a common first-column key header (mapping columns by normalized header name and taking the column union).
+       * Preserve all additional/secondary Markdown tables (e.g., under `### ` subheadings or distinct schemas) from `old_sec` instead of overwriting them.
+  5. **Auxiliary Equipment & Exhaustive Line/Table Extraction Prompts (`extracter_agent/agent/orchestrator.py` & `extracter_agent/pdf/processor.py`):**
+     - Update `ORCHESTRATOR_INSTRUCTIONS` and the multimodal extraction prompt to require synthesizing all distinct primary AND auxiliary equipment tags depicted on a package datasheet or P&ID, all piping line numbers, and all multi-sheet appendix tables.
+- **Unit & Property-Based Tests (PBT):**
+  - `test_pdf_resolution_boundary_and_shortened_citation`: Unit test verifying `_match_pdf_candidate` resolves base drawing `0012` to `0012_...` even when `0012A_...` precedes it in ASCII order, and resolves shortened `<PREFIX>_Z1.pdf` citations.
+  - `test_datasheet_with_border_boilerplate_triggers_and_injects_multimodal`: Unit test verifying that a `data_sheets` PDF with `> 500` chars of border text per page triggers `extract_pdf_multimodal_summary` and injects the multimodal block into `pages`.
+  - `test_multimodal_window_batching_for_multipage_pdf`: Unit test verifying `extract_pdf_multimodal_summary` slices `> 10`-page PDFs into 10-page windows and caches/concatenates each window.
+  - `test_merge_section_content_multi_table_and_mismatched_columns`: Unit test verifying `_merge_section_content` merges tables with differing column counts and preserves secondary `### ` sub-tables.
+  - `test_pbt_pdf_candidate_exact_code_prefix_never_matches_alpha_suffix`: `hypothesis` property test verifying that for any numeric drawing code `<N>` and alpha-suffixed sibling `<N><LETTER>`, querying `<N>` or `<N>_Z1.pdf` always resolves to `<N>_...` regardless of candidate list ordering.
+  - `test_pbt_merge_markdown_bodies_preserves_all_tables_across_column_variations`: `hypothesis` property test verifying that `merge_markdown_bodies` never loses table row keys when merging tables with extra/reordered columns or multiple sub-tables.
+- **Completion Criteria:** 100% `pytest` pass rate, previous eval artifacts backed up, updated ADK agent deployed to `agent_runtime` and `cloud_run`, and detached background evaluations launched for both `By-Equipment` and `By-PDF`.
+
 ---
 
 ## 8. Plan Progress Tracking & Living Spec Synchronization
 - All milestones, verification metrics, and test results will be continuously recorded under `specs/plan/`.
 - If any data model or interface evolves during implementation, this specification will be updated synchronously to prevent spec drift.
+
 
 
 

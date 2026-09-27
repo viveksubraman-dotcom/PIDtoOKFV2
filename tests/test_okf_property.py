@@ -402,3 +402,83 @@ def test_pbt_equipment_tag_base_id_preservation_invariant(
         tag, [distractor_src, own_src], bundle_root=Path("/nonexistent_bundle_dir_pbt")
     )
     assert _extract_equipment_base_id(resolved) == f"{prefix}-{num}"
+
+
+@given(
+    dwg_num=st.integers(min_value=1, max_value=9999),
+    alpha_suffix=st.sampled_from(["A", "B", "C", "D", "F", "L"]),
+    reverse_order=st.booleans(),
+)
+def test_pbt_pdf_candidate_exact_code_prefix_never_matches_alpha_suffix(
+    dwg_num, alpha_suffix, reverse_order
+):
+    """Invariant: For any numeric drawing code <N> and alpha-suffixed sibling <N><LETTER>, querying <N> or <N>_Z1.pdf always resolves to <N>_... regardless of candidate list ordering."""
+    from extracter_agent.tools.pdf_tools import _match_pdf_candidate
+
+    num_str = f"{dwg_num:04d}"
+    base_code = f"14780-8120-25-23-{num_str}"
+    alpha_code = f"14780-8120-25-23-{num_str}{alpha_suffix}"
+
+    c_base = {"file_name": f"{base_code}_PID_MAIN_LINE_Z1.pdf", "subfolder": "pid"}
+    c_alpha = {"file_name": f"{alpha_code}_PID_AUX_DRUM_Z1.pdf", "subfolder": "pid"}
+    candidates = [c_alpha, c_base] if not reverse_order else [c_base, c_alpha]
+
+    res_code = _match_pdf_candidate(base_code, "pid", candidates)
+    assert res_code is not None
+    assert res_code["file_name"] == c_base["file_name"]
+
+    res_short = _match_pdf_candidate(f"{base_code}_Z1.pdf", "pid", candidates)
+    assert res_short is not None
+    assert res_short["file_name"] == c_base["file_name"]
+
+
+@given(
+    keys_4col=st.lists(
+        st.from_regex(r"[A-Z]{2}-[0-9]{4}", fullmatch=True),
+        min_size=1,
+        max_size=4,
+        unique=True,
+    ),
+    keys_5col=st.lists(
+        st.from_regex(r"[A-Z]{2}-[0-9]{4}", fullmatch=True),
+        min_size=1,
+        max_size=4,
+        unique=True,
+    ),
+)
+def test_pbt_merge_markdown_bodies_preserves_all_tables_across_column_variations(
+    keys_4col, keys_5col
+):
+    """Invariant: merge_markdown_bodies never loses table row keys when merging tables with differing column counts or secondary ### sub-tables."""
+    from extracter_agent.okf.synthesizer import merge_markdown_bodies
+
+    rows_4 = "\n".join(f"| {k} | Service 1 | 0-10 bar | DWG-001 |" for k in keys_4col)
+    rows_5 = "\n".join(
+        f"| {k} | Transmitter | Service 2 | 0-20 bar | DWG-002 |" for k in keys_5col
+    )
+
+    md_a = (
+        "# Register\n\n"
+        "## Loops\n\n"
+        "| Tag | Service | Range | Source |\n"
+        "| --- | --- | --- | --- |\n"
+        f"{rows_4}\n\n"
+        "### Auxiliary Sub-Table\n\n"
+        "| AuxTag | Note |\n"
+        "| --- | --- |\n"
+        "| AUX-0001 | Retained |\n"
+    )
+    md_b = (
+        "# Register\n\n"
+        "## Loops\n\n"
+        "| Tag | Type | Service | Range | Source |\n"
+        "| --- | --- | --- | --- |\n"
+        f"{rows_5}\n"
+    )
+
+    merged = merge_markdown_bodies(md_a, md_b)
+    for k in set(keys_4col) | set(keys_5col):
+        assert f"| {k} |" in merged
+    assert "### Auxiliary Sub-Table" in merged
+    assert "| AUX-0001 | Retained |" in merged
+

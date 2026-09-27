@@ -769,3 +769,149 @@ def test_concept_id_specificity_prevents_prefix_and_shared_source_collision(tmp_
     )
 
 
+def test_pdf_resolution_boundary_and_shortened_citation():
+    """Verify _match_pdf_candidate resolves base drawing 0012 to 0012_... even when 0012A_... sorts first, and resolves shortened <PREFIX>_Z1.pdf citations."""
+    from extracter_agent.tools.pdf_tools import _match_pdf_candidate
+
+    # In ASCII order, '0012A_' ('A' = 65) comes BEFORE '0012_' ('_' = 95)
+    candidates = [
+        {
+            "file_name": "14780-8120-25-23-0012A_P&ID CDN UNIT DECOMPOSER FEED FLUSH DRUM_Z1.pdf",
+            "subfolder": "pid",
+        },
+        {
+            "file_name": "14780-8120-25-23-0012_P&ID CDN UNIT FLASH COLUMN BOTTOMS LINE_Z1.pdf",
+            "subfolder": "pid",
+        },
+    ]
+
+    # 1. Base code query '14780-8120-25-23-0012' must match 0012_, NOT 0012A_
+    m1 = _match_pdf_candidate("14780-8120-25-23-0012", "pid", candidates)
+    assert m1 is not None
+    assert m1["file_name"].startswith("14780-8120-25-23-0012_")
+
+    # 2. Shortened citation '14780-8120-25-23-0012_Z1.pdf' (omitting middle title words) must match 0012_
+    m2 = _match_pdf_candidate("14780-8120-25-23-0012_Z1.pdf", "pid", candidates)
+    assert m2 is not None
+    assert m2["file_name"].startswith("14780-8120-25-23-0012_")
+
+    # 3. Short drawing number '0012' must match 0012_, while '0012A' must match 0012A_
+    m3 = _match_pdf_candidate("0012", "pid", candidates)
+    assert m3 is not None
+    assert m3["file_name"].startswith("14780-8120-25-23-0012_")
+
+    m4 = _match_pdf_candidate("0012A", "pid", candidates)
+    assert m4 is not None
+    assert m4["file_name"].startswith("14780-8120-25-23-0012A_")
+
+
+def test_datasheet_with_border_boilerplate_triggers_and_injects_multimodal(monkeypatch, tmp_path):
+    """Verify a data_sheets PDF whose pages have >500 chars of border text still triggers multimodal vision and injects it into pages."""
+    from extracter_agent.tools import pdf_tools
+
+    dummy_pdf = tmp_path / "data_sheets" / "PS-D9999_VESSEL_DATASHEET.pdf"
+    dummy_pdf.parent.mkdir(parents=True)
+    dummy_pdf.write_bytes(b"%PDF-1.4 dummy")
+
+    border_boilerplate = "UOP CONFIDENTIAL BORDER HEADER FORM QUA-04-5 " * 20  # > 800 chars
+    monkeypatch.setattr(
+        pdf_tools,
+        "get_pdf_metadata",
+        lambda p: {"file_name": p.name, "file_size_bytes": 100, "page_count": 2},
+    )
+    monkeypatch.setattr(
+        pdf_tools,
+        "extract_pdf_pages",
+        lambda p: [
+            {"page_number": 1, "text": border_boilerplate, "char_count": len(border_boilerplate), "word_count": 120},
+            {"page_number": 2, "text": border_boilerplate, "char_count": len(border_boilerplate), "word_count": 120},
+        ],
+    )
+    monkeypatch.setattr(pdf_tools, "is_vector_drawing", lambda p: False)
+    monkeypatch.setattr(
+        pdf_tools,
+        "extract_pdf_multimodal_summary",
+        lambda p, prompt_hint=None: "Extracted Raster Sketch Loops: NT-99-2001, LI-9909, WT-99-2001",
+    )
+
+    res = pdf_tools.process_raw_pdf_tool(
+        pdf_filename=str(dummy_pdf),
+        subfolder="data_sheets",
+        enable_multimodal=True,
+    )
+    assert res["status"] == "success"
+    assert res["pages_processed"] == 2
+    assert res["multimodal_analysis"] is not None
+    assert "NT-99-2001" in res["multimodal_analysis"]
+    assert any("NT-99-2001" in p["text"] for p in res["pages"])
+
+
+def test_multimodal_window_batching_for_multipage_pdf(monkeypatch, tmp_path):
+    """Verify extract_pdf_multimodal_summary slices >10-page PDFs into 10-page windows and concatenates all window extractions."""
+    import pypdf
+
+    from extracter_agent.pdf import processor
+
+    # Create a valid 15-page PDF using pypdf.PdfWriter
+    pdf_path = tmp_path / "PS-X9901_PACKAGE_15PAGES.pdf"
+    writer = pypdf.PdfWriter()
+    for _ in range(15):
+        writer.add_blank_page(width=612, height=792)
+    with open(pdf_path, "wb") as f:
+        writer.write(f)
+
+    called_windows: list[str] = []
+
+    def fake_single_window(pdf_bytes: bytes, cache_key_name: str, prompt_hint: str | None = None) -> str:
+        called_windows.append(cache_key_name)
+        return f"Extracted content for {cache_key_name}"
+
+    monkeypatch.setattr(processor, "_extract_single_pdf_window_multimodal", fake_single_window)
+
+    summary = processor.extract_pdf_multimodal_summary(pdf_path, window_size=10)
+    assert len(called_windows) == 2
+    assert called_windows[0].endswith("_p1-10")
+    assert called_windows[1].endswith("_p11-15")
+    assert "Pages 1–10 of 15" in summary
+    assert "Pages 11–15 of 15" in summary
+
+
+def test_merge_section_content_multi_table_and_mismatched_columns():
+    """Verify _merge_section_content aligns mismatched column counts and preserves secondary ### sub-tables."""
+    from extracter_agent.okf.synthesizer import merge_markdown_bodies
+
+    old_md = (
+        "# Package Instrument Summary\n\n"
+        "## Instrumentation & Control Loops\n\n"
+        "### Primary Package Loops\n\n"
+        "| Tag | Service | Range | Source |\n"
+        "| --- | --- | --- | --- |\n"
+        "| PT-1001 | Suction Pressure | 0-760 mmHgA | DWG-001 |\n\n"
+        "### Seal Water Pump P-9916A/B Local Gauges\n\n"
+        "| Tag | Service | Location | Source |\n"
+        "| --- | --- | --- | --- |\n"
+        "| LG-9910 | Seal Pot Level | P-9916A | PS-X9901 |\n"
+    )
+
+    # New PDF has a 5-column table for Primary Package Loops (adding 'Type' column) and omits the secondary ### table
+    new_md = (
+        "# Package Instrument Summary\n\n"
+        "## Instrumentation & Control Loops\n\n"
+        "### Primary Package Loops\n\n"
+        "| Tag | Type | Service | Range | Source |\n"
+        "| --- | --- | --- | --- |\n"
+        "| TI-1002 | RTD | Discharge Temp | 0-150 °C | DWG-002 |\n"
+    )
+
+    merged = merge_markdown_bodies(old_md, new_md)
+    # 1. Both PT-1001 (from 4-col table) and TI-1002 (from 5-col table) must be in the merged Primary table
+    assert "PT-1001" in merged
+    assert "0-760 mmHgA" in merged
+    assert "TI-1002" in merged
+    assert "0-150 °C" in merged
+    # 2. The secondary ### sub-table for P-9916A/B must also be preserved
+    assert "### Seal Water Pump P-9916A/B Local Gauges" in merged
+    assert "LG-9910" in merged
+
+
+

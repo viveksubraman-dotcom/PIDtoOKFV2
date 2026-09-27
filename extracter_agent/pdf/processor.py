@@ -223,20 +223,12 @@ def extract_pdf_multimodal_part(file_path: Path | str) -> Any:
     return types.Part.from_bytes(data=pdf_bytes, mime_type="application/pdf")
 
 
-def extract_pdf_multimodal_summary(
-    file_path: Path | str,
+def _extract_single_pdf_window_multimodal(
+    pdf_bytes: bytes,
+    cache_key_name: str,
     prompt_hint: str | None = None,
 ) -> str:
-    """Extract chemical engineering technical content using Gemini multimodal vision.
-
-    Invoked when a document is a vector drawing (P&ID, PFD) lacking font text streams,
-    or contains scanned raster data tables. Includes a deterministic SHA-256 local and
-    GCS cache so repeated tool calls on the same engineering PDF return in < 50ms.
-    """
-    path = Path(file_path)
-    if not path.exists():
-        raise PDFProcessingError(f"PDF file does not exist: {path}")
-
+    """Run or fetch cached Gemini multimodal extraction for a single PDF or page-window byte stream."""
     import hashlib
     import tempfile
     import time
@@ -247,11 +239,10 @@ def extract_pdf_multimodal_summary(
     from extracter_agent.config import get_config
 
     cfg = get_config()
-    pdf_bytes = path.read_bytes()
     pdf_sha = hashlib.sha256(pdf_bytes).hexdigest()[:24]
-    cache_dir = Path(tempfile.gettempdir()) / "extracter_multimodal_cache"
+    cache_dir = Path(tempfile.gettempdir()) / "extracter_multimodal_cache_v2"
     cache_dir.mkdir(parents=True, exist_ok=True)
-    cache_file = cache_dir / f"{path.stem}_{pdf_sha}.md"
+    cache_file = cache_dir / f"{cache_key_name}_{pdf_sha}.md"
 
     if cache_file.exists() and cache_file.stat().st_size > 100:
         return cache_file.read_text(encoding="utf-8")
@@ -262,7 +253,7 @@ def extract_pdf_multimodal_summary(
 
             st_client = storage.Client(project=cfg.google_cloud_project)
             bucket = st_client.bucket(cfg.destination_gcs_bucket)
-            cache_blob = bucket.blob(f"cache/multimodal/{path.stem}_{pdf_sha}.md")
+            cache_blob = bucket.blob(f"cache/multimodal_v2/{cache_key_name}_{pdf_sha}.md")
             if cache_blob.exists():
                 cached_text = cache_blob.download_as_text(encoding="utf-8")
                 if len(cached_text) > 100:
@@ -295,14 +286,15 @@ def extract_pdf_multimodal_summary(
     part = types.Part.from_bytes(data=pdf_bytes, mime_type="application/pdf")
 
     base_prompt = (
-        "Extract all chemical engineering technical specifications from this engineering document:\n"
-        "- Equipment tag, equipment name/title, unit/section, and document number\n"
-        "- Mechanical dimensions (diameter, tangent length, boot ID/length, elevation), supports (saddles/skirt), vessel internals (distributors, partitions, vortex breakers)\n"
-        "- Design ratings (internal/external design pressure, design temperature, metallurgy, corrosion allowance)\n"
-        "  * CRITICAL OCR DECIMAL CHECK: Carefully inspect decimal points on Design Pressure and Operating Pressure. Cross-check the P&ID equipment banner/title block against the Process Data Sheet AS-BUILT table.\n"
-        "- Operating conditions (operating pressure, operating temperature, liquid levels NLL/LLL/VHL, specific gravity)\n"
-        "- Nozzles schedule (exact nozzle marks, sizes, ratings, services), stream connections, line tags, origins and destinations\n"
-        "- Complete instrumentation loops: NEVER collapse stacked or redundant P&ID instrument bubbles into a single tag; explicitly enumerate every sibling transmitter, controller, hand switch, and suffix\n"
+        "Extract all chemical engineering technical specifications and tables from this engineering document:\n"
+        "- Primary and auxiliary equipment tags (including package sub-components, seal pots, pumps, chillers, scrubbers, filters, and spare suffixes), equipment titles, unit/section, and document numbers\n"
+        "- Mechanical dimensions (diameter, tangent length, boot ID/length, filter element dimensions, elevation), supports (saddles/skirt), vessel internals (distributors, partitions, vortex breakers, demisters)\n"
+        "- Design ratings (internal/external design pressure, design temperature, metallurgy, corrosion allowance, motor/driver kW, heat duty MM kcal/hr)\n"
+        "  * CRITICAL OCR DECIMAL CHECK: Carefully inspect decimal points on Design Pressure, Operating Pressure, Orifice Areas, and Capacities. Cross-check the P&ID equipment banner/title block against the Process Data Sheet AS-BUILT table.\n"
+        "- Operating conditions (operating pressure, operating temperature, flow rates, liquid levels NLL/LLL/VHL, specific gravity, viscosity, process stream compositions wt%)\n"
+        "- Nozzles schedule (exact nozzle marks, sizes, ratings, facings, services), stream connections, EVERY piping line number (<size>\"-<fluid>-<unit>-<number>-<class>), origins and destinations\n"
+        "- Complete instrumentation loops: NEVER collapse stacked or redundant P&ID instrument bubbles or multi-sheet register tables into a single tag; explicitly enumerate every transmitter, gauge, switch, analyzer, control valve, PSV, controller, and suffix\n"
+        "- Exhaustively transcribe all rows and numerical values from embedded raster tables, mechanical sketches, relief valve sizing tables, analyzer stream tables, and appendix tables\n"
         "- Safety Instrumented Systems (SIS/ESD valves, unit interlocks, trip actions, alarms, PSVs and setpoints)\n"
         "- Engineering notes, minimum static elevation head notes, standard references, and cross-document conflict notes."
     )
@@ -310,11 +302,16 @@ def extract_pdf_multimodal_summary(
         base_prompt = f"{base_prompt}\nFocus especially on: {prompt_hint}"
 
     last_err: Exception | None = None
+    gen_cfg = types.GenerateContentConfig(
+        max_output_tokens=65536,
+        temperature=0.0,
+    )
     for attempt in range(3):
         try:
             resp = client.models.generate_content(
                 model=cfg.gemini_model,
                 contents=[part, base_prompt],
+                config=gen_cfg,
             )
             text_out = resp.text or ""
             if len(text_out) > 100:
@@ -326,7 +323,7 @@ def extract_pdf_multimodal_summary(
                         st_client = storage.Client(project=cfg.google_cloud_project)
                         bucket = st_client.bucket(cfg.destination_gcs_bucket)
                         bucket.blob(
-                            f"cache/multimodal/{path.stem}_{pdf_sha}.md"
+                            f"cache/multimodal_v2/{cache_key_name}_{pdf_sha}.md"
                         ).upload_from_string(text_out, content_type="text/markdown")
                 except Exception as exc:
                     logging.getLogger(__name__).debug("Ignored non-fatal exception: %s", exc)
@@ -336,5 +333,104 @@ def extract_pdf_multimodal_summary(
             if attempt < 2:
                 time.sleep(2.0 * (2**attempt))
     return f"[Multimodal extraction error: {last_err}]"
+
+
+def extract_pdf_multimodal_summary(
+    file_path: Path | str,
+    prompt_hint: str | None = None,
+    window_size: int = 8,
+) -> str:
+    """Extract chemical engineering technical content using Gemini multimodal vision.
+
+    Eliminates the single-call multimodal output bottleneck on multi-sheet packages:
+    - For single-sheet or <= window_size PDFs, executes a single cached call keyed by full-PDF SHA-256.
+    - For multi-sheet PDFs (> window_size pages, up to 150 pages including 18-136 page instrument/valve
+      packages and 60-65 page engineering standards), slices all pages into window_size page batches via
+      pypdf.PdfWriter, executes windows concurrently (up to 4 parallel workers) with max_output_tokens=65536,
+      and caches each window deterministically under extracter_multimodal_cache_v2 / cache/multimodal_v2/.
+    """
+    import io
+    from concurrent.futures import ThreadPoolExecutor
+
+    path = Path(file_path)
+    if not path.exists():
+        raise PDFProcessingError(f"PDF file does not exist: {path}")
+
+    pdf_bytes = path.read_bytes()
+    effective_window = max(1, window_size)
+
+    try:
+        reader = pypdf.PdfReader(io.BytesIO(pdf_bytes))
+        total_pages = len(reader.pages)
+    except Exception:
+        total_pages = 1
+        reader = None
+
+    if reader is None or total_pages <= effective_window:
+        return _extract_single_pdf_window_multimodal(
+            pdf_bytes=pdf_bytes,
+            cache_key_name=path.stem,
+            prompt_hint=prompt_hint,
+        )
+
+    # Multi-sheet PDF (> window_size pages): build page windows across all sheets up to 150 pages
+    if total_pages <= 150:
+        target_indices = list(range(total_pages))
+    else:
+        # For 300+ page prose operating manuals, extract TOC + low-text/diagram pages
+        target_indices = list(range(min(effective_window * 2, total_pages)))
+        for idx in range(effective_window * 2, total_pages):
+            try:
+                txt_len = len((reader.pages[idx].extract_text() or "").strip())
+            except Exception:
+                txt_len = 0
+            if txt_len < 1300:
+                target_indices.append(idx)
+        target_indices = target_indices[: effective_window * 8]
+
+    windows: list[list[int]] = [
+        target_indices[i : i + effective_window]
+        for i in range(0, len(target_indices), effective_window)
+    ]
+
+    prepared_windows: list[tuple[int, int, bytes, str]] = []
+    for win_indices in windows:
+        start_p = win_indices[0] + 1
+        end_p = win_indices[-1] + 1
+        try:
+            writer = pypdf.PdfWriter()
+            for p_idx in win_indices:
+                writer.add_page(reader.pages[p_idx])
+            buf = io.BytesIO()
+            writer.write(buf)
+            win_bytes = buf.getvalue()
+        except Exception:
+            win_bytes = pdf_bytes
+
+        win_hint = (
+            f"{prompt_hint} (Pages {start_p}-{end_p} of {total_pages}: exhaustively transcribe every sheet, table row, tag, and numerical value in this page window without summarizing)"
+            if prompt_hint
+            else f"Exhaustively transcribe all tables, instrument tags, nozzles, and specifications on pages {start_p}-{end_p} of {total_pages} without summarizing"
+        )
+        prepared_windows.append((start_p, end_p, win_bytes, win_hint))
+
+    def _run_window(item: tuple[int, int, bytes, str]) -> str:
+        s_p, e_p, w_bytes, w_hint = item
+        w_text = _extract_single_pdf_window_multimodal(
+            pdf_bytes=w_bytes,
+            cache_key_name=f"{path.stem}_p{s_p}-{e_p}",
+            prompt_hint=w_hint,
+        )
+        return f"### [Pages {s_p}–{e_p} of {total_pages}]\n{w_text}"
+
+    if len(prepared_windows) == 1:
+        window_outputs = [_run_window(prepared_windows[0])]
+    else:
+        with ThreadPoolExecutor(max_workers=min(4, len(prepared_windows))) as pool:
+            window_outputs = list(pool.map(_run_window, prepared_windows))
+
+    return "\n\n".join(window_outputs)
+
+
 
 
