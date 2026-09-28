@@ -35,7 +35,7 @@ BRAIN_STANDALONE_HTML = Path(
 
 
 def test_root_and_demo_serve_mining_m3_cockpit() -> None:
-    """Verify `/` and `/demo` return HTTP 200 with Mining M3 Light Cockpit HTML."""
+    """Verify `/` and `/demo` return HTTP 200 with 4-Screen Mining M3 Light Cockpit HTML."""
     for path in ("/", "/demo"):
         resp = CLIENT.get(path)
         assert resp.status_code == 200
@@ -44,9 +44,10 @@ def test_root_and_demo_serve_mining_m3_cockpit() -> None:
         assert "OKF v0.2" in html
         assert 'id="pane-macro"' in html
         assert 'id="pane-schematic"' in html
-        assert 'id="pane-personas"' in html
         assert 'id="pane-ecosystem"' in html
         assert 'id="pane-architecture"' in html
+        assert "SCREEN 01 / 04" in html
+        assert "SCREEN 04 / 04" in html
 
 
 def test_architecture_diagram_route_serves_m3_light_svg() -> None:
@@ -351,7 +352,7 @@ def test_mining_m3_light_css_tokens_and_zero_dark_workspace() -> None:
 
 
 def test_mining_m3_light_html_structure_and_progressive_disclosure() -> None:
-    """Verify `index.html` and standalone artifact contain all 5 tabs and UX components."""
+    """Verify `index.html` and standalone artifact contain strictly 4 visual screens and UX components."""
     html_files = [
         REPO_ROOT / "extracter_agent" / "static" / "index.html",
         BRAIN_STANDALONE_HTML,
@@ -359,27 +360,34 @@ def test_mining_m3_light_html_structure_and_progressive_disclosure() -> None:
     required_ids_and_classes = [
         'id="pane-macro"',
         'id="pane-schematic"',
-        'id="pane-personas"',
         'id="pane-ecosystem"',
         'id="pane-architecture"',
         'data-tab="macro"',
         'data-tab="schematic"',
-        'data-tab="personas"',
         'data-tab="ecosystem"',
         'data-tab="architecture"',
+        "SCREEN 01 / 04",
+        "SCREEN 02 / 04",
+        "SCREEN 03 / 04",
+        "SCREEN 04 / 04",
+        'id="s1-visual-blueprint-svg"',
+        'id="schematic-particle-canvas"',
         'id="radial-risk-gauge"',
+        'id="wb-pipeline-dag-svg"',
+        'id="datagraph-svg"',
+        'id="arch-visual-blueprint-svg"',
         'id="btn-prev-span"',
         'id="btn-next-span"',
         'id="dispatch-toast"',
         'role="status"',
         'aria-live="polite"',
-        'class="node-drawer-overlay"',
         'id="schematic-inspector-drawer"',
-        'id="datagraph-svg"',
         'id="datagraph-detail"',
+        "tech-spec-drawer",
+        "storyline-footer",
         "card-safety-barrier",
         "gee-band-table",
-        "Agents = f(Physical Discrepancy)",
+        "AGENTS = f(PHYSICAL DISCREPANCY)",
     ]
 
     forbidden_strings = [
@@ -398,6 +406,20 @@ def test_mining_m3_light_html_structure_and_progressive_disclosure() -> None:
             assert req in content, f"Missing '{req}' in {fpath.name}"
         for bad in forbidden_strings:
             assert bad not in content, f"Forbidden string '{bad}' found in {fpath.name}"
+
+
+def test_embedded_build_verification_harness() -> None:
+    """Verify the 5-Group Build-Time Verification Harness passes 100% (CSS coverage, DOM ID parity, SVG safety)."""
+    from scripts.build_demo_assets import run_build_verification_harness
+
+    html = (REPO_ROOT / "extracter_agent" / "static" / "index.html").read_text(encoding="utf-8")
+    css = (REPO_ROOT / "extracter_agent" / "static" / "app.css").read_text(encoding="utf-8")
+    js = (REPO_ROOT / "extracter_agent" / "static" / "app.js").read_text(encoding="utf-8")
+
+    stats = run_build_verification_harness(html, css, js)
+    assert stats["screen_count"] == 4
+    assert stats["total_checks"] >= 50
+    assert stats["svg_blocks"] >= 5
 
 
 def test_embedded_demo_data_completeness() -> None:

@@ -912,6 +912,155 @@ def build_static_data() -> dict[str, Any]:
     }
 
 
+def _replace_once(src: str, old: str, new: str, label: str) -> str:
+    cnt = src.count(old)
+    assert cnt == 1, f"replace_once({label}) expected 1 occurrence, found {cnt}"
+    return src.replace(old, new, 1)
+
+
+def run_build_verification_harness(html: str, css: str, js: str) -> dict[str, int]:
+    """Runs the 5-Group Build-Time Verification Harness on the compiled 4-Screen Cockpit."""
+    checks_run = 0
+
+    def _check(cond: bool, msg: str) -> None:
+        nonlocal checks_run
+        checks_run += 1
+        if not cond:
+            raise AssertionError(f"[BUILD HARNESS FAIL #{checks_run}] {msg}")
+
+    # -------------------------------------------------------------------------
+    # Group A: Design Token Lock & Colour Discipline
+    # -------------------------------------------------------------------------
+    required_tokens = [
+        "--m3-canvas: #F8F9FA",
+        "--m3-surface: #FFFFFF",
+        "--m3-primary: #1A73E8",
+        "--m3-border: #DADCE0",
+        "--m3-critical: #D93025",
+        "--m3-success: #1E8E3E",
+        "--sp-1: 8px",
+        "--sp-2: 16px",
+        "--sp-3: 24px",
+        "--sp-4: 32px",
+        "--sp-5: 40px",
+        "Playfair Display",
+        "Plus Jakarta Sans",
+        "Inter",
+        "Roboto Mono",
+        "scroll-padding-top: 130px",
+        "max-width: 1540px",
+        "scroll-margin-top: 130px",
+    ]
+    for tok in required_tokens:
+        _check(tok in css, f"Missing required CSS design token: {tok}")
+
+    forbidden_strings = [
+        "#131313",
+        "#0d1520",
+        "🛰️",
+        "🎯",
+        "📐",
+        "🚀",
+        "L6 PM",
+        "L7 PM",
+        "RED-TEAM CRITIC",
+        "GEE-BUG",
+        "SCADA JOIN",
+    ]
+    combined = html + "\n" + css + "\n" + js
+    for fb in forbidden_strings:
+        _check(fb not in combined, f"Forbidden string/token detected: {fb}")
+
+    # -------------------------------------------------------------------------
+    # Group B: Automated CSS Class-Coverage Audit
+    # -------------------------------------------------------------------------
+    defined_classes = set(re.findall(r"\.([a-zA-Z_][a-zA-Z0-9_-]*)", css))
+    html_class_attrs = re.findall(r'class="([^"\'\n]+)"', html)
+    js_class_attrs = re.findall(r'class="([^"\'\n]+)"', js)
+    used_classes: set[str] = set()
+    for attr in html_class_attrs + js_class_attrs:
+        for token in attr.split():
+            clean_tok = token.strip()
+            if re.match(r"^[a-zA-Z_][a-zA-Z0-9_-]*$", clean_tok):
+                used_classes.add(clean_tok)
+    missing_classes = sorted(used_classes - defined_classes)
+    _check(
+        len(missing_classes) == 0,
+        f"Undefined CSS classes used in HTML/JS: {missing_classes}",
+    )
+
+    # -------------------------------------------------------------------------
+    # Group C: DOM ID Parity Audit (app.js -> index.html + dynamic templates)
+    # -------------------------------------------------------------------------
+    html_ids = set(re.findall(r'id="([a-zA-Z0-9_-]+)"', html + "\n" + js))
+    js_Static_ids = set(re.findall(r'getElementById\("([a-zA-Z0-9_-]+)"\)', js))
+    missing_ids = sorted(js_Static_ids - html_ids)
+    _check(
+        len(missing_ids) == 0,
+        f"DOM IDs queried in app.js but missing in index.html/templates: {missing_ids}",
+    )
+
+    # -------------------------------------------------------------------------
+    # Group D: JS Bracket Integrity & SVG Tag Safety
+    # -------------------------------------------------------------------------
+    _check(js.count("(") == js.count(")"), "Unbalanced parentheses () in app.js")
+    _check(js.count("[") == js.count("]"), "Unbalanced brackets [] in app.js")
+    _check(js.count("{") == js.count("}"), "Unbalanced braces {} in app.js")
+
+    svg_blocks = re.findall(r"<svg[\s\S]*?</svg>", html)
+    _check(len(svg_blocks) >= 5, f"Expected >= 5 SVG blocks in index.html, found {len(svg_blocks)}")
+    for idx, svg_block in enumerate(svg_blocks):
+        _check(
+            "<sub" not in svg_block and "<sup" not in svg_block,
+            f"Forbidden HTML <sub>/<sup> inside <svg> block #{idx + 1}",
+        )
+
+    # -------------------------------------------------------------------------
+    # Group E: 4-Screen Visual-First Structure Lock
+    # -------------------------------------------------------------------------
+    screen_panes = re.findall(r'<div id="pane-([a-z]+)" class="screen-pane', html)
+    _check(
+        screen_panes == ["macro", "schematic", "ecosystem", "architecture"],
+        f"Expected strictly 4 screens ['macro', 'schematic', 'ecosystem', 'architecture'], found {screen_panes}",
+    )
+    nav_tabs = re.findall(r'id="tab-([a-z]+)"', html)
+    _check(
+        nav_tabs == ["macro", "schematic", "ecosystem", "architecture"],
+        f"Expected strictly 4 header nav tabs, found {nav_tabs}",
+    )
+    for screen_num in ("SCREEN 01 / 04", "SCREEN 02 / 04", "SCREEN 03 / 04", "SCREEN 04 / 04"):
+        _check(screen_num in html, f"Missing screen badge {screen_num}")
+
+    required_visual_ids = [
+        "s1-visual-blueprint-svg",
+        "schematic-particle-canvas",
+        "radial-risk-gauge",
+        "wb-pipeline-dag-svg",
+        "datagraph-svg",
+        "arch-visual-blueprint-svg",
+    ]
+    for vid in required_visual_ids:
+        _check(vid in html_ids, f"Missing required visual stage ID: {vid}")
+
+    _check(
+        html.count('class="tech-spec-drawer"') == 4,
+        "Expected 1 collapsible .tech-spec-drawer on each of the 4 screens",
+    )
+    _check(
+        html.count('class="storyline-footer"') == 4,
+        "Expected 1 .storyline-footer takeaway bar on each of the 4 screens",
+    )
+
+    return {
+        "total_checks": checks_run,
+        "defined_css_classes": len(defined_classes),
+        "verified_used_classes": len(used_classes),
+        "verified_dom_ids": len(js_Static_ids),
+        "svg_blocks": len(svg_blocks),
+        "screen_count": len(screen_panes),
+    }
+
+
 def main() -> None:
     STATIC_DIR.mkdir(parents=True, exist_ok=True)
     data = build_static_data()
@@ -927,22 +1076,36 @@ def main() -> None:
     index_path = STATIC_DIR / "index.html"
     css_path = STATIC_DIR / "app.css"
     js_path = STATIC_DIR / "app.js"
-    if index_path.exists() and css_path.exists() and js_path.exists():
-        html = index_path.read_text(encoding="utf-8")
-        css = css_path.read_text(encoding="utf-8")
-        js = js_path.read_text(encoding="utf-8")
-        standalone = html.replace(
-            '<link rel="stylesheet" href="/static/app.css">',
-            f"<style>\n{css}\n</style>",
-        )
-        standalone = standalone.replace(
-            '<script src="/static/data.js"></script>\n<script src="/static/app.js"></script>',
-            f"<script>\n{data_js_content}\n</script>\n<script>\n{js}\n</script>",
-        )
-        BRAIN_ARTIFACT.parent.mkdir(parents=True, exist_ok=True)
-        BRAIN_ARTIFACT.write_text(standalone, encoding="utf-8")
-        print(f"Wrote standalone HTML artifact: {BRAIN_ARTIFACT} ({len(standalone):,} bytes)")
+    html = index_path.read_text(encoding="utf-8")
+    css = css_path.read_text(encoding="utf-8")
+    js = js_path.read_text(encoding="utf-8")
+
+    harness_stats = run_build_verification_harness(html, css, js)
+    print(
+        f"[BUILD HARNESS PASS] {harness_stats['total_checks']}/{harness_stats['total_checks']} checks | "
+        f"{harness_stats['screen_count']} screens | "
+        f"{harness_stats['verified_used_classes']}/{harness_stats['defined_css_classes']} CSS classes verified | "
+        f"{harness_stats['verified_dom_ids']} DOM IDs verified | "
+        f"{harness_stats['svg_blocks']} SVG blocks verified"
+    )
+
+    standalone = _replace_once(
+        html,
+        '<link rel="stylesheet" href="/static/app.css">',
+        "<style>\n" + css + "\n</style>",
+        "inline_css",
+    )
+    standalone = _replace_once(
+        standalone,
+        '<script src="/static/data.js"></script>\n<script src="/static/app.js"></script>',
+        "<script>\n" + data_js_content + "\n</script>\n<script>\n" + js + "\n</script>",
+        "inline_js",
+    )
+    BRAIN_ARTIFACT.parent.mkdir(parents=True, exist_ok=True)
+    BRAIN_ARTIFACT.write_text(standalone, encoding="utf-8")
+    print(f"Wrote standalone HTML artifact: {BRAIN_ARTIFACT} ({len(standalone):,} bytes)")
 
 
 if __name__ == "__main__":
     main()
+

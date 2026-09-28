@@ -126,36 +126,57 @@ def run_all_checks(cloud_run_url: str | None = None) -> UATRunner:
     )
 
     # ==========================================================================
-    # Tier 2: 5-Tab Cockpit DOM & Progressive Disclosure Hierarchy
+    # Tier 2: 4-Screen Visual-First Cockpit DOM & Build Verification Harness
     # ==========================================================================
+    from scripts.build_demo_assets import run_build_verification_harness
+
+    js_text = (REPO_ROOT / "extracter_agent" / "static" / "app.js").read_text(
+        encoding="utf-8"
+    )
+    harness_stats = run_build_verification_harness(index_html, css_text, js_text)
+    runner.check(
+        "Tier 2: Build Harness",
+        "Embedded 5-Group Build Verification Harness passes 100%",
+        harness_stats["screen_count"] == 4 and harness_stats["total_checks"] >= 50,
+        json.dumps(harness_stats),
+    )
+
     dom_markers = [
-        ('id="pane-macro"', "Screen 1 #macro pane"),
-        ('id="pane-schematic"', "Screen 2 #schematic pane"),
-        ('id="pane-personas"', "Screen 3 #personas pane"),
-        ('id="pane-ecosystem"', "Screen 4 #ecosystem pane"),
-        ('id="pane-architecture"', "Screen 5 #architecture pane"),
+        ('id="pane-macro"', "Screen 01 #macro pane"),
+        ('id="pane-schematic"', "Screen 02 #schematic pane"),
+        ('id="pane-ecosystem"', "Screen 03 #ecosystem unified Persona+Workbench pane"),
+        ('id="pane-architecture"', "Screen 04 #architecture OKF Graph+Cloud pane"),
         ('data-tab="macro"', "Header tab data-tab=macro"),
         ('data-tab="schematic"', "Header tab data-tab=schematic"),
-        ('data-tab="personas"', "Header tab data-tab=personas"),
         ('data-tab="ecosystem"', "Header tab data-tab=ecosystem"),
         ('data-tab="architecture"', "Header tab data-tab=architecture"),
-        ('id="s1-benchmark-bars"', "Screen 1 3-way benchmark bar container"),
-        ('id="s1-headwinds"', "Screen 1 structural headwinds grid"),
-        ('id="s1-levers"', "Screen 1 lever exhaustion matrix"),
-        ('id="s1-outcomes"', "Screen 1 executive outcomes strip"),
-        ('id="schematic-particle-canvas"', "Screen 2 HTML5 particle canvas"),
-        ('id="btn-prev-span"', "Screen 2 Prev Node stepper button"),
-        ('id="btn-next-span"', "Screen 2 Next Node stepper button"),
-        ('id="radial-risk-gauge"', "Screen 2 SVG radial risk gauge"),
-        ('class="node-drawer-overlay"', "Screen 2 slide-out node inspector drawer"),
-        ('id="persona-tabs"', "Screen 3 persona navigation strip"),
-        ('id="wb-concept-select"', "Screen 4 OKF concept selector"),
-        ('id="wb-pdf-select"', "Screen 4 raw PDF selector"),
-        ('id="btn-wb-run-live"', "Screen 4 Live Extraction trigger button"),
-        ('id="datagraph-svg"', "Screen 5 SVG knowledge graph canvas"),
-        ('id="datagraph-detail"', "Screen 5 knowledge graph detail inspector"),
+        ("SCREEN 01 / 04", "Screen 01 / 04 badge"),
+        ("SCREEN 02 / 04", "Screen 02 / 04 badge"),
+        ("SCREEN 03 / 04", "Screen 03 / 04 badge"),
+        ("SCREEN 04 / 04", "Screen 04 / 04 badge"),
+        ('id="s1-visual-blueprint-svg"', "Screen 01 interactive transformation & inversion SVG"),
+        ('id="s1-benchmark-bars"', "Screen 01 3-way benchmark bar container"),
+        ('id="s1-headwinds"', "Screen 01 structural headwinds grid"),
+        ('id="s1-levers"', "Screen 01 lever exhaustion matrix"),
+        ('id="s1-outcomes"', "Screen 01 executive outcomes strip"),
+        ('id="schematic-particle-canvas"', "Screen 02 HTML5 particle canvas"),
+        ('id="schematic-node-pills"', "Screen 02 12-node quick-jump pill strip"),
+        ('id="btn-prev-span"', "Screen 02 Prev Node stepper button"),
+        ('id="btn-next-span"', "Screen 02 Next Node stepper button"),
+        ('id="radial-risk-gauge"', "Screen 02 SVG radial risk gauge"),
+        ('id="schematic-inspector-drawer"', "Screen 02 docked 3-block node inspector"),
+        ('id="persona-tabs"', "Screen 03 unified persona navigation strip"),
+        ('id="wb-pipeline-dag-svg"', "Screen 03 interactive 6-step ADK pipeline DAG SVG"),
+        ('id="wb-concept-select"', "Screen 03 OKF concept selector"),
+        ('id="wb-pdf-select"', "Screen 03 raw PDF selector"),
+        ('id="btn-wb-run-live"', "Screen 03 Live Extraction trigger button"),
+        ('id="datagraph-svg"', "Screen 04 SVG knowledge graph canvas"),
+        ('id="datagraph-detail"', "Screen 04 knowledge graph detail inspector"),
+        ('id="arch-visual-blueprint-svg"', "Screen 04 7-layer cloud architecture SVG"),
+        ('class="tech-spec-drawer"', "Collapsible secondary prose/spec accordion"),
+        ('class="storyline-footer"', "Storyline SO WHAT takeaway footer bar"),
         ('id="dispatch-toast"', "Live ARIA polite status toast"),
-        ("Agents = f(Physical Discrepancy)", "Formulaic agent derivation principle"),
+        ("AGENTS = f(PHYSICAL DISCREPANCY)", "Formulaic agent derivation principle"),
     ]
     for marker, desc in dom_markers:
         runner.check(

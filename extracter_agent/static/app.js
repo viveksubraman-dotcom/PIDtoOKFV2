@@ -1,6 +1,7 @@
 /* =============================================================================
    P&ID-to-OKF v0.2 Autonomous Compiler — Interactive Controller (app.js)
-   Mining M3 Light Executive Theme • Connected to Live FastAPI + ADK Backend
+   4-Screen Visual-First Mining M3 Light Executive Cockpit
+   Connected to Live FastAPI + ADK Backend (/api/demo/* & /dev-ui/)
    ========================================================================== */
 (function () {
   "use strict";
@@ -21,7 +22,13 @@
     graph: { nodes: [], edges: [] }
   };
 
-  var TABS = ["macro", "schematic", "personas", "ecosystem", "architecture"];
+  var TABS = ["macro", "schematic", "ecosystem", "architecture"];
+  var PERSONA_FLAGSHIP_CONCEPTS = [
+    "equipment/D-2304",
+    "equipment/V-2301",
+    "instruments/sis-cdn",
+    "equipment/P-2302"
+  ];
   var currentTab = "macro";
   var currentNodeIndex = 4; // Default to D-2304 Decomposer Drum (Critical Conflict Node)
   var currentPersonaIndex = 0;
@@ -50,8 +57,19 @@
 
   /* ---------------------------------------------------------- Tab Navigation */
   function switchTab(tabId, updateHash) {
-    if (TABS.indexOf(tabId) === -1) tabId = "macro";
+    if (tabId === "personas") {
+      tabId = "ecosystem";
+    }
+    if (TABS.indexOf(tabId) === -1) {
+      tabId = "macro";
+    }
     currentTab = tabId;
+    var screenIdx = TABS.indexOf(tabId) + 1;
+    var stepIndicator = document.getElementById("screen-step-indicator");
+    if (stepIndicator) {
+      stepIndicator.textContent = "SCREEN 0" + screenIdx + " / 04";
+    }
+
     TABS.forEach(function (t) {
       var nav = document.getElementById("tab-" + t);
       var pane = document.getElementById("pane-" + t);
@@ -70,11 +88,12 @@
       } catch (e) {}
     }
     if (tabId === "schematic") {
-      setTimeout(drawSchematicCanvas, 50);
+      setTimeout(drawSchematicCanvas, 40);
     }
     if (tabId === "architecture") {
-      setTimeout(renderKnowledgeGraph, 50);
+      setTimeout(renderKnowledgeGraph, 40);
     }
+    window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
   /* ------------------------------------------------------- Screen 1: Macro */
@@ -143,7 +162,7 @@
             '<div class="lever-tag">' +
             escapeHtml(l.tag) +
             "</div>" +
-            '<div style="font-size:15px; font-weight:700; margin-bottom:8px;">' +
+            '<div style="font-size:12.5px; font-weight:700; margin-bottom:4px;">' +
             escapeHtml(l.title) +
             "</div>" +
             '<p class="lever-desc">' +
@@ -155,7 +174,7 @@
             (l.active ? "var(--m3-primary)" : "var(--m3-critical)") +
             ';"></span></div>' +
             '<div class="lever-status-row">' +
-            "<span>HEADROOM</span>" +
+            "<span>STATUS</span>" +
             '<span class="' +
             (l.active ? "status-active" : "status-exhausted") +
             '">' +
@@ -203,7 +222,7 @@
     var circumference = 2 * Math.PI * radius;
     var dash = (score / 100) * circumference;
     return (
-      '<svg id="radial-risk-gauge" width="68" height="68" viewBox="0 0 68 68" role="img" aria-label="Hazard and Conflict Risk Index ' +
+      '<svg id="radial-risk-gauge" width="56" height="56" viewBox="0 0 68 68" role="img" aria-label="Hazard and Conflict Risk Index ' +
       score +
       '%">' +
       '<circle cx="34" cy="34" r="' +
@@ -225,6 +244,41 @@
     );
   }
 
+  function renderSchematicNodePills() {
+    var pillStrip = document.getElementById("schematic-node-pills");
+    if (!pillStrip || !DATA.schematic_nodes.length) return;
+    pillStrip.innerHTML = DATA.schematic_nodes
+      .map(function (n, idx) {
+        var isCrit = n.health === "CRITICAL" || n.health === "WARNING";
+        var dotColor =
+          n.health === "CRITICAL"
+            ? "#D93025"
+            : n.health === "WARNING"
+            ? "#B06000"
+            : "#1E8E3E";
+        return (
+          '<button class="node-jump-pill ' +
+          (idx === currentNodeIndex ? "active " : "") +
+          (isCrit ? "pill-crit" : "") +
+          '" data-pill-node-idx="' +
+          idx +
+          '">' +
+          '<span style="width:6px;height:6px;border-radius:50%;background:' +
+          dotColor +
+          ';display:inline-block;"></span>' +
+          escapeHtml((idx + 1) + ". " + n.label) +
+          "</button>"
+        );
+      })
+      .join("");
+
+    pillStrip.querySelectorAll("[data-pill-node-idx]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        openSchematicNode(parseInt(btn.getAttribute("data-pill-node-idx"), 10), true);
+      });
+    });
+  }
+
   function openSchematicNode(idx, openDrawer) {
     if (!DATA.schematic_nodes.length) return;
     if (idx < 0) idx = DATA.schematic_nodes.length - 1;
@@ -237,6 +291,10 @@
         "node-active-selected",
         el.getAttribute("data-node") === node.id
       );
+    });
+
+    document.querySelectorAll("[data-pill-node-idx]").forEach(function (btn, i) {
+      btn.classList.toggle("active", i === idx);
     });
 
     var stepLabel = document.getElementById("span-stepper-counter");
@@ -270,7 +328,7 @@
     if (metricsEl) {
       metricsEl.innerHTML = node.metrics
         .map(function (m) {
-          var isCrit = m.k.indexOf("Conflict") !== -1 || m.v.indexOf("HOLD") !== -1;
+          var isCrit = m.k.indexOf("Conflict") !== -1 || m.v.indexOf("HOLD") !== -1 || m.v.indexOf("vs") !== -1;
           return (
             '<div class="drawer-keyval-row">' +
             '<span class="drawer-key">' +
@@ -377,16 +435,16 @@
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Draw Cartographic Compass Rose & 25m Process Scale Bar in bottom-right
+    // Draw Cartographic Compass Rose & 25m Process Scale Bar in bottom-left
     ctx.save();
     ctx.font = "700 10px 'Roboto Mono', monospace";
     ctx.fillStyle = "#5F6368";
-    ctx.fillText("N▲  PROCESS FLOW TOPOLOGY  |  SCALE: 25m ELEVATION", canvas.width - 340, canvas.height - 14);
+    ctx.fillText("N▲  PROCESS FLOW TOPOLOGY  |  SCALE: 25m ELEVATION", 18, canvas.height - 12);
     ctx.strokeStyle = "#1A73E8";
     ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.moveTo(canvas.width - 110, canvas.height - 26);
-    ctx.lineTo(canvas.width - 40, canvas.height - 26);
+    ctx.moveTo(350, canvas.height - 16);
+    ctx.lineTo(410, canvas.height - 16);
     ctx.stroke();
     ctx.restore();
 
@@ -446,8 +504,8 @@
     });
   }
 
-  /* ---------------------------------------------------- Screen 3: Personas */
-  function selectPersona(idx) {
+  /* ------------------------------------ Screen 3: Unified Persona + Workbench */
+  function selectPersona(idx, syncWorkbench) {
     if (!DATA.personas.length) return;
     currentPersonaIndex = idx;
     var p = DATA.personas[idx];
@@ -490,7 +548,7 @@
               '<div class="eco-agent-desc">' +
               escapeHtml(s.role) +
               "</div></div>" +
-              '<div class="eco-agent-footer"><span style="font-size:11px; color:var(--m3-primary); font-weight:700;">Inspect in Workbench &rsaquo;</span></div>' +
+              '<div class="eco-agent-footer"><span style="font-size:11px; color:var(--m3-primary); font-weight:700;">Inspect Contract &rsaquo;</span></div>' +
               "</div>"
             );
           })
@@ -499,10 +557,15 @@
 
       squadEl.querySelectorAll("[data-open-tool]").forEach(function (card) {
         card.addEventListener("click", function () {
-          switchTab("ecosystem", true);
           openAgentDeepDive(card.getAttribute("data-open-tool"));
         });
       });
+    }
+
+    if (syncWorkbench) {
+      var targetConcept = PERSONA_FLAGSHIP_CONCEPTS[idx] || "equipment/D-2304";
+      renderWorkbenchConcept(targetConcept);
+      showToast("Persona synced -> Loaded " + targetConcept + ".md");
     }
   }
 
@@ -517,6 +580,9 @@
           '" data-persona-idx="' +
           i +
           '" role="tab">' +
+          '<span class="badge badge-stable" style="padding:2px 6px;">' +
+          escapeHtml(p.initials) +
+          "</span>" +
           escapeHtml(p.name) +
           "</button>"
         );
@@ -525,14 +591,13 @@
 
     strip.querySelectorAll("[data-persona-idx]").forEach(function (btn) {
       btn.addEventListener("click", function () {
-        selectPersona(parseInt(btn.getAttribute("data-persona-idx"), 10));
+        selectPersona(parseInt(btn.getAttribute("data-persona-idx"), 10), true);
       });
     });
 
-    selectPersona(0);
+    selectPersona(0, false);
   }
 
-  /* ----------------------------------- Screen 4: Workbench & Agent DeepDive */
   function findConceptById(conceptId) {
     for (var i = 0; i < DATA.concepts.length; i++) {
       if (DATA.concepts[i].concept_id === conceptId) {
@@ -563,7 +628,6 @@
       selEl.value = c.concept_id;
     }
 
-    // Match first source PDF if present
     var matchedPdf = null;
     if (c.sources && c.sources.length) {
       matchedPdf = findPdfByPath(c.sources[0]);
@@ -656,7 +720,7 @@
             " &bull; " +
             escapeHtml(s.tool) +
             "</div>" +
-            '<div style="font-size:12px; color:var(--m3-text-secondary);">' +
+            '<div style="font-size:11.5px; color:var(--m3-text-secondary);">' +
             escapeHtml(s.detail) +
             "</div></div>" +
             '<span class="badge badge-optimal">OK</span>' +
@@ -710,7 +774,7 @@
         });
       } else {
         linksRow.innerHTML =
-          '<span style="font-size:11.5px; color:var(--m3-text-tertiary);">No outbound wiki cross-links</span>';
+          '<span style="font-size:11px; color:var(--m3-text-tertiary);">No outbound wiki cross-links</span>';
       }
     }
   }
@@ -755,7 +819,7 @@
             traceEl.innerHTML =
               '<div class="wb-trace-item" style="border-left-color:var(--m3-critical); background:var(--m3-critical-container);">' +
               '<div><div style="font-family:var(--font-mono); font-size:11px; font-weight:700; color:var(--m3-critical);">STEP 0 // MODEL ARMOR PRE-FLIGHT INTERCEPT</div>' +
-              '<div style="font-size:12px; color:var(--m3-on-critical);">' +
+              '<div style="font-size:11.5px; color:var(--m3-on-critical);">' +
               escapeHtml(res.error || "SecurityGuardrailError: Prompt injection / path traversal blocked") +
               "</div></div>" +
               '<span class="badge badge-critical">BLOCKED</span></div>';
@@ -788,7 +852,6 @@
         );
       })
       .catch(function () {
-        // Offline file:// fallback
         if (
           currentWbMode === "security" ||
           prompt.toLowerCase().indexOf("ignore previous") !== -1 ||
@@ -895,7 +958,6 @@
       pdfSel.addEventListener("change", function () {
         var rel = pdfSel.value;
         var stem = rel.split("/").pop().replace(/\.pdf$/i, "");
-        // Find concept citing this PDF
         for (var i = 0; i < DATA.concepts.length; i++) {
           var c = DATA.concepts[i];
           if (
@@ -910,7 +972,6 @@
       });
     }
 
-    // Mode buttons
     document.querySelectorAll("[data-wb-mode]").forEach(function (btn) {
       btn.addEventListener("click", function () {
         currentWbMode = btn.getAttribute("data-wb-mode");
@@ -945,7 +1006,13 @@
       });
     }
 
-    // Render ADK Tool Topology Cards
+    // Wire interactive 6-step Pipeline DAG SVG nodes
+    document.querySelectorAll("[data-open-tool-svg]").forEach(function (g) {
+      g.addEventListener("click", function () {
+        openAgentDeepDive(g.getAttribute("data-open-tool-svg"));
+      });
+    });
+
     var stack = document.getElementById("topology-stack");
     if (stack) {
       stack.innerHTML =
@@ -1014,7 +1081,7 @@
     renderWorkbenchConcept("equipment/D-2304");
   }
 
-  /* ---------------------------------------- Screen 5: Logical & OKF Graph */
+  /* ---------------------------------------- Screen 4: OKF Graph & Cloud Stack */
   function renderArchitectureScreen() {
     var stackEl = document.getElementById("arch-stack");
     if (stackEl) {
@@ -1118,7 +1185,7 @@
     var svg = document.getElementById("datagraph-svg");
     if (!svg) return;
     var width = svg.clientWidth || 820;
-    var height = 520;
+    var height = 410;
     svg.setAttribute("viewBox", "0 0 " + width + " " + height);
 
     var nodes = DATA.graph.nodes.filter(function (n) {
@@ -1161,14 +1228,14 @@
     var cy = height / 2;
     nodes.forEach(function (n, idx) {
       var ringIdx = Math.max(0, catOrder.indexOf(n.category));
-      var radius = 55 + (ringIdx % 4) * 52 + (idx % 3) * 14;
+      var radius = 48 + (ringIdx % 4) * 42 + (idx % 3) * 12;
       var angle = (idx / Math.max(1, nodes.length)) * 2 * Math.PI;
-      var x = cx + Math.cos(angle) * radius * 1.35;
+      var x = cx + Math.cos(angle) * radius * 1.45;
       var y = cy + Math.sin(angle) * radius * 0.92;
       nodeMap[n.id] = {
         node: n,
-        x: Math.max(48, Math.min(width - 48, x)),
-        y: Math.max(36, Math.min(height - 36, y)),
+        x: Math.max(44, Math.min(width - 44, x)),
+        y: Math.max(30, Math.min(height - 30, y)),
         color: n.has_conflict ? "#D93025" : catColors[n.category] || "#1A73E8"
       };
     });
@@ -1259,7 +1326,7 @@
         ? '<span class="badge badge-critical">CONFLICT FLAGGED</span>'
         : '<span class="badge badge-optimal">VERIFIED</span>') +
       "</div>" +
-      '<div style="font-size:13px; font-weight:700; margin-bottom:10px;">' +
+      '<div style="font-size:12.5px; font-weight:700; margin-bottom:8px;">' +
       escapeHtml(c.title) +
       "</div>" +
       '<div class="dg-detail-stats">' +
@@ -1271,17 +1338,17 @@
       '</div><div class="dg-detail-stat-label">Wiki Links</div></div>' +
       "</div>" +
       (c.has_conflict
-        ? '<div class="wb-conflict-alert" style="margin-bottom:10px;">' +
+        ? '<div class="wb-conflict-alert" style="margin-bottom:8px;">' +
           escapeHtml(c.conflict_summary) +
           "</div>"
         : "") +
       '<div class="dg-detail-section-label">Governing Raw PDFs</div>' +
       (c.sources.length
         ? c.sources
-            .slice(0, 6)
+            .slice(0, 5)
             .map(function (s) {
               return (
-                '<div style="font-family:var(--font-mono); font-size:10.5px; padding:3px 0; border-bottom:1px solid var(--m3-border-subtle);">' +
+                '<div style="font-family:var(--font-mono); font-size:10px; padding:3px 0; border-bottom:1px solid var(--m3-border-subtle);">' +
                 escapeHtml(s) +
                 "</div>"
               );
@@ -1303,7 +1370,7 @@
             })
             .join("")
         : '<div style="font-size:11px; color:var(--m3-text-tertiary);">Leaf node</div>') +
-      '<button class="btn btn-primary" style="width:100%; margin-top:14px;" id="btn-dg-open-wb">Open in Live Workbench &rsaquo;</button>';
+      '<button class="btn btn-primary" style="width:100%; margin-top:12px;" id="btn-dg-open-wb">Open in Live Workbench &rsaquo;</button>';
 
     detailEl.querySelectorAll("[data-dg-jump]").forEach(function (row) {
       row.addEventListener("click", function () {
@@ -1323,7 +1390,6 @@
 
   /* --------------------------------------------------- Initialization */
   document.addEventListener("DOMContentLoaded", function () {
-    // Wire top nav tabs
     TABS.forEach(function (t) {
       var nav = document.getElementById("tab-" + t);
       if (nav) {
@@ -1332,6 +1398,14 @@
           switchTab(t, true);
         });
       }
+    });
+
+    // Wire storyline footer & SVG jump buttons
+    document.querySelectorAll("[data-goto-tab], [data-jump-tab]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var target = btn.getAttribute("data-goto-tab") || btn.getAttribute("data-jump-tab");
+        if (target) switchTab(target, true);
+      });
     });
 
     // Wire schematic nodes & drawer buttons
@@ -1352,9 +1426,7 @@
     [closeDrawer, dismissDrawer].forEach(function (b) {
       if (b) {
         b.addEventListener("click", function () {
-          document
-            .getElementById("schematic-inspector-drawer")
-            .classList.remove("open");
+          openSchematicNode(4, true);
         });
       }
     });
@@ -1376,9 +1448,6 @@
     if (drawerToStudio) {
       drawerToStudio.addEventListener("click", function () {
         var node = DATA.schematic_nodes[currentNodeIndex];
-        document
-          .getElementById("schematic-inspector-drawer")
-          .classList.remove("open");
         switchTab("ecosystem", true);
         if (node && node.concept_id) {
           renderWorkbenchConcept(node.concept_id);
@@ -1390,11 +1459,13 @@
     var personaStudioBtn = document.getElementById("btn-persona-studio");
     if (personaStudioBtn) {
       personaStudioBtn.addEventListener("click", function () {
-        switchTab("ecosystem", true);
+        var targetConcept =
+          PERSONA_FLAGSHIP_CONCEPTS[currentPersonaIndex] || "equipment/D-2304";
+        renderWorkbenchConcept(targetConcept);
+        showToast("Synced Live Workbench to " + targetConcept + ".md");
       });
     }
 
-    // Keyboard navigation for Schematic Node Stepper
     window.addEventListener("keydown", function (e) {
       if (
         document.activeElement &&
@@ -1419,13 +1490,15 @@
     });
 
     renderMacroScreen();
+    renderSchematicNodePills();
     renderSchematicTelemetry();
-    openSchematicNode(4, false);
+    openSchematicNode(4, true);
     renderPersonasScreen();
     renderEcosystemScreen();
     renderArchitectureScreen();
 
     var initialHash = (window.location.hash || "").replace(/^#/, "");
+    if (initialHash === "personas") initialHash = "ecosystem";
     if (TABS.indexOf(initialHash) !== -1) {
       switchTab(initialHash, false);
     } else {

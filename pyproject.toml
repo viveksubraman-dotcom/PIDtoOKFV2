@@ -28,7 +28,11 @@ python_files = ["test_*.py"]
 [tool.setuptools.packages.find]
 include = ["extracter_agent*"]
 
+[tool.ruff]
+exclude = ["_agents", ".agents", "build", "reference"]
+
 [tool.ruff.lint]
 ignore = ["BLE001"]
+
 
 

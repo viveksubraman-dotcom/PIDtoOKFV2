@@ -25,7 +25,7 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from google.adk.cli.fast_api import get_fast_api_app
 from google.adk.runners import InMemoryRunner
@@ -228,6 +228,14 @@ def create_web_app() -> FastAPI:
         if not index_file.exists():
             raise HTTPException(status_code=404, detail="Cockpit index.html not found")
         return HTMLResponse(content=index_file.read_text(encoding="utf-8"))
+
+    @app.get("/favicon.ico", include_in_schema=False)
+    async def serve_favicon() -> Response:
+        svg_icon = (
+            '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#1A73E8">'
+            '<path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>'
+        )
+        return Response(content=svg_icon, media_type="image/svg+xml")
 
     @app.get(
         "/architecture-diagram",
