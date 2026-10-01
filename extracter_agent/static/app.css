@@ -313,6 +313,50 @@ main.main-content {
 /* =============================================================================
    SCREEN 1 — Executive Thesis & Benchmark (#macro)
    ========================================================================== */
+.scenario-switcher-strip {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;
+  margin-bottom: 12px;
+}
+.scenario-pill-btn {
+  background: var(--m3-surface); border: 1px solid var(--m3-border);
+  border-radius: var(--radius-md); padding: 10px 12px;
+  text-align: left; cursor: pointer; transition: all 0.15s ease;
+  display: flex; flex-direction: column; gap: 3px; box-shadow: var(--shadow-xs);
+  font-family: var(--font-sans);
+}
+.scenario-pill-btn:hover { border-color: var(--m3-primary); background: var(--m3-surface-subtle); }
+.scenario-pill-btn.active {
+  background: var(--m3-primary-container); border: 1.5px solid var(--m3-primary);
+  box-shadow: var(--shadow-sm);
+}
+.scenario-pill-top {
+  display: flex; justify-content: space-between; align-items: center; gap: 6px;
+  font-family: var(--font-mono); font-size: 9.5px; font-weight: 800;
+  color: var(--m3-text-secondary); text-transform: uppercase;
+}
+.scenario-pill-btn.active .scenario-pill-top { color: var(--m3-on-primary-container); }
+.scenario-pill-title {
+  font-size: 12px; font-weight: 700; color: var(--m3-text-primary); line-height: 1.25;
+}
+.scenario-spotlight-card {
+  background: var(--m3-surface); border: 1px solid var(--m3-border);
+  border-left: 5px solid var(--m3-primary); border-radius: var(--radius-md);
+  padding: 14px 18px; margin-bottom: var(--sp-2); box-shadow: var(--shadow-xs);
+}
+.scenario-spotlight-grid {
+  display: grid; grid-template-columns: 1.35fr 1.15fr auto; gap: 16px;
+  align-items: center;
+}
+.scenario-formula-pill {
+  background: var(--m3-surface-subtle); border: 1px solid var(--m3-border);
+  border-radius: var(--radius-sm); padding: 8px 12px;
+  font-family: var(--font-mono); font-size: 11px; color: var(--m3-text-primary);
+  line-height: 1.45;
+}
+.scenario-actions-col {
+  display: flex; flex-direction: column; gap: 6px; min-width: 210px;
+}
+
 .inversion-chart-card {
   background: var(--m3-surface); border: 1px solid var(--m3-border);
   border-radius: var(--radius-md); padding: 18px 20px; position: relative;
@@ -773,8 +817,8 @@ main.main-content {
 }
 
 @media (max-width: 1200px) {
-  .vkpi-ribbon, .telemetry-grid, .levers-grid, .outcomes-container { grid-template-columns: repeat(2, 1fr); }
-  .visual-split-2col, .schematic-2zone-split, .workbench-controls-grid, .workbench-split-grid, .persona-grid-2col, .arch-stack-grid, .datagraph-body, .deepdive-top-grid, .deepdive-main-grid { grid-template-columns: 1fr; }
+  .vkpi-ribbon, .scenario-switcher-strip, .telemetry-grid, .levers-grid, .outcomes-container { grid-template-columns: repeat(2, 1fr); }
+  .visual-split-2col, .scenario-spotlight-grid, .schematic-2zone-split, .workbench-controls-grid, .workbench-split-grid, .persona-grid-2col, .arch-stack-grid, .datagraph-body, .deepdive-top-grid, .deepdive-main-grid { grid-template-columns: 1fr; }
   .schematic-zones-grid { grid-template-columns: 1fr; }
 }
 @media (prefers-reduced-motion: reduce) {

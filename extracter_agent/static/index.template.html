@@ -1,0 +1,754 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{PAGE_TITLE}}</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,600;0,700;1,600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=Roboto+Mono:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%231A73E8'%3E%3Cpath d='M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+
+<header class="app-header">
+  <div class="brand-cluster">
+    <svg class="brand-logo-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+    </svg>
+    <span class="brand-title">{{BRAND_TITLE}}</span>
+    <span class="header-sep">|</span>
+    <div class="header-sys-badge"><span class="sys-dot-live"></span><span>GEMINI 3.8 FLASH GLOBAL</span></div>
+  </div>
+
+  <nav class="header-nav" id="main-header-nav" role="tablist" aria-label="4-Screen Executive Navigation">
+    <a class="nav-item active" id="tab-macro"        data-tab="macro"        href="#macro"        role="tab" aria-selected="true"  aria-controls="pane-macro"><span class="nav-step-num">01</span><span>Executive Thesis</span></a>
+    <a class="nav-item"        id="tab-schematic"    data-tab="schematic"    href="#schematic"    role="tab" aria-selected="false" aria-controls="pane-schematic"><span class="nav-step-num">02</span><span>Plant &amp; Conflict Twin</span></a>
+    <a class="nav-item"        id="tab-ecosystem"    data-tab="ecosystem"    href="#ecosystem"    role="tab" aria-selected="false" aria-controls="pane-ecosystem"><span class="nav-step-num">03</span><span>Persona &amp; Live Workbench</span></a>
+    <a class="nav-item"        id="tab-architecture" data-tab="architecture" href="#architecture" role="tab" aria-selected="false" aria-controls="pane-architecture"><span class="nav-step-num">04</span><span>OKF Graph &amp; Cloud Stack</span></a>
+  </nav>
+
+  <div class="header-actions">
+    <span class="screen-counter-pill tnum" id="screen-step-indicator">SCREEN 01 / 04</span>
+    <a class="btn" href="/architecture-diagram" title="View Dual-Mode Ingestion Blueprint">Ingestion SVG</a>
+    <a class="btn btn-primary" href="/dev-ui/?app=extracter_agent" title="Launch Google ADK Developer UI (/dev-ui/)">ADK Dev UI &rsaquo;</a>
+    <div class="user-avatar" title="Signed in: Argolis Admin">VS</div>
+  </div>
+</header>
+
+<main class="main-content">
+
+  <!-- ===================================================== SCREEN 01 / 04: EXECUTIVE THESIS & BENCHMARK -->
+  <div id="pane-macro" class="screen-pane active" data-screen-index="1">
+    <div class="screen-header-compact">
+      <div>
+        <div class="eyebrow">SCREEN 01 / 04 &bull; {{S1_EYEBROW}}</div>
+        <h1 class="hero-title">{{S1_H1}}</h1>
+        <p class="hero-desc">
+{{S1_HERO_DESC}}
+        </p>
+      </div>
+      <div style="display:flex; gap:8px; align-items:center;">
+{{S1_HERO_BADGES}}
+      </div>
+    </div>
+
+    <!-- Interactive 4-Scenario Process Manufacturing Lens Switcher (Beyond HAZOP) -->
+    <div class="scenario-switcher-strip" id="scenario-switcher-strip" role="tablist" aria-label="Process Manufacturing Scenarios Beyond HAZOP"></div>
+
+    <!-- Active Process Manufacturing Scenario Spotlight Card -->
+    <div class="scenario-spotlight-card" id="s1-scenario-spotlight">
+      <div class="scenario-spotlight-grid">
+        <div>
+          <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px; flex-wrap:wrap;">
+            <span class="badge badge-primary" id="sc-spot-badge">{{S1_SPOT_BADGE}}
+            <span style="font-family:var(--font-mono); font-size:10.5px; font-weight:700; color:var(--m3-text-secondary);" id="sc-spot-code">{{S1_SPOT_CODE}}
+          </div>
+          <div style="font-family:var(--font-serif); font-size:17.5px; font-weight:700; margin-bottom:4px;" id="sc-spot-title">{{S1_SPOT_TITLE}}
+          <p style="font-size:12px; color:var(--m3-text-secondary); line-height:1.45;" id="sc-spot-challenge"></p>
+        </div>
+        <div>
+          <div style="font-family:var(--font-mono); font-size:10px; font-weight:800; color:var(--m3-primary); text-transform:uppercase; margin-bottom:4px;">Governing Physical / Chemical Law &amp; OKF Derivation</div>
+          <div class="scenario-formula-pill" id="sc-spot-derivation"></div>
+          <div style="font-size:11.5px; font-weight:600; color:var(--m3-success); margin-top:6px;" id="sc-spot-impact"></div>
+        </div>
+        <div class="scenario-actions-col">
+          <button class="btn btn-primary" id="btn-scenario-launch-wb">Inspect Scenario in Workbench &rsaquo;</button>
+          <button class="btn" id="btn-scenario-launch-twin">Focus Node on Plant Twin &rsaquo;</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4-Card Visual KPI Ribbon -->
+    <div class="vkpi-ribbon">
+{{S1_KPI_RIBBON}}
+    </div>
+
+    <!-- Dominant 2-Column Visual Stage -->
+    <div class="visual-split-2col">
+      <!-- Left: Interactive Transformation Schematic + Complexity Inversion SVG -->
+      <div class="inversion-chart-card">
+        <div class="chart-header-row">
+          <div>
+            <h2 class="section-title" style="font-size:16.5px; margin-bottom:2px;">{{S1_CHART_TITLE}}</h2>
+            <div style="font-size:11.5px; color:var(--m3-text-secondary);">Click any pipeline block below to jump directly to its live interactive screen</div>
+          </div>
+          <div class="chart-legend">
+            {{S1_CHART_LEGEND}}
+          </div>
+        </div>
+
+        <svg id="s1-visual-blueprint-svg" viewBox="0 0 680 320" style="width:100%; height:340px; overflow:visible;" role="img" aria-label="{{S1_SVG_ARIA}}">
+          <!-- Top Pipeline Schematic Band (y: 6..126) -->
+          <rect x="4" y="6" width="672" height="122" rx="8" fill="#F8F9FA" stroke="#DADCE0" stroke-width="1"/>
+          <text x="16" y="24" font-family="'Roboto Mono', monospace" font-size="9.5" font-weight="700" fill="#5F6368" letter-spacing="0.5">{{S1_SVG_BAND_TITLE}}</text>
+
+          <!-- Node A: Dark Corpus -->
+          <g class="dag-node-group" data-jump-tab="schematic">
+            <rect x="16" y="34" width="185" height="82" rx="6" fill="#FFFFFF" stroke="#D93025" stroke-width="1.5"/>
+            <rect x="16" y="34" width="185" height="18" rx="6" fill="#FCE8E6"/>
+{{S1_NODE_A}}
+          </g>
+
+          <!-- Connector A -> B -->
+          <line x1="201" y1="75" x2="235" y2="75" stroke="#1A73E8" stroke-width="2" stroke-dasharray="4,3"/>
+          <polygon points="235,75 228,71 228,79" fill="#1A73E8"/>
+
+          <!-- Node B: Dual-Mode ADK Compiler -->
+          <g class="dag-node-group" data-jump-tab="ecosystem">
+            <rect x="238" y="34" width="210" height="82" rx="6" fill="#E8F0FE" stroke="#1A73E8" stroke-width="2"/>
+            <rect x="238" y="34" width="210" height="18" rx="6" fill="#1A73E8"/>
+{{S1_NODE_B}}
+          </g>
+
+          <!-- Connector B -> C -->
+          <line x1="448" y1="75" x2="482" y2="75" stroke="#1E8E3E" stroke-width="2" stroke-dasharray="4,3"/>
+          <polygon points="482,75 475,71 475,79" fill="#1E8E3E"/>
+
+          <!-- Node C: Verified OKF Graph -->
+          <g class="dag-node-group" data-jump-tab="architecture">
+            <rect x="485" y="34" width="179" height="82" rx="6" fill="#FFFFFF" stroke="#1E8E3E" stroke-width="1.5"/>
+            <rect x="485" y="34" width="179" height="18" rx="6" fill="#E6F4EA"/>
+{{S1_NODE_C}}
+          </g>
+
+{{S1_SVG_BOTTOM}}
+        </svg>
+      </div>
+
+      <!-- Right: 6-Bar Evaluation Benchmark + Compact 4-Lever Strip -->
+      <div class="itc-slide-card">
+        <div>
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+{{S1_BENCH_HEAD}}
+          <div id="s1-benchmark-bars"></div>
+        </div>
+
+        <div>
+          <div style="font-family:var(--font-mono); font-size:10px; font-weight:800; color:var(--m3-text-tertiary); text-transform:uppercase; letter-spacing:0.4px; margin-top:12px;">
+            {{S1_LEVER_TITLE}}
+          </div>
+          <div class="levers-grid" id="s1-levers"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Collapsible Secondary Prose & Detailed Cards -->
+    <details class="tech-spec-drawer">
+      <summary class="tech-spec-summary">
+        <span>{{S1_DRAWER_SUMMARY}}</span>
+        <span class="badge badge-stable">EXPAND EVIDENCE</span>
+      </summary>
+      <div class="tech-spec-body">
+        <div class="headwinds-grid" id="s1-headwinds"></div>
+        <div class="outcomes-bar-title">{{S1_OUTCOMES_TITLE}}</div>
+        <div class="outcomes-container" id="s1-outcomes"></div>
+      </div>
+    </details>
+
+    <!-- Bottom Storyline Takeaway Bar -->
+    <div class="storyline-footer">
+      <div class="storyline-takeaway">
+        <span class="storyline-so-what">SO WHAT</span>
+{{S1_SOWHAT}}
+      </div>
+      <div class="storyline-nav-group">
+        <button class="btn btn-primary" data-goto-tab="schematic">Next: 02 &middot; Plant &amp; Conflict Twin &rsaquo;</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================================================= SCREEN 02 / 04: PLANT & CONFLICT TWIN -->
+  <div id="pane-schematic" class="screen-pane" data-screen-index="2">
+    <div class="schematic-top-bar">
+      <div>
+        <div class="eyebrow">SCREEN 02 / 04 &bull; {{S2_EYEBROW}}</div>
+        <h1 class="hero-title" style="margin-bottom:0;">{{S2_H1}}</h1>
+      </div>
+      <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+        <span class="badge badge-stable tnum" id="span-stepper-counter">{{S2_STEPPER_DEFAULT}}</span>
+        <button class="btn" id="btn-prev-span" title="Previous plant node (ArrowLeft)">&lsaquo; Prev Node</button>
+        <button class="btn" id="btn-next-span" title="Next plant node (ArrowRight)">Next Node &rsaquo;</button>
+        <div class="badge badge-critical">
+          <span style="width:7px; height:7px; border-radius:50%; background:var(--m3-critical); display:inline-block;"></span>
+          {{S2_CONFLICT_BADGE}}
+        </div>
+      </div>
+    </div>
+
+    <!-- 1-Line Node Quick-Jump Pill Bar -->
+    <div class="node-pill-strip" id="schematic-node-pills" role="toolbar" aria-label="Quick-jump equipment nodes"></div>
+
+    <!-- Calm 2-Zone Split: 72% Dominant 2D Process Flow Stage + 28% Docked 3-Block Inspector -->
+    <div class="schematic-2zone-split">
+      <!-- Left: Dominant Interactive 12-Node Process Schematic Canvas -->
+      <div class="schematic-canvas-card">
+        <div class="schematic-grid-bg" id="schematic-container">
+          <canvas id="schematic-particle-canvas" style="position:absolute; top:0; left:0; width:100%; height:100%; z-index:2; pointer-events:none;"></canvas>
+
+          <div class="schematic-zones-grid">
+{{S2_ZONES}}
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: Docked 3-Block Inspector Card -->
+      <aside class="node-drawer-overlay open" id="schematic-inspector-drawer" aria-label="Plant Node OKF Inspector">
+        <div class="drawer-header-bar">
+          <div>
+            <div style="display:flex; align-items:center; gap:6px; margin-bottom:3px;">
+              <span class="badge badge-stable" id="drawer-isa95-tag"{{S2_DRAWER_ISA}}
+              <span class="badge badge-critical" id="drawer-badge-health">CRITICAL</span>
+            </div>
+            <h3 style="font-family:var(--font-serif); font-size:16.5px; font-weight:700; line-height:1.2;" id="drawer-node-title">{{S2_DRAWER_TITLE}}</h3>
+          </div>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <div id="drawer-gauge-wrap"><svg id="radial-risk-gauge" width="56" height="56" viewBox="0 0 68 68" role="img" aria-label="Node conflict risk gauge"></svg></div>
+            <button class="icon-btn" id="btn-close-drawer" title="Reset inspector">&times;</button>
+          </div>
+        </div>
+
+        <div class="drawer-body-content">
+          <!-- Block 1: 4-Row Tabular Derivation Table (.gee-band-table) -->
+          <div>
+            <div class="drawer-section-label"><span>1. Extracted OKF v0.2 Parameters</span><span style="color:var(--m3-primary);">{{S2_DRAWER_LENS}}</span></div>
+            <div class="drawer-data-card gee-band-table" id="drawer-telemetry-metrics"></div>
+          </div>
+
+          <!-- Block 2: Governing ADK Tool & Formula Derivation -->
+          <div>
+            <div class="drawer-section-label"><span>2. ADK Compiler &amp; Process Law Derivation</span></div>
+            <div class="drawer-data-card" style="margin-bottom:8px;">
+              <div class="drawer-keyval-row"><span class="drawer-key">Compiler Mode:</span><span class="drawer-val" id="drawer-swarm-id" style="color:var(--m3-primary);"></span></div>
+              <div class="drawer-keyval-row"><span class="drawer-key">ADK Tool:</span><span class="drawer-val" id="drawer-swarm-coord"></span></div>
+              <div class="drawer-keyval-row"><span class="drawer-key">Reconciler:</span><span class="drawer-val" id="drawer-solver-id" style="color:var(--m3-critical);"></span></div>
+            </div>
+            <div class="drawer-formula-box" id="drawer-formula-code"></div>
+          </div>
+
+          <!-- Block 3: OT Safety Boundary & 1-Click Dispatch to Workbench -->
+          <div class="card-safety-barrier">
+            <div class="safety-barrier-inner">
+              <div>
+                <div style="font-family:var(--font-mono); font-size:9.5px; font-weight:700; color:var(--m3-critical);">RULE 14 &amp; OT ADVISORY BOUNDARY</div>
+                <div style="font-size:11.5px; font-weight:700;" id="drawer-sap-id"{{S2_DRAWER_SAP}}
+              </div>
+              <span class="badge badge-critical">READ-ONLY</span>
+            </div>
+          </div>
+
+          <div style="display:flex; gap:8px; margin-top:auto;">
+            <button class="btn btn-primary" style="flex:1;" id="btn-drawer-to-studio">Inspect in Live Workbench &rsaquo;</button>
+            <button class="btn" id="btn-drawer-dismiss">Reset</button>
+          </div>
+        </div>
+      </aside>
+    </div>
+
+    <!-- Collapsible All-12 Equipment Telemetry Cards -->
+    <details class="tech-spec-drawer">
+      <summary class="tech-spec-summary">
+        <span>{{S2_TELEMETRY_SUMMARY}}</span>
+        <span class="badge badge-stable"{{S2_TELEMETRY_BADGE}}
+      </summary>
+      <div class="tech-spec-body">
+        <div class="telemetry-grid" id="s2-telemetry"></div>
+      </div>
+    </details>
+
+    <!-- Bottom Storyline Takeaway Bar -->
+    <div class="storyline-footer">
+      <div class="storyline-takeaway">
+        <span class="storyline-so-what">SO WHAT</span>
+{{S2_SOWHAT}}
+      </div>
+      <div class="storyline-nav-group">
+        <button class="btn" data-goto-tab="macro">&lsaquo; 01 &middot; Thesis</button>
+        <button class="btn btn-primary" data-goto-tab="ecosystem">Next: 03 &middot; Persona &amp; Live Workbench &rsaquo;</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================================================= SCREEN 03 / 04: PERSONA & LIVE ADK WORKBENCH -->
+  <div id="pane-ecosystem" class="screen-pane" data-screen-index="3">
+    <div id="view-ecosystem-overview" class="ecosystem-view active">
+      <div class="screen-header-compact">
+        <div>
+          <div class="eyebrow">SCREEN 03 / 04 &bull; {{S3_EYEBROW}}</div>
+          <h1 class="hero-title">Multi-Scenario Persona &amp; Live OKF v0.2 Compiler Workbench</h1>
+        </div>
+        <div style="display:flex; gap:8px; align-items:center;">
+          <span class="badge badge-optimal" id="wb-guardrail-badge">MODEL ARMOR: PASS</span>
+          <span class="badge badge-primary tnum">{{S3_COUNT_BADGE}}</span>
+        </div>
+      </div>
+
+      <!-- Unified Persona Role Strip (Selecting a persona syncs the Live Workbench below) -->
+      <div class="persona-nav-strip" id="persona-tabs" role="tablist" aria-label="{{S3_PERSONA_ARIA}}"></div>
+
+      <!-- Compact Visual Persona Context Banner -->
+      <div class="persona-compact-banner">
+        <div class="persona-identity-row">
+          <div class="persona-hero-img" id="persona-hero-img">
+            {{S3_PERSONA_INITIALS}}
+          </div>
+          <div>
+            <div style="display:flex; gap:8px; align-items:center; margin-bottom:2px; flex-wrap:wrap;">
+              <span class="badge badge-primary" id="persona-code-badge">{{S3_PERSONA_CODE}}
+              <strong style="font-family:var(--font-serif); font-size:17px;" id="persona-title-display">{{S3_PERSONA_TITLE}}
+            </div>
+            <div style="font-size:12px; color:var(--m3-text-secondary);" id="persona-jtbd-display"></div>
+          </div>
+        </div>
+        <div style="display:flex; align-items:center; gap:10px;">
+          <span class="badge badge-optimal tnum">{{S3_PERSONA_SPEED}}</span>
+          <button class="btn btn-primary" id="btn-persona-studio">Load Persona Flagship Scenario &rsaquo;</button>
+        </div>
+      </div>
+
+      <!-- Interactive 6-Step Autonomous ADK Pipeline DAG SVG -->
+      <div class="pipeline-dag-card">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; flex-wrap:wrap; gap:8px;">
+          <span style="font-family:var(--font-mono); font-size:10.5px; font-weight:800; color:var(--m3-primary); text-transform:uppercase;">
+            AUTONOMOUS 6-STEP ADK COMPILER PIPELINE (CLICK ANY NODE TO INSPECT PYTHON CONTRACT &amp; CODE)
+          </span>
+          <span style="font-family:var(--font-mono); font-size:10px; color:var(--m3-text-tertiary);">
+            extracter_orchestrator &bull; gemini-3.8-flash (global)
+          </span>
+        </div>
+        <svg id="wb-pipeline-dag-svg" viewBox="0 0 1080 96" style="width:100%; height:92px; overflow:visible;" role="img" aria-label="Interactive 6-Step ADK Extraction Pipeline">
+          <!-- Step 0: Model Armor -->
+          <g class="dag-node-group" data-open-tool-svg="GUARD-01" transform="translate(4, 8)">
+            <rect width="160" height="76" rx="6" fill="#FFFFFF" stroke="#1E8E3E" stroke-width="1.5"/>
+            <rect width="160" height="18" rx="6" fill="#E6F4EA"/>
+            <text x="80" y="13" text-anchor="middle" font-family="'Roboto Mono', monospace" font-size="8.5" font-weight="700" fill="#137333">STEP 0 // GUARDRAIL</text>
+            <text x="80" y="38" text-anchor="middle" font-family="'Roboto Mono', monospace" font-size="10" font-weight="700" fill="#202124">Model Armor Callback</text>
+            <text x="80" y="55" text-anchor="middle" font-family="'Plus Jakarta Sans', sans-serif" font-size="9.5" fill="#5F6368">100% Injection Block</text>
+            <text x="80" y="69" text-anchor="middle" font-family="'Roboto Mono', monospace" font-size="8.5" font-weight="700" fill="#1A73E8">Inspect Code &rsaquo;</text>
+          </g>
+          <line x1="164" y1="46" x2="184" y2="46" stroke="#1A73E8" stroke-width="2"/>
+          <polygon points="184,46 178,42 178,50" fill="#1A73E8"/>
+
+          <!-- Step 1: Discovery -->
+          <g class="dag-node-group" data-open-tool-svg="TOOL-01" transform="translate(186, 8)">
+            <rect width="160" height="76" rx="6" fill="#FFFFFF" stroke="#1A73E8" stroke-width="1.5"/>
+            <rect width="160" height="18" rx="6" fill="#E8F0FE"/>
+            <text x="80" y="13" text-anchor="middle" font-family="'Roboto Mono', monospace" font-size="8.5" font-weight="700" fill="#174EA6">STEP 1 // DISCOVERY</text>
+            <text x="80" y="38" text-anchor="middle" font-family="'Roboto Mono', monospace" font-size="10" font-weight="700" fill="#202124">find_raw_documents</text>
+            <text x="80" y="55" text-anchor="middle" font-family="'Plus Jakarta Sans', sans-serif" font-size="9.5" fill="#5F6368">{{S3_DAG_STEP1}}</text>
+            <text x="80" y="69" text-anchor="middle" font-family="'Roboto Mono', monospace" font-size="8.5" font-weight="700" fill="#1A73E8">Inspect Code &rsaquo;</text>
+          </g>
+          <line x1="346" y1="46" x2="366" y2="46" stroke="#1A73E8" stroke-width="2"/>
+          <polygon points="366,46 360,42 360,50" fill="#1A73E8"/>
+
+          <!-- Step 2: Multimodal Parser -->
+          <g class="dag-node-group" data-open-tool-svg="TOOL-02" transform="translate(368, 8)">
+            <rect width="168" height="76" rx="6" fill="#FFFFFF" stroke="#1A73E8" stroke-width="1.5"/>
+            <rect width="168" height="18" rx="6" fill="#E8F0FE"/>
+            <text x="84" y="13" text-anchor="middle" font-family="'Roboto Mono', monospace" font-size="8.5" font-weight="700" fill="#174EA6">STEP 2 // HYBRID PARSER</text>
+            <text x="84" y="38" text-anchor="middle" font-family="'Roboto Mono', monospace" font-size="10" font-weight="700" fill="#202124">process_raw_pdf_tool</text>
+            <text x="84" y="55" text-anchor="middle" font-family="'Plus Jakarta Sans', sans-serif" font-size="9.5" fill="#5F6368">PyMuPDF + 300 DPI Vision</text>
+            <text x="84" y="69" text-anchor="middle" font-family="'Roboto Mono', monospace" font-size="8.5" font-weight="700" fill="#1A73E8">Inspect Code &rsaquo;</text>
+          </g>
+          <line x1="536" y1="46" x2="556" y2="46" stroke="#1A73E8" stroke-width="2"/>
+          <polygon points="556,46 550,42 550,50" fill="#1A73E8"/>
+
+          <!-- Step 3: State Check -->
+          <g class="dag-node-group" data-open-tool-svg="TOOL-03" transform="translate(558, 8)">
+            <rect width="160" height="76" rx="6" fill="#FFFFFF" stroke="#1A73E8" stroke-width="1.5"/>
+            <rect width="160" height="18" rx="6" fill="#E8F0FE"/>
+            <text x="80" y="13" text-anchor="middle" font-family="'Roboto Mono', monospace" font-size="8.5" font-weight="700" fill="#174EA6">STEP 3 // STATE CHECK</text>
+            <text x="80" y="38" text-anchor="middle" font-family="'Roboto Mono', monospace" font-size="10" font-weight="700" fill="#202124">inspect_existing_okf</text>
+            <text x="80" y="55" text-anchor="middle" font-family="'Plus Jakarta Sans', sans-serif" font-size="9.5" fill="#5F6368">Read-Before-Upsert</text>
+            <text x="80" y="69" text-anchor="middle" font-family="'Roboto Mono', monospace" font-size="8.5" font-weight="700" fill="#1A73E8">Inspect Code &rsaquo;</text>
+          </g>
+          <line x1="718" y1="46" x2="738" y2="46" stroke="#1A73E8" stroke-width="2"/>
+          <polygon points="738,46 732,42 732,50" fill="#1A73E8"/>
+
+          <!-- Step 4: Read-Merge-Upsert -->
+          <g class="dag-node-group" data-open-tool-svg="TOOL-04" transform="translate(740, 8)">
+            <rect width="164" height="76" rx="6" fill="#FFFFFF" stroke="#D93025" stroke-width="1.5"/>
+            <rect width="164" height="18" rx="6" fill="#FCE8E6"/>
+            <text x="82" y="13" text-anchor="middle" font-family="'Roboto Mono', monospace" font-size="8.5" font-weight="700" fill="#C5221F">STEP 4 // MERGE-UPSERT</text>
+            <text x="82" y="38" text-anchor="middle" font-family="'Roboto Mono', monospace" font-size="10" font-weight="700" fill="#202124">generate_equipment_okf</text>
+            <text x="82" y="55" text-anchor="middle" font-family="'Plus Jakarta Sans', sans-serif" font-size="9.5" fill="{{S3_DAG_STEP4}} y="69" text-anchor="middle" font-family="'Roboto Mono', monospace" font-size="8.5" font-weight="700" fill="#1A73E8">Inspect Code &rsaquo;</text>
+          </g>
+          <line x1="904" y1="46" x2="924" y2="46" stroke="#1E8E3E" stroke-width="2"/>
+          <polygon points="924,46 918,42 918,50" fill="#1E8E3E"/>
+
+          <!-- Step 5: Validator & GCS Sync -->
+          <g class="dag-node-group" data-open-tool-svg="TOOL-06" transform="translate(926, 8)">
+            <rect width="150" height="76" rx="6" fill="#FFFFFF" stroke="#1E8E3E" stroke-width="1.5"/>
+            <rect width="150" height="18" rx="6" fill="#E6F4EA"/>
+            <text x="75" y="13" text-anchor="middle" font-family="'Roboto Mono', monospace" font-size="8.5" font-weight="700" fill="#137333">STEP 5 // VALIDATE &amp; GCS</text>
+            <text x="75" y="38" text-anchor="middle" font-family="'Roboto Mono', monospace" font-size="10" font-weight="700" fill="#202124">build_okf_indexes</text>
+            <text x="75" y="55" text-anchor="middle" font-family="'Plus Jakarta Sans', sans-serif" font-size="9.5" fill="#137333">{{S3_DAG_STEP5}}</text>
+            <text x="75" y="69" text-anchor="middle" font-family="'Roboto Mono', monospace" font-size="8.5" font-weight="700" fill="#1A73E8">Inspect Code &rsaquo;</text>
+          </g>
+        </svg>
+      </div>
+
+      <!-- Live Interactive Workbench Card -->
+      <div class="workbench-shell">
+        <div class="workbench-mode-bar">
+          <div style="display:flex; gap:6px; flex-wrap:wrap;">
+            <button class="filter-chip active" data-wb-mode="mode_a">{{S3_MODE_A}}</button>
+            <button class="filter-chip" data-wb-mode="mode_b">{{S3_MODE_B}}</button>
+            <button class="filter-chip" data-wb-mode="security">Security Test: Model Armor Guardrail</button>
+          </div>
+          <div style="display:flex; gap:8px; align-items:center;">
+            <span class="badge badge-primary tnum">{{S3_MD_BADGE}}</span>
+          </div>
+        </div>
+
+        <div class="workbench-controls-grid">
+          <div>
+            <label class="wb-field-label" for="wb-concept-select">{{S3_CONCEPT_LABEL}}</label>
+            <select class="wb-select" id="wb-concept-select"></select>
+          </div>
+          <div>
+            <label class="wb-field-label" for="wb-pdf-select">{{S3_PDF_LABEL}}</label>
+            <select class="wb-select" id="wb-pdf-select"></select>
+          </div>
+          <div style="display:flex; gap:8px;">
+            <button class="btn" id="btn-wb-open-pdf" title="Open raw engineering PDF in browser">View Raw PDF</button>
+            <button class="btn btn-primary" id="btn-wb-run-live">Run ADK Compiler &rsaquo;</button>
+          </div>
+        </div>
+
+        <div style="margin-bottom:14px;">
+          <label class="wb-field-label" for="wb-prompt-input">Active ADK Orchestrator Prompt (Editable for Live Vertex AI Execution or Security Testing)</label>
+          <input type="text" class="wb-input" id="wb-prompt-input" value="{{S3_PROMPT_DEFAULT}}">
+        </div>
+
+        <div class="workbench-split-grid">
+          <!-- Left Pane: 6-Step ADK Tool Execution Trajectory -->
+          <div class="wb-pane">
+            <div class="wb-pane-header">
+              <span class="wb-pane-title">1. Autonomous 6-Step ADK Execution Trajectory</span>
+              <span class="badge badge-stable">extracter_orchestrator</span>
+            </div>
+            <div class="wb-trace-list" id="wb-trace-container"></div>
+            <div style="margin-top:auto; padding-top:8px; border-top:1px solid var(--m3-border);">
+              <div class="wb-field-label" style="margin-bottom:4px;">Outbound Wiki Cross-Links (Click to Traverse Bundle)</div>
+              <div style="display:flex; gap:6px; flex-wrap:wrap;" id="wb-crosslinks-row"></div>
+            </div>
+          </div>
+
+          <!-- Right Pane: Compiled OKF v0.2 Markdown & Conflict Callouts -->
+          <div class="wb-pane">
+            <div class="wb-pane-header">
+              <span class="wb-pane-title" id="wb-output-title">{{S3_OUTPUT_TITLE}}</span>
+              <span class="badge badge-optimal">is_valid_okf: true</span>
+            </div>
+            <div class="wb-conflict-alert" id="wb-conflict-banner" style="display:none;"></div>
+            <pre class="wb-code-viewer" id="wb-markdown-output"></pre>
+          </div>
+        </div>
+      </div>
+
+      <!-- Collapsible Persona Reality & Full 9-Card ADK Tool Catalog -->
+      <details class="tech-spec-drawer">
+        <summary class="tech-spec-summary">
+          <span>+ INSPECT PERSONA BEFORE/AFTER TRANSFORMATION &amp; ALL 9 ADK FUNCTIONTOOL CONTRACTS</span>
+          <span class="badge badge-stable">PERSONA + 9 TOOLS</span>
+        </summary>
+        <div class="tech-spec-body">
+          <div style="font-size:12.5px; color:var(--m3-text-secondary); margin-bottom:10px;" id="persona-mandate-display"></div>
+          <div class="persona-grid-2col">
+            <div class="reality-box" style="border-top:3px solid var(--m3-critical);">
+              <div class="reality-head" style="color:var(--m3-critical);">Today's Broken Reality (Manual Document Takeoff)</div>
+              <p class="card-body-text" id="persona-broken-text"></p>
+            </div>
+            <div class="reality-box" style="border-top:3px solid var(--m3-success); background:#F8FCF9;">
+              <div class="reality-head" style="color:var(--m3-success);">Agentic OKF v0.2 Reality (Autonomous Read-Merge-Upsert)</div>
+              <p class="card-body-text" id="persona-agentic-text" style="color:var(--m3-text-primary);"></p>
+            </div>
+          </div>
+          <h3 class="section-title" style="font-size:15px; margin-bottom:6px;">Persona Assigned ADK Squad</h3>
+          <div id="squad-list-container" style="margin-bottom:16px;"></div>
+          <h3 class="section-title" style="font-size:15px; margin-bottom:6px;">Complete ADK Orchestrator &amp; 8 Deterministic FunctionTools</h3>
+          <div id="topology-stack"></div>
+        </div>
+      </details>
+
+      <!-- Bottom Storyline Takeaway Bar -->
+      <div class="storyline-footer">
+        <div class="storyline-takeaway">
+          <span class="storyline-so-what">SO WHAT</span>
+          <span>Selecting any engineering persona immediately aligns the Dual-Mode ADK Compiler to their governing vessels, raw PDFs, and 6-step tool trajectory—with 100% Model Armor pre-flight protection.</span>
+        </div>
+        <div class="storyline-nav-group">
+          <button class="btn" data-goto-tab="schematic">&lsaquo; 02 &middot; Plant Twin</button>
+          <button class="btn btn-primary" data-goto-tab="architecture">Next: 04 &middot; OKF Graph &amp; Cloud Stack &rsaquo;</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Agent / Tool Deep-Dive Sub-View -->
+    <div id="view-agent-deepdive" class="ecosystem-view agent-deepdive-panel">
+      <div class="deepdive-nav-bar">
+        <button class="btn-back-topology" id="btn-back-topology">
+          &lsaquo; Back to Persona &amp; Live Extracter Workbench
+        </button>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span style="font-size:12px; color:var(--m3-text-secondary); font-weight:600;">Component Switcher:</span>
+          <select id="agent-quick-select" class="deepdive-select"></select>
+        </div>
+      </div>
+
+      <div class="deepdive-top-grid">
+        <div class="deepdive-header-card">
+          <div class="deepdive-badges-cluster">
+            <span class="badge-agent-id" id="dd-badge-id"></span>
+            <span class="badge-apqc-pill" id="dd-badge-apqc"></span>
+            <span class="badge badge-optimal" id="dd-badge-status"></span>
+          </div>
+          <h2 class="deepdive-hero-title" id="dd-title"></h2>
+          <div class="deepdive-process-sub" id="dd-process"></div>
+        </div>
+        <div class="value-unlocked-card">
+          <div class="value-unlocked-header">VERIFIED BENCHMARK METRIC</div>
+          <div class="value-unlocked-amount tnum" id="dd-value-amount"></div>
+          <div class="value-unlocked-period" id="dd-value-period"></div>
+        </div>
+      </div>
+
+      <div class="deepdive-main-grid">
+        <div class="deepdive-left-col">
+          <div class="business-logic-card">
+            <div class="card-header-label" style="color:var(--m3-primary);"><span>Component Engineering Contract</span></div>
+            <div class="biz-stake-line" id="dd-biz-stake"></div>
+            <div class="biz-row"><div class="biz-row-label">Decision it owns</div><div class="biz-row-value" id="dd-biz-owns"></div></div>
+            <div class="biz-row"><div class="biz-row-label">Answers to</div><div class="biz-row-value" id="dd-biz-answers"></div></div>
+            <div class="biz-row"><div class="biz-row-label">Engineering impact</div><div class="biz-row-value" id="dd-biz-pl"></div></div>
+            <div class="biz-row"><div class="biz-row-label" style="color:var(--m3-critical);">What it cannot do</div><div class="biz-row-value" id="dd-biz-cannot"></div></div>
+            <div class="biz-row"><div class="biz-row-label">Failure handling</div><div class="biz-row-value" id="dd-biz-failure"></div></div>
+          </div>
+
+          <div class="deepdive-code-card">
+            <div class="card-header-label">
+              <span>Production Implementation</span>
+              <span id="dd-code-lang" style="color:var(--m3-text-tertiary); font-weight:500;"></span>
+            </div>
+            <pre class="code-editor-box" id="dd-code-box"></pre>
+          </div>
+        </div>
+
+        <div class="deepdive-right-col">
+          <a class="btn btn-primary" style="width:100%; padding:10px;" href="/dev-ui/?app=extracter_agent">
+            Invoke Live in ADK Dev UI (/dev-ui/) &rsaquo;
+          </a>
+          <a class="btn" style="width:100%; padding:10px;" href="/architecture-diagram">
+            View Full Ingestion Architecture SVG &rsaquo;
+          </a>
+          <div class="deepdive-provenance-card" style="margin-top:4px;">
+            <div class="card-header-label"><span>Verified GCP Runtime Environment</span></div>
+            <div class="drawer-keyval-row"><span class="drawer-key">GCP Project:</span><span class="drawer-val">ut-interaction-demo</span></div>
+            <div class="drawer-keyval-row"><span class="drawer-key">Cloud Run Region:</span><span class="drawer-val">asia-southeast1</span></div>
+            <div class="drawer-keyval-row"><span class="drawer-key">Model Endpoint:</span><span class="drawer-val">gemini-3.8-flash (global)</span></div>
+            <div class="drawer-keyval-row"><span class="drawer-key">GCS Knowledge Store:</span><span class="drawer-val">gs://ut-interaction-demo-okf-knowledge</span></div>
+            <div class="drawer-keyval-row"><span class="drawer-key">Pytest / Ruff / Bandit:</span><span class="drawer-val" style="color:var(--m3-success);">100% PASSING</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================================================ SCREEN 04 / 04: OKF GRAPH & CLOUD STACK -->
+  <div id="pane-architecture" class="screen-pane" data-screen-index="4">
+    <div class="security-top-meta">
+      <div>
+        <div class="eyebrow" style="color:var(--m3-success);">SCREEN 04 / 04 &bull; INTERACTIVE OKF v0.2 KNOWLEDGE GRAPH &amp; GOOGLE CLOUD ARCHITECTURE</div>
+        <h1 class="hero-title" style="margin-bottom:2px;">{{S4_H1}}</h1>
+      </div>
+      <div style="text-align:right;">
+        <span class="badge badge-primary" style="margin-bottom:3px;">RULE 14 IMMUTABLE &bull; MODEL ARMOR</span>
+        <div style="font-size:10.5px; font-family:var(--font-mono); color:var(--m3-text-tertiary);">{{S4_GCS_PATH}}</div>
+      </div>
+    </div>
+
+    <!-- Dominant Visual Stage 1: Interactive 125-Node, 866-Edge OKF Property Graph -->
+    <div class="datagraph-section">
+      <div class="datagraph-head">
+        <div>
+          <h2 style="font-family:var(--font-serif); font-size:19px; font-weight:700; margin-bottom:2px;">{{S4_GRAPH_H2}}</h2>
+          <p style="font-size:12px; color:var(--m3-text-secondary);">
+            Click any vessel, instrument register, hazard, or source node to inspect its raw PDFs and cross-links. Red nodes mark active conflicts.
+          </p>
+        </div>
+        <div class="datagraph-stat-row">
+          <div>{{S4_STAT_PDFS}}<div class="datagraph-stat-label">Raw PDFs</div></div>
+          <div>{{S4_STAT_CONCEPTS}}<div class="datagraph-stat-label">OKF Concepts</div></div>
+          <div><div class="datagraph-stat-value tnum" style="{{S4_STAT_CONFLICTS}}<div class="datagraph-stat-label">Conflicts</div></div>
+          <div><div class="datagraph-stat-value tnum" style="color:var(--m3-success);">0</div><div class="datagraph-stat-label">Broken Links</div></div>
+        </div>
+      </div>
+
+      <div class="datagraph-toolbar" id="datagraph-toolbar"></div>
+
+      <div class="datagraph-body">
+        <div class="datagraph-canvas-wrap">
+          <svg id="datagraph-svg" role="img" aria-label="Interactive graph of the OKF v0.2 knowledge bundle: concepts as nodes, wiki cross-links as edges."></svg>
+          <div class="datagraph-legend">
+            <div class="dg-legend-item"><span class="dg-legend-dot" style="background:#D93025;"></span> {{S4_LEGEND_CONFLICT}}</div>
+            <div class="dg-legend-item"><span class="dg-legend-dot" style="background:#1A73E8;"></span> Equipment &amp; Procedures</div>
+            <div class="dg-legend-item"><span class="dg-legend-dot" style="background:#1E8E3E;"></span> Instruments &amp; SIS</div>
+            <div class="dg-legend-item"><span class="dg-legend-dot" style="background:#174EA6;"></span> Process Units</div>
+            <div class="dg-legend-item"><span class="dg-legend-dot" style="background:#80868B;"></span> Source Dossiers</div>
+          </div>
+          <div class="datagraph-hint">Click any node to inspect raw PDFs, cross-links &amp; conflicts &middot; filter by category above</div>
+        </div>
+        <div class="datagraph-detail" id="datagraph-detail"></div>
+      </div>
+    </div>
+
+    <!-- Dominant Visual Stage 2: 7-Layer Google Cloud & Governance Architecture Blueprint SVG -->
+    <div class="arch-blueprint-card">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; flex-wrap:wrap; gap:8px;">
+        <div>
+          <h2 class="section-title" style="font-size:17px; margin-bottom:0;">Google Cloud Production Deployment &amp; Governance Blueprint (ut-interaction-demo)</h2>
+        </div>
+        <div class="arch-legend-row" style="margin-bottom:0;">
+          <div class="arch-legend-item"><span class="arch-legend-swatch" style="background:var(--m3-primary);"></span> Request descending</div>
+          <div class="arch-legend-item"><span class="arch-legend-swatch" style="background:var(--m3-success);"></span> Verified OKF v0.2 evidence</div>
+          <div class="arch-legend-item"><span class="arch-legend-swatch" style="background:var(--m3-critical);"></span> 4 Binding Controls</div>
+        </div>
+      </div>
+
+      <svg id="arch-visual-blueprint-svg" viewBox="0 0 1080 185" style="width:100%; height:175px; overflow:visible;" role="img" aria-label="7-Layer Google Cloud Architecture and 4 Binding Governance Controls">
+        <!-- Left-to-Right Cloud Runtime Pipeline -->
+        <!-- Box 1: Cloud Run + FastAPI -->
+        <g transform="translate(6, 10)">
+          <rect width="195" height="112" rx="6" fill="#FFFFFF" stroke="#1A73E8" stroke-width="1.5"/>
+          <rect width="195" height="20" rx="6" fill="#E8F0FE"/>
+          <text x="97" y="14" text-anchor="middle" font-family="'Roboto Mono', monospace" font-size="8.5" font-weight="700" fill="#174EA6">L1-L2 // CLOUD RUN RUNTIME</text>
+          <text x="97" y="40" text-anchor="middle" font-family="'Plus Jakarta Sans', sans-serif" font-size="11" font-weight="700" fill="#202124">FastAPI + ADK Web Server</text>
+          <text x="97" y="58" text-anchor="middle" font-family="'Roboto Mono', monospace" font-size="9.5" fill="#5F6368">asia-southeast1 (2 vCPU/2GiB)</text>
+          <text x="97" y="76" text-anchor="middle" font-family="'Roboto Mono', monospace" font-size="9.5" fill="#1A73E8">GET / &bull; /dev-ui/ &bull; /api/demo</text>
+          <text x="97" y="96" text-anchor="middle" font-family="'Roboto Mono', monospace" font-size="8.5" font-weight="700" fill="#137333">Zero-Cold-Start Bundle Seed</text>
+        </g>
+        <line x1="201" y1="66" x2="221" y2="66" stroke="#1A73E8" stroke-width="2"/>
+        <polygon points="221,66 215,62 215,70" fill="#1A73E8"/>
+
+        <!-- Box 2: Model Armor Guardrail -->
+        <g transform="translate(223, 10)">
+          <rect width="185" height="112" rx="6" fill="#FFFFFF" stroke="#D93025" stroke-width="1.5"/>
+          <rect width="185" height="20" rx="6" fill="#FCE8E6"/>
+          <text x="92" y="14" text-anchor="middle" font-family="'Roboto Mono', monospace" font-size="8.5" font-weight="700" fill="#C5221F">L3 // MODEL ARMOR SECURITY</text>
+          <text x="92" y="40" text-anchor="middle" font-family="'Plus Jakarta Sans', sans-serif" font-size="11" font-weight="700" fill="#202124">before_agent_callback</text>
+          <text x="92" y="58" text-anchor="middle" font-family="'Roboto Mono', monospace" font-size="9.5" fill="#5F6368">Prompt Injection Blocker</text>
+          <text x="92" y="76" text-anchor="middle" font-family="'Roboto Mono', monospace" font-size="9.5" fill="#5F6368">Path Traversal Guard (../)</text>
+          <text x="92" y="96" text-anchor="middle" font-family="'Roboto Mono', monospace" font-size="8.5" font-weight="700" fill="#D93025">100% Block Rate (9/9 Cases)</text>
+        </g>
+        <line x1="408" y1="66" x2="428" y2="66" stroke="#1A73E8" stroke-width="2"/>
+        <polygon points="428,66 422,62 422,70" fill="#1A73E8"/>
+
+        <!-- Box 3: Vertex AI Gemini 3.8 Flash + Vision -->
+        <g transform="translate(430, 10)">
+          <rect width="215" height="112" rx="6" fill="#E8F0FE" stroke="#1A73E8" stroke-width="2"/>
+          <rect width="215" height="20" rx="6" fill="#1A73E8"/>
+          <text x="107" y="14" text-anchor="middle" font-family="'Roboto Mono', monospace" font-size="8.5" font-weight="700" fill="#FFFFFF">L4-L5 // COGNITION &amp; VISION</text>
+          <text x="107" y="40" text-anchor="middle" font-family="'Plus Jakarta Sans', sans-serif" font-size="11" font-weight="700" fill="#174EA6">Gemini 3.8 Flash (Global)</text>
+          <text x="107" y="58" text-anchor="middle" font-family="'Roboto Mono', monospace" font-size="9.5" fill="#202124">PyMuPDF Digital Tables</text>
+          <text x="107" y="76" text-anchor="middle" font-family="'Roboto Mono', monospace" font-size="9.5" fill="#202124">300 DPI Vector CAD Vision</text>
+          <text x="107" y="96" text-anchor="middle" font-family="'Roboto Mono', monospace" font-size="8.5" font-weight="700" fill="#174EA6">SHA-256 Vision Cache + 5x Retry</text>
+        </g>
+        <line x1="645" y1="66" x2="665" y2="66" stroke="#1E8E3E" stroke-width="2"/>
+        <polygon points="665,66 659,62 659,70" fill="#1E8E3E"/>
+
+        <!-- Box 4: Read-Merge-Upsert Compiler -->
+        <g transform="translate(667, 10)">
+          <rect width="195" height="112" rx="6" fill="#FFFFFF" stroke="#1E8E3E" stroke-width="1.5"/>
+          <rect width="195" height="20" rx="6" fill="#E6F4EA"/>
+          <text x="97" y="14" text-anchor="middle" font-family="'Roboto Mono', monospace" font-size="8.5" font-weight="700" fill="#137333">L6 // COMPILER &amp; VALIDATOR</text>
+          <text x="97" y="40" text-anchor="middle" font-family="'Plus Jakarta Sans', sans-serif" font-size="11" font-weight="700" fill="#202124">Read-Merge-Upsert Engine</text>
+          <text x="97" y="58" text-anchor="middle" font-family="'Roboto Mono', monospace" font-size="9.5" fill="#5F6368">{{S4_ARCH_SUPERSESSION}}</text>
+          <text x="97" y="76" text-anchor="middle" font-family="'Roboto Mono', monospace" font-size="9.5" fill="{{S4_ARCH_CONFLICTS}} y="96" text-anchor="middle" font-family="'Roboto Mono', monospace" font-size="8.5" font-weight="700" fill="#137333">is_valid_okf: true (0 Broken)</text>
+        </g>
+        <line x1="862" y1="66" x2="882" y2="66" stroke="#1E8E3E" stroke-width="2"/>
+        <polygon points="882,66 876,62 876,70" fill="#1E8E3E"/>
+
+        <!-- Box 5: Two-Tier GCS Store -->
+        <g transform="translate(884, 10)">
+          <rect width="190" height="112" rx="6" fill="#FFFFFF" stroke="#1A73E8" stroke-width="1.5"/>
+          <rect width="190" height="20" rx="6" fill="#E8F0FE"/>
+          <text x="95" y="14" text-anchor="middle" font-family="'Roboto Mono', monospace" font-size="8.5" font-weight="700" fill="#174EA6">L7 // TWO-TIER GCS STORE</text>
+          <text x="95" y="40" text-anchor="middle" font-family="'Plus Jakarta Sans', sans-serif" font-size="11" font-weight="700" fill="#202124">ut-interaction-demo-okf</text>
+          <text x="95" y="58" text-anchor="middle" font-family="'Roboto Mono', monospace" font-size="9.5" fill="#5F6368">{{S4_ARCH_RAW}}</text>
+          <text x="95" y="76" text-anchor="middle" font-family="'Roboto Mono', monospace" font-size="9.5" fill="#137333">{{S4_ARCH_MD}}</text>
+          <text x="95" y="96" text-anchor="middle" font-family="'Roboto Mono', monospace" font-size="8.5" font-weight="700" fill="#174EA6">16-Worker MD5 Parallel Sync</text>
+        </g>
+
+        <!-- Bottom Spanning Governance Bar -->
+        <g transform="translate(6, 134)">
+          <rect width="1068" height="42" rx="6" fill="#F8F9FA" stroke="#D93025" stroke-width="1.25" stroke-dasharray="5,3"/>
+          <text x="18" y="25" font-family="'Roboto Mono', monospace" font-size="10" font-weight="800" fill="#D93025">4 BINDING CONTROLS:</text>
+          <text x="175" y="25" font-family="'Roboto Mono', monospace" font-size="10" font-weight="700" fill="#202124">[1] Rule 14 reference/ Immutability</text>
+          <text x="430" y="25" font-family="'Roboto Mono', monospace" font-size="10" font-weight="700" fill="#202124">[2] Model Armor Pre-Flight Intercept</text>
+          <text x="695" y="25" font-family="'Roboto Mono', monospace" font-size="10" font-weight="700" fill="#202124">[3] Datasheet vs P&amp;ID Precedence</text>
+          <text x="925" y="25" font-family="'Roboto Mono', monospace" font-size="10" font-weight="700" fill="#137333">[4] 100% Schema Gate</text>
+        </g>
+      </svg>
+    </div>
+
+    <!-- Collapsible Detailed 7-Layer Stack & 4 Governance Controls -->
+    <details class="tech-spec-drawer">
+      <summary class="tech-spec-summary">
+        <span>+ INSPECT DETAILED 7-LAYER LOGICAL STACK SPECIFICATIONS &amp; 4 GOVERNANCE CONTROL RULES</span>
+        <span class="badge badge-stable">7 LAYERS + 4 CONTROLS</span>
+      </summary>
+      <div class="tech-spec-body">
+        <div class="arch-stack-grid">
+          <div class="arch-stack" id="arch-stack"></div>
+          <div class="arch-control-rail">
+            <div class="arch-control-title">Controls that bind every layer</div>
+            <div id="arch-controls" style="display:flex; flex-direction:column; gap:10px;"></div>
+          </div>
+        </div>
+      </div>
+    </details>
+
+    <!-- Bottom Storyline Takeaway Bar -->
+    <div class="storyline-footer">
+      <div class="storyline-takeaway">
+        <span class="storyline-so-what">SO WHAT</span>
+{{S4_SOWHAT}}
+      </div>
+      <div class="storyline-nav-group">
+        <button class="btn" data-goto-tab="ecosystem">&lsaquo; 03 &middot; Live Workbench</button>
+        <button class="btn btn-primary" data-goto-tab="macro">Restart Executive Tour (Screen 01) &#8634;</button>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<div id="dispatch-toast" role="status" aria-live="polite">Ready</div>
+
+<script src="/static/data.js"></script>
+<script src="/static/app.js"></script>
+</body>
+</html>

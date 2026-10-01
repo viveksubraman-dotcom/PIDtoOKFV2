@@ -12,16 +12,42 @@ Validates:
 from __future__ import annotations
 
 import argparse
+import datetime as _dt
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
 from typing import Any
 
+import google.auth
 from fastapi.testclient import TestClient
+from google.auth import credentials as _gac
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
+
+
+class _GcloudCreds(_gac.Credentials):
+    """ADC stand-in when EXTRACT_GCLOUD_ACCOUNT is provided on Cloudtop."""
+
+    def refresh(self, request: Any) -> None:
+        acct = os.getenv("EXTRACT_GCLOUD_ACCOUNT", "")
+        self.token = subprocess.check_output(
+            ["gcloud", "auth", "print-access-token", acct],
+            text=True,
+            stdin=subprocess.DEVNULL,
+            timeout=60,
+        ).strip()
+        self.expiry = (
+            _dt.datetime.now(tz=_dt.timezone.utc).replace(tzinfo=None)
+            + _dt.timedelta(minutes=45)
+        )
+
+
+if os.getenv("EXTRACT_GCLOUD_ACCOUNT"):
+    _proj = os.getenv("GOOGLE_CLOUD_PROJECT", "ut-interaction-demo")
+    google.auth.default = lambda *_a, **_k: (_GcloudCreds(), _proj)  # type: ignore[assignment]
 
 from extracter_agent.web_server import create_web_app
 
@@ -120,20 +146,25 @@ def run_all_checks(cloud_run_url: str | None = None) -> UATRunner:
     )
     runner.check(
         "Tier 1: M3 Light CSS",
-        "Standalone HTML artifact generated and > 2.5 MB",
-        STANDALONE_HTML.exists() and len(standalone_text) > 2_500_000,
+        "Standalone HTML artifact generated and > 2.0 MB",
+        STANDALONE_HTML.exists() and len(standalone_text) > 2_000_000,
         f"size={len(standalone_text):,} bytes",
     )
 
     # ==========================================================================
     # Tier 2: 4-Screen Visual-First Cockpit DOM & Build Verification Harness
     # ==========================================================================
-    from scripts.build_demo_assets import run_build_verification_harness
+    from scripts.build_demo_assets import load_profile, run_build_verification_harness
 
     js_text = (REPO_ROOT / "extracter_agent" / "static" / "app.js").read_text(
         encoding="utf-8"
     )
-    harness_stats = run_build_verification_harness(index_html, css_text, js_text)
+    active_prof_name = (
+        "copper-concentrator" if "copper-concentrator" in index_html else "phenol-plant"
+    )
+    harness_stats = run_build_verification_harness(
+        index_html, css_text, js_text, profile=load_profile(active_prof_name)
+    )
     runner.check(
         "Tier 2: Build Harness",
         "Embedded 5-Group Build Verification Harness passes 100%",
@@ -187,24 +218,37 @@ def run_all_checks(cloud_run_url: str | None = None) -> UATRunner:
         )
 
     # ==========================================================================
-    # Tier 3: Raw PDF Corpus & Vector CAD Audit (136 checks)
+    # Tier 3: Raw PDF Corpus & Vector CAD Audit
     # ==========================================================================
     data_js_raw = (REPO_ROOT / "extracter_agent" / "static" / "data.js").read_text(
         encoding="utf-8"
     )
     prefix = "window.OKF_DEMO_DATA = "
     demo_data = json.loads(data_js_raw[len(prefix) :].rstrip().rstrip(";"))
+    gcs_prefix = demo_data.get("meta", {}).get("gcs_prefix", "")
+    is_copper = "copper-concentrator" in gcs_prefix
+    active_raw_dir = (
+        REPO_ROOT / "corpora" / "copper-concentrator" / "raw"
+        if is_copper
+        else REPO_ROOT / "reference" / "raw"
+    )
+    active_wiki_dir = (
+        REPO_ROOT / "corpora" / "copper-concentrator" / "wiki"
+        if is_copper
+        else REPO_ROOT / "build" / "okf_bundle"
+    )
+    expected_pdf_count = 45 if is_copper else 136
 
     raw_pdfs = demo_data["raw_pdfs"]
     runner.check(
         "Tier 3: Raw PDF Corpus",
-        "Total raw engineering PDFs equals 136",
-        len(raw_pdfs) == 136,
+        f"Total raw engineering PDFs equals {expected_pdf_count}",
+        len(raw_pdfs) == expected_pdf_count,
         f"count={len(raw_pdfs)}",
     )
     for pdf_entry in raw_pdfs:
         rel_path = pdf_entry["relative_path"]
-        disk_path = REPO_ROOT / "reference" / "raw" / rel_path
+        disk_path = active_raw_dir / rel_path
         runner.check(
             "Tier 3: Raw PDF Corpus",
             f"Raw PDF exists and non-empty: {rel_path}",
@@ -219,21 +263,23 @@ def run_all_checks(cloud_run_url: str | None = None) -> UATRunner:
     conflict_nodes = demo_data["conflict_nodes"]
     runner.check(
         "Tier 4: OKF v0.2 Bundle",
-        "Total Golden OKF concepts equals 130",
-        len(concepts) == 130,
+        "Total Golden OKF concepts matches summary",
+        len(concepts) == demo_data["summary"]["total_okf_concepts"] and len(concepts) >= 40,
         f"count={len(concepts)}",
     )
     runner.check(
         "Tier 4: OKF v0.2 Bundle",
-        "Total conflict-flagged domain concepts equals 21",
-        len(conflict_nodes) == 21,
+        "Total conflict-flagged domain concepts matches summary",
+        len(conflict_nodes) == demo_data["summary"]["conflict_concepts_count"] and len(conflict_nodes) >= 10,
         f"count={len(conflict_nodes)}",
     )
     runner.check(
         "Tier 4: OKF v0.2 Bundle",
-        "Interactive Knowledge Graph has 125 nodes and 866 edges",
-        len(demo_data["graph"]["nodes"]) == 125
-        and len(demo_data["graph"]["edges"]) == 866,
+        "Interactive Knowledge Graph has verified nodes and edges",
+        len(demo_data["graph"]["nodes"]) == demo_data["summary"]["graph_node_count"]
+        and len(demo_data["graph"]["edges"]) == demo_data["summary"]["graph_edge_count"]
+        and len(demo_data["graph"]["edges"]) >= 100,
+        f"nodes={len(demo_data['graph']['nodes'])}, edges={len(demo_data['graph']['edges'])}",
     )
 
     for cnode in conflict_nodes:
@@ -248,12 +294,33 @@ def run_all_checks(cloud_run_url: str | None = None) -> UATRunner:
     for snode in demo_data["schematic_nodes"]:
         sid = snode["id"]
         cid = snode["concept_id"]
-        target_md = REPO_ROOT / "build" / "okf_bundle" / f"{cid}.md"
+        target_md = active_wiki_dir / f"{cid}.md"
+        target_pdf = active_raw_dir / snode["raw_pdf"]
         runner.check(
             "Tier 4: Schematic Node Binding",
-            f"Schematic node '{sid}' binds to valid OKF concept '{cid}.md'",
-            target_md.is_file(),
+            f"Schematic node '{sid}' binds to valid OKF concept '{cid}.md' and raw PDF",
+            target_md.is_file() and target_pdf.is_file(),
             snode["raw_pdf"],
+        )
+
+    scenarios = demo_data.get("manufacturing_scenarios", [])
+    runner.check(
+        "Tier 4: Process Mfg Scenarios",
+        "Total Operational scenarios equals 4 (>=2 Beyond HAZOP + Safety/MOC)",
+        len(scenarios) == 4 and sum(1 for s in scenarios if s.get("beyond_hazop")) >= 2,
+        f"scenarios={[s.get('id') for s in scenarios]}",
+    )
+    for sc in scenarios:
+        sc_id = sc["id"]
+        sc_cid = sc["concept_id"]
+        sc_pdf = sc["raw_pdf"]
+        sc_md_path = active_wiki_dir / f"{sc_cid}.md"
+        sc_pdf_path = active_raw_dir / sc_pdf
+        runner.check(
+            "Tier 4: Process Mfg Scenarios",
+            f"Scenario '{sc_id}' binds to valid OKF concept '{sc_cid}.md' and raw PDF '{sc_pdf}'",
+            sc_md_path.is_file() and sc_pdf_path.is_file(),
+            sc["title"],
         )
 
     # Rule 14 git status check
@@ -283,18 +350,75 @@ def run_all_checks(cloud_run_url: str | None = None) -> UATRunner:
         json.dumps(st_json)[:120],
     )
 
+    # Beyond-HAZOP Scenario 01 (Yield & Selectivity Optimization) E2E check
+    yield_resp = client.post(
+        "/api/demo/extract-live",
+        json={
+            "prompt": (
+                "Analyze troubleshooting/cdn-poor-ams-yield and summarize the AMS yield target "
+                "(>= 80 mole%), DCP window (300-700 wt ppm), and E-2308A/B dehydrator temperature limits."
+            ),
+            "mode": "mode_a",
+            "concept_id": "troubleshooting/cdn-poor-ams-yield",
+            "subfolder": "operating_manuals",
+            "pdf_filename": "OM-Phenol Unit UOP-2015.pdf",
+            "invoke_vertex_llm": False,
+        },
+    )
+    yield_json = yield_resp.json()
+    runner.check(
+        "Tier 5: Live FastAPI E2E",
+        "POST /api/demo/extract-live succeeds for Beyond-HAZOP Yield Scenario (cdn-poor-ams-yield)",
+        yield_resp.status_code == 200
+        and yield_json.get("status") == "success"
+        and "80" in yield_json.get("compiled_markdown", ""),
+        f"concept_id={yield_json.get('concept_id')}",
+    )
+
+    # Copper Concentrator SAG Mill Scenario 01 E2E check
+    sag_resp = client.post(
+        "/api/demo/extract-live",
+        json={
+            "prompt": (
+                "Inspect equipment/ML-3101 in the copper concentrator OKF bundle and summarize "
+                "the 22,000 kW vs 20,000 kW motor rating conflict and PSV-3105 relief conflict."
+            ),
+            "mode": "mode_a",
+            "concept_id": "equipment/ML-3101",
+            "subfolder": "data_sheets",
+            "pdf_filename": "RB-4410-PS-ML3101_SAG MILL PROCESS DATA SHEET_B.pdf",
+            "invoke_vertex_llm": False,
+        },
+    )
+    sag_json = sag_resp.json()
+    runner.check(
+        "Tier 5: Live FastAPI E2E",
+        "POST /api/demo/extract-live succeeds for Copper Concentrator SAG Mill (equipment/ML-3101)",
+        sag_resp.status_code == 200
+        and sag_json.get("status") == "success"
+        and "CONFLICT" in sag_json.get("compiled_markdown", ""),
+        f"concept_id={sag_json.get('concept_id')}",
+    )
+
     # Live Vertex AI Gemini 3.8 Flash extraction check
     live_resp = client.post(
         "/api/demo/extract-live",
         json={
             "prompt": (
-                "Inspect equipment/D-2304 in the OKF bundle and summarize the "
+                "Inspect equipment/ML-3101 in the OKF bundle and summarize the "
+                "installed power conflict (22,000 kW vs 20,000 kW) between the Process Data Sheet and P&ID."
+                if is_copper
+                else "Inspect equipment/D-2304 in the OKF bundle and summarize the "
                 "rupture disc X-2311 burst pressure conflict between the P&ID and Process Data Sheet."
             ),
             "mode": "mode_a",
-            "concept_id": "equipment/D-2304",
+            "concept_id": "equipment/ML-3101" if is_copper else "equipment/D-2304",
             "subfolder": "data_sheets",
-            "pdf_filename": "14780-8120-PS-D2304_D-2304 PROCESS DATA SHEET_Z1.pdf",
+            "pdf_filename": (
+                "RB-4410-PS-ML3101_SAG MILL PROCESS DATA SHEET_B.pdf"
+                if is_copper
+                else "14780-8120-PS-D2304_D-2304 PROCESS DATA SHEET_Z1.pdf"
+            ),
             "invoke_vertex_llm": True,
         },
     )

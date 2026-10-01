@@ -8,6 +8,7 @@
 
   var DATA = window.OKF_DEMO_DATA || {
     meta: {},
+    manufacturing_scenarios: [],
     benchmark_bars: [],
     headwinds: [],
     levers: [],
@@ -22,19 +23,22 @@
     graph: { nodes: [], edges: [] }
   };
 
+  var UI = DATA.ui || {};
   var TABS = ["macro", "schematic", "ecosystem", "architecture"];
-  var PERSONA_FLAGSHIP_CONCEPTS = [
-    "equipment/D-2304",
-    "equipment/V-2301",
-    "instruments/sis-cdn",
-    "equipment/P-2302"
-  ];
+  var PERSONA_FLAGSHIP_CONCEPTS = UI.persona_flagship_concepts || [];
+  var DEFAULT_CONCEPT =
+    UI.default_concept ||
+    (DATA.concepts && DATA.concepts[0] ? DATA.concepts[0].concept_id : "");
+  var DEFAULT_NODE_INDEX =
+    typeof UI.default_node_index === "number" ? UI.default_node_index : 4;
   var currentTab = "macro";
-  var currentNodeIndex = 4; // Default to D-2304 Decomposer Drum (Critical Conflict Node)
+  var currentScenarioIndex = 0;
+  var currentNodeIndex = DEFAULT_NODE_INDEX;
   var currentPersonaIndex = 0;
   var currentWbMode = "mode_a";
   var currentGraphFilter = "all";
-  var selectedGraphNodeId = "equipment/D-2304";
+  var selectedGraphNodeId =
+    UI.default_graph_node || PERSONA_FLAGSHIP_CONCEPTS[0] || DEFAULT_CONCEPT;
 
   function showToast(msg) {
     var toast = document.getElementById("dispatch-toast");
@@ -97,7 +101,102 @@
   }
 
   /* ------------------------------------------------------- Screen 1: Macro */
+  function selectManufacturingScenario(idx, syncAll) {
+    var scenarios = DATA.manufacturing_scenarios || [];
+    if (!scenarios.length) return;
+    if (idx < 0 || idx >= scenarios.length) idx = 0;
+    currentScenarioIndex = idx;
+    var sc = scenarios[idx];
+
+    document.querySelectorAll("[data-scenario-idx]").forEach(function (btn, i) {
+      btn.classList.toggle("active", i === idx);
+      btn.setAttribute("aria-selected", i === idx ? "true" : "false");
+    });
+
+    var badgeEl = document.getElementById("sc-spot-badge");
+    if (badgeEl) {
+      badgeEl.textContent = sc.badge;
+      badgeEl.className = "badge " + (sc.beyond_hazop ? "badge-primary" : "badge-critical");
+    }
+    var codeEl = document.getElementById("sc-spot-code");
+    if (codeEl) codeEl.textContent = sc.code;
+    var titleEl = document.getElementById("sc-spot-title");
+    if (titleEl) titleEl.textContent = sc.title;
+    var chalEl = document.getElementById("sc-spot-challenge");
+    if (chalEl) chalEl.textContent = sc.challenge;
+    var derivEl = document.getElementById("sc-spot-derivation");
+    if (derivEl) derivEl.textContent = sc.derivation;
+    var impEl = document.getElementById("sc-spot-impact");
+    if (impEl) impEl.textContent = sc.impact;
+
+    if (syncAll) {
+      if (typeof sc.persona_idx === "number") {
+        selectPersona(sc.persona_idx, false);
+      }
+      if (sc.concept_id) {
+        renderWorkbenchConcept(sc.concept_id);
+        selectedGraphNodeId = sc.concept_id;
+      }
+      if (sc.schematic_node_id) {
+        for (var j = 0; j < DATA.schematic_nodes.length; j++) {
+          if (DATA.schematic_nodes[j].id === sc.schematic_node_id) {
+            openSchematicNode(j, true);
+            break;
+          }
+        }
+      }
+      showToast("Active Scenario: " + sc.short_label + " -> " + sc.concept_id + ".md");
+    }
+  }
+
   function renderMacroScreen() {
+    var scStrip = document.getElementById("scenario-switcher-strip");
+    var scenarios = DATA.manufacturing_scenarios || [];
+    if (scStrip && scenarios.length) {
+      scStrip.innerHTML = scenarios
+        .map(function (sc, idx) {
+          var badgeClass = sc.beyond_hazop ? "badge-optimal" : "badge-critical";
+          var tagText = sc.tag_text || (sc.beyond_hazop ? "BEYOND HAZOP" : "MOC & HAZOP");
+          return (
+            '<button class="scenario-pill-btn ' +
+            (idx === currentScenarioIndex ? "active" : "") +
+            '" data-scenario-idx="' +
+            idx +
+            '" role="tab" aria-selected="' +
+            (idx === currentScenarioIndex ? "true" : "false") +
+            '">' +
+            '<div class="scenario-pill-top">' +
+            "<span>" +
+            escapeHtml(sc.short_label) +
+            "</span>" +
+            '<span class="badge ' +
+            badgeClass +
+            '" style="padding:2px 6px; font-size:9px;">' +
+            escapeHtml(tagText) +
+            "</span>" +
+            "</div>" +
+            '<div class="scenario-pill-title">' +
+            escapeHtml(sc.title) +
+            "</div>" +
+            '<div style="font-family:var(--font-mono); font-size:10.5px; font-weight:700; color:var(--m3-primary); margin-top:2px;">' +
+            escapeHtml(sc.kpi_delta + " • " + sc.speedup) +
+            "</div>" +
+            "</button>"
+          );
+        })
+        .join("");
+
+      scStrip.querySelectorAll("[data-scenario-idx]").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          selectManufacturingScenario(
+            parseInt(btn.getAttribute("data-scenario-idx"), 10),
+            true
+          );
+        });
+      });
+      selectManufacturingScenario(currentScenarioIndex, false);
+    }
+
     var benchEl = document.getElementById("s1-benchmark-bars");
     if (benchEl) {
       benchEl.innerHTML = DATA.benchmark_bars
@@ -435,11 +534,15 @@
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Draw Cartographic Compass Rose & 25m Process Scale Bar in bottom-left
+    // Draw Cartographic Compass Rose & Process Scale Bar in bottom-left
     ctx.save();
     ctx.font = "700 10px 'Roboto Mono', monospace";
     ctx.fillStyle = "#5F6368";
-    ctx.fillText("N▲  PROCESS FLOW TOPOLOGY  |  SCALE: 25m ELEVATION", 18, canvas.height - 12);
+    ctx.fillText(
+      UI.canvas_caption || "N▲  PROCESS FLOW TOPOLOGY  |  SCALE: 25m ELEVATION",
+      18,
+      canvas.height - 12
+    );
     ctx.strokeStyle = "#1A73E8";
     ctx.lineWidth = 2;
     ctx.beginPath();
@@ -448,19 +551,8 @@
     ctx.stroke();
     ctx.restore();
 
-    var pairs = [
-      ["node-r2201", "node-v2301"],
-      ["node-v2301", "node-v2302"],
-      ["node-v2302", "node-d2301"],
-      ["node-d2301", "node-d2304"],
-      ["node-d2304", "node-e2307"],
-      ["node-d2304", "node-p2302"],
-      ["node-p2302", "node-d2308"],
-      ["node-d2312", "node-d2304"],
-      ["node-d2308", "node-v2401"],
-      ["node-sis_cdn", "node-d2304"],
-      ["node-hazop_cdn", "node-sis_cdn"]
-    ];
+    var critDomId = UI.critical_dom_id || "";
+    var pairs = UI.flow_pairs || [];
 
     pairs.forEach(function (pair) {
       var a = document.getElementById(pair[0]);
@@ -474,7 +566,7 @@
       var y2 = rb.top - rect.top + rb.height / 2;
 
       ctx.save();
-      ctx.strokeStyle = pair[1] === "node-d2304" ? "#D93025" : "#1A73E8";
+      ctx.strokeStyle = pair[1] === critDomId ? "#D93025" : "#1A73E8";
       ctx.lineWidth = 1.75;
       ctx.setLineDash([5, 4]);
       ctx.beginPath();
@@ -487,7 +579,7 @@
       var my = (y1 + y2) / 2;
       var angle = Math.atan2(y2 - y1, x2 - x1);
       ctx.setLineDash([]);
-      ctx.fillStyle = pair[1] === "node-d2304" ? "#D93025" : "#1A73E8";
+      ctx.fillStyle = pair[1] === critDomId ? "#D93025" : "#1A73E8";
       ctx.beginPath();
       ctx.moveTo(mx + 6 * Math.cos(angle), my + 6 * Math.sin(angle));
       ctx.lineTo(
@@ -563,7 +655,7 @@
     }
 
     if (syncWorkbench) {
-      var targetConcept = PERSONA_FLAGSHIP_CONCEPTS[idx] || "equipment/D-2304";
+      var targetConcept = PERSONA_FLAGSHIP_CONCEPTS[idx] || DEFAULT_CONCEPT;
       renderWorkbenchConcept(targetConcept);
       showToast("Persona synced -> Loaded " + targetConcept + ".md");
     }
@@ -677,7 +769,7 @@
             "Matched " +
             (c.sources.length || 1) +
             " governing PDFs: " +
-            (c.sources.slice(0, 3).join(", ") || "reference/raw/")
+            (c.sources.slice(0, 3).join(", ") || UI.raw_dir_label || "reference/raw/")
         },
         {
           step: "STEP 2 // PARSER",
@@ -784,7 +876,7 @@
     var conceptSel = document.getElementById("wb-concept-select");
     var pdfSel = document.getElementById("wb-pdf-select");
     var prompt = promptInput ? promptInput.value.trim() : "";
-    var conceptId = conceptSel ? conceptSel.value : "equipment/D-2304";
+    var conceptId = conceptSel ? conceptSel.value : DEFAULT_CONCEPT;
     var pdfRel = pdfSel ? pdfSel.value : "";
 
     var parts = pdfRel.split("/");
@@ -986,7 +1078,7 @@
           }
           runLiveWorkbenchExtraction();
         } else {
-          var selVal = conceptSel ? conceptSel.value : "equipment/D-2304";
+          var selVal = conceptSel ? conceptSel.value : DEFAULT_CONCEPT;
           renderWorkbenchConcept(selVal);
         }
       });
@@ -1078,7 +1170,7 @@
       });
     }
 
-    renderWorkbenchConcept("equipment/D-2304");
+    renderWorkbenchConcept(PERSONA_FLAGSHIP_CONCEPTS[0] || DEFAULT_CONCEPT);
   }
 
   /* ---------------------------------------- Screen 4: OKF Graph & Cloud Stack */
@@ -1144,14 +1236,28 @@
 
     var toolbar = document.getElementById("datagraph-toolbar");
     if (toolbar) {
+      var gNodes = (DATA.graph && DATA.graph.nodes) || [];
+      var conflictCnt = gNodes.filter(function (n) { return n.has_conflict; }).length;
+      var eqCnt = gNodes.filter(function (n) { return n.category === "equipment"; }).length;
+      var srcCnt = gNodes.filter(function (n) { return n.category === "sources"; }).length;
+      var hazCnt = gNodes.filter(function (n) { return n.category === "hazards"; }).length;
+      var instCnt = gNodes.filter(function (n) { return n.category === "instruments"; }).length;
+      var procCnt = gNodes.filter(function (n) {
+        return (
+          n.category === "procedures" ||
+          n.category === "units" ||
+          n.category === "hazop" ||
+          n.category === "troubleshooting"
+        );
+      }).length;
       var cats = [
-        { id: "all", label: "All Concepts (" + DATA.graph.nodes.length + ")" },
-        { id: "conflicts", label: "Conflicts Only (21)" },
-        { id: "equipment", label: "Equipment (54)" },
-        { id: "sources", label: "Sources (27)" },
-        { id: "hazards", label: "Hazards (15)" },
-        { id: "instruments", label: "Instruments (13)" },
-        { id: "procedures", label: "Procedures & Units (10)" }
+        { id: "all", label: "All Concepts (" + gNodes.length + ")" },
+        { id: "conflicts", label: "Conflicts Only (" + conflictCnt + ")" },
+        { id: "equipment", label: "Equipment (" + eqCnt + ")" },
+        { id: "sources", label: "Sources (" + srcCnt + ")" },
+        { id: "hazards", label: "Hazards (" + hazCnt + ")" },
+        { id: "instruments", label: "Instruments (" + instCnt + ")" },
+        { id: "procedures", label: "Procedures & Units (" + procCnt + ")" }
       ];
       toolbar.innerHTML = cats
         .map(function (c) {
@@ -1426,7 +1532,7 @@
     [closeDrawer, dismissDrawer].forEach(function (b) {
       if (b) {
         b.addEventListener("click", function () {
-          openSchematicNode(4, true);
+          openSchematicNode(DEFAULT_NODE_INDEX, true);
         });
       }
     });
@@ -1460,9 +1566,45 @@
     if (personaStudioBtn) {
       personaStudioBtn.addEventListener("click", function () {
         var targetConcept =
-          PERSONA_FLAGSHIP_CONCEPTS[currentPersonaIndex] || "equipment/D-2304";
+          PERSONA_FLAGSHIP_CONCEPTS[currentPersonaIndex] ||
+          PERSONA_FLAGSHIP_CONCEPTS[0] ||
+          DEFAULT_CONCEPT;
         renderWorkbenchConcept(targetConcept);
         showToast("Synced Live Workbench to " + targetConcept + ".md");
+      });
+    }
+
+    var scWbBtn = document.getElementById("btn-scenario-launch-wb");
+    if (scWbBtn) {
+      scWbBtn.addEventListener("click", function () {
+        var sc = (DATA.manufacturing_scenarios || [])[currentScenarioIndex];
+        switchTab("ecosystem", true);
+        if (sc) {
+          if (typeof sc.persona_idx === "number") {
+            selectPersona(sc.persona_idx, false);
+          }
+          renderWorkbenchConcept(
+            sc.concept_id || PERSONA_FLAGSHIP_CONCEPTS[0] || DEFAULT_CONCEPT
+          );
+          showToast("Loaded Scenario in Workbench: " + sc.concept_id + ".md");
+        }
+      });
+    }
+
+    var scTwinBtn = document.getElementById("btn-scenario-launch-twin");
+    if (scTwinBtn) {
+      scTwinBtn.addEventListener("click", function () {
+        var sc = (DATA.manufacturing_scenarios || [])[currentScenarioIndex];
+        switchTab("schematic", true);
+        if (sc && sc.schematic_node_id) {
+          for (var k = 0; k < DATA.schematic_nodes.length; k++) {
+            if (DATA.schematic_nodes[k].id === sc.schematic_node_id) {
+              openSchematicNode(k, true);
+              showToast("Focused Plant Twin on " + DATA.schematic_nodes[k].label);
+              break;
+            }
+          }
+        }
       });
     }
 
@@ -1492,7 +1634,7 @@
     renderMacroScreen();
     renderSchematicNodePills();
     renderSchematicTelemetry();
-    openSchematicNode(4, true);
+    openSchematicNode(DEFAULT_NODE_INDEX, true);
     renderPersonasScreen();
     renderEcosystemScreen();
     renderArchitectureScreen();

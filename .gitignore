@@ -8,6 +8,7 @@ env/
 venv/
 .pytest_cache/
 .hypothesis/
+*.egg-info/
 
 
 # Environment Variables & Secrets

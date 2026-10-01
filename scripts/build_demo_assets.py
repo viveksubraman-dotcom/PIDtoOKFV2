@@ -12,19 +12,30 @@ from __future__ import annotations
 
 import json
 import re
+import sys
 from pathlib import Path
 from typing import Any
 
 import yaml
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from corpus_profiles import Profile
+from corpus_profiles import load as load_profile
+
 STATIC_DIR = REPO_ROOT / "extracter_agent" / "static"
+TEMPLATE_PATH = STATIC_DIR / "index.template.html"
 BUNDLE_DIR = REPO_ROOT / "build" / "okf_bundle"
 WIKI_DIR = REPO_ROOT / "reference" / "wiki"
 RAW_DIR = REPO_ROOT / "reference" / "raw"
 BRAIN_ARTIFACT = Path(
     "/usr/local/google/home/viveksubraman/.gemini/jetski/brain/"
     "ebe0626f-e99d-42a7-9bf9-1e8745dcf94f/pid_to_okf_mining_executive_demo.html"
+)
+CURRENT_BRAIN_ARTIFACT = Path(
+    "/usr/local/google/home/viveksubraman/.gemini/jetski/brain/"
+    "2de3f51c-4543-4cf1-a604-b3fc52c9e87a/pid_to_okf_mining_executive_demo.html"
 )
 
 
@@ -41,14 +52,15 @@ def _parse_frontmatter_and_body(md_text: str) -> tuple[dict[str, Any], str]:
     return {}, md_text.strip()
 
 
-def collect_raw_pdfs() -> list[dict[str, Any]]:
+def collect_raw_pdfs(raw_dir: Path | None = None) -> list[dict[str, Any]]:
+    active_raw = raw_dir or RAW_DIR
     pdfs: list[dict[str, Any]] = []
-    if not RAW_DIR.exists():
+    if not active_raw.exists():
         return pdfs
-    for p in sorted(RAW_DIR.rglob("*")):
+    for p in sorted(active_raw.rglob("*")):
         if not p.is_file() or p.name.startswith(".") or p.suffix.lower() != ".pdf":
             continue
-        rel = p.relative_to(RAW_DIR).as_posix()
+        rel = p.relative_to(active_raw).as_posix()
         parts = rel.split("/", 1)
         subfolder = parts[0] if len(parts) > 1 else "root"
         filename = parts[1] if len(parts) > 1 else parts[0]
@@ -65,8 +77,13 @@ def collect_raw_pdfs() -> list[dict[str, Any]]:
     return pdfs
 
 
-def collect_okf_concepts() -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
-    active_dir = BUNDLE_DIR if BUNDLE_DIR.exists() else WIKI_DIR
+def collect_okf_concepts(
+    wiki_dir: Path | None = None,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
+    if wiki_dir is not None:
+        active_dir = wiki_dir
+    else:
+        active_dir = BUNDLE_DIR if BUNDLE_DIR.exists() else WIKI_DIR
     concepts: list[dict[str, Any]] = []
     nodes: list[dict[str, Any]] = []
     edges: list[dict[str, Any]] = []
@@ -74,7 +91,7 @@ def collect_okf_concepts() -> tuple[list[dict[str, Any]], list[dict[str, Any]], 
 
     for p in sorted(active_dir.rglob("*.md")):
         rel = p.relative_to(active_dir).as_posix()
-        if rel.endswith("/index.md"):
+        if rel.endswith("/index.md") or p.name.startswith("_"):
             continue
         txt = p.read_text(encoding="utf-8")
         fm, _body = _parse_frontmatter_and_body(txt)
@@ -151,8 +168,34 @@ def collect_okf_concepts() -> tuple[list[dict[str, Any]], list[dict[str, Any]], 
                 }
             )
 
+    has_wiki_syntax = any(c["cross_links"] for c in concepts)
+    label_to_cid = {
+        n["label"]: n["id"] for n in nodes if len(n["label"]) >= 4
+    }
+    node_by_id = {n["id"]: n for n in nodes}
+
     for c in concepts:
         src_id = c["concept_id"]
+        if not has_wiki_syntax and src_id not in ("index", "log"):
+            txt = c["markdown"]
+            md_links = [
+                m.lstrip("/").removesuffix(".md")
+                for m in re.findall(r"\]\((/[^)#\s]+\.md)", txt)
+            ]
+            tag_links = [
+                target_cid
+                for lbl, target_cid in label_to_cid.items()
+                if target_cid != src_id and lbl in txt
+            ]
+            resolved = [
+                lnk
+                for lnk in sorted(set(md_links + tag_links))
+                if lnk in seen_nodes and lnk != src_id
+            ][:12]
+            c["cross_links"] = resolved
+            if src_id in node_by_id:
+                node_by_id[src_id]["links_count"] = len(resolved)
+
         if src_id not in seen_nodes:
             continue
         for target_raw in c["cross_links"]:
@@ -164,11 +207,13 @@ def collect_okf_concepts() -> tuple[list[dict[str, Any]], list[dict[str, Any]], 
     return concepts, nodes, edges
 
 
-def build_static_data() -> dict[str, Any]:
-    raw_pdfs = collect_raw_pdfs()
-    concepts, nodes, edges = collect_okf_concepts()
-    conflict_nodes = [c for c in concepts if c["has_conflict"]]
-
+def _default_phenol_static_data(
+    raw_pdfs: list[dict[str, Any]],
+    concepts: list[dict[str, Any]],
+    nodes: list[dict[str, Any]],
+    edges: list[dict[str, Any]],
+    conflict_nodes: list[dict[str, Any]],
+) -> dict[str, Any]:
     return {
         "meta": {
             "project_id": "ut-interaction-demo",
@@ -191,6 +236,121 @@ def build_static_data() -> dict[str, Any]:
             "graph_edge_count": len(edges),
         },
         "conflict_nodes": conflict_nodes,
+        "manufacturing_scenarios": [
+            {
+                "id": "yield_optimization",
+                "code": "SCENARIO 01 // YIELD & SELECTIVITY OPTIMIZATION (BEYOND HAZOP)",
+                "short_label": "01 · Yield & Selectivity",
+                "title": "AMS Co-Product Yield (>=80 mol%) & DCP Conversion Optimization",
+                "beyond_hazop": True,
+                "badge": "BEYOND HAZOP • YIELD & QUALITY",
+                "kpi_delta": ">= 80 mol% AMS",
+                "speedup": "16h -> 4m",
+                "concept_id": "troubleshooting/cdn-poor-ams-yield",
+                "secondary_concept_id": "parameters/cdn-operating-windows",
+                "raw_pdf": "operating_manuals/OM-Phenol Unit UOP-2015.pdf",
+                "schematic_node_id": "v2401",
+                "persona_idx": 0,
+                "challenge": (
+                    "Co-product Alpha-Methylstyrene (AMS) selectivity drops below the >= 80 mole% "
+                    "licensor target when Dicumylperoxide (DCP) over-converts (< 300 wt ppm vs. "
+                    "300-700 wt ppm target) due to E-2308A/B dehydrator temperature exceeding "
+                    "125-145 deg C or CSTR H2SO4 catalyst drifting outside 40-60 wt ppm."
+                ),
+                "derivation": (
+                    "dT_calorimeter (X-2308) = 7.2 deg C per wt% CHP (target 7-10 deg C at 1.0-1.5 wt% CHP, "
+                    "36s residence) | DCP Target: 300-700 wt ppm (max 900 wt ppm per o-cresol spec)"
+                ),
+                "impact": (
+                    "Restores >= 80 mole% AMS selectivity, protects 99.99 wt% Phenol purity (<= 100 wt ppm H2O), "
+                    "and compresses cross-document yield excursion root-cause diagnosis from 16 hours to 4 minutes."
+                ),
+            },
+            {
+                "id": "fouling_reliability",
+                "code": "SCENARIO 02 // FOULING, ACIDITY & ASSET RELIABILITY (BEYOND HAZOP)",
+                "short_label": "02 · Fouling & Reliability",
+                "title": "Exchanger Polymer Fouling (E-2308), Flash Acidity & Seal Plan Integrity",
+                "beyond_hazop": True,
+                "badge": "BEYOND HAZOP • RELIABILITY",
+                "kpi_delta": "1-3 mo Cycle Extended",
+                "speedup": "2,020 vs 3,020 m3/h",
+                "concept_id": "troubleshooting/cdn-dehydrator-plugging",
+                "secondary_concept_id": "instruments/pump-seal-plans",
+                "raw_pdf": "pid/14780-8120-25-23-0001K_P&ID CDN UNIT TYPICAL PUMP SEAL PLAN(3-4)_Z1.pdf",
+                "schematic_node_id": "p2302",
+                "persona_idx": 1,
+                "challenge": (
+                    "Dehydrator E-2308A/B suffers 1-3 month tube plugging from heavy phenolic polymer "
+                    "after 300 wt ppm H2SO4 startup spikes; Flash Column crude product pH drops below 2.3 "
+                    "(organic acid breakthrough); P-2302A/B exhibits a 1,000 m3/h P&ID vs. Datasheet flow conflict."
+                ),
+                "derivation": (
+                    "Dehydrator dP Surge: H2SO4 > 60 wt ppm + T > 145 deg C -> Polymer Plugging | "
+                    "Flash Crude pH: 2.3-2.7 (Spent Air O2 >= 5 vol%) | P-2302A/B API Plan 11/53A Dual Seal"
+                ),
+                "impact": (
+                    "Eliminates premature E-2308A/B tube plugging, prevents column organic acid corrosion (pH < 2.3), "
+                    "and reconciles hydraulic curves & API Plan 11/53A / 2/53A seal piping across 14 pump packages."
+                ),
+            },
+            {
+                "id": "startup_envelope",
+                "code": "SCENARIO 03 // COLD-START & OPERATING ENVELOPE (BEYOND HAZOP)",
+                "short_label": "03 · Cold-Start & Envelope",
+                "title": "5-Gate Cold-Start Readiness & CSTR Temperature Step-Down Execution",
+                "beyond_hazop": True,
+                "badge": "BEYOND HAZOP • OPERATIONS",
+                "kpi_delta": "5-Gate Feed-In",
+                "speedup": "1 deg C / 15 min",
+                "concept_id": "procedures/startup-cdn",
+                "secondary_concept_id": "parameters/cdn-operating-windows",
+                "raw_pdf": "operating_manuals/OM-Phenol Unit UOP-2015.pdf",
+                "schematic_node_id": "r2201",
+                "persona_idx": 2,
+                "challenge": (
+                    "Transitioning from cold circulation to exothermic cleavage requires simultaneous "
+                    "verification of 5 'Ready for Feed In' gates across SOP manuals, P&IDs, and DCS loops "
+                    "before stepping CSTR temperature down from 70 deg C to 60 deg C."
+                ),
+                "derivation": (
+                    "Gate 1: T_decomp = 70 deg C | Gate 2: H2SO4 = 300 wt ppm | Gate 3: H2O < 2 wt% | "
+                    "Gate 4: Water Inj = 0 kg/h | Gate 5: Cumene Double-Flush -> Step-down 1 deg C per >= 15 min"
+                ),
+                "impact": (
+                    "Standardizes shift-to-shift cold startup and grade transitions, accounting for 36-second "
+                    "Calorimeter X-2308 lag and <= 5% acid steps to prevent startup off-spec slop."
+                ),
+            },
+            {
+                "id": "turnaround_hazop",
+                "code": "SCENARIO 04 // TURNAROUND LOTO, MOC & PROCESS SAFETY (HAZOP)",
+                "short_label": "04 · Turnaround, MOC & HAZOP",
+                "title": "As-Built Datasheet vs. P&ID Reconciliation, LOTO Isolation & PHA",
+                "beyond_hazop": False,
+                "badge": "TURNAROUND, MOC & HAZOP",
+                "kpi_delta": "21 Conflicts Flagged",
+                "speedup": "14d -> 18m",
+                "concept_id": "equipment/D-2304",
+                "secondary_concept_id": "equipment/V-2301",
+                "raw_pdf": "data_sheets/14780-8120-PS-D2304_D-2304 PROCESS DATA SHEET_Z1.pdf",
+                "schematic_node_id": "d2304",
+                "persona_idx": 3,
+                "challenge": (
+                    "Reconciling 55 As-Built Process Data Sheets against 46 AutoCAD P&IDs uncovers 21 active "
+                    "mechanical, hydraulic, and chemical conflicts (e.g., D-2304 burst disc 12.16 vs 11.0 kg/cm2g; "
+                    "V-2301 21,000 vs 7,550 mm T/T; E-2307 13.0 vs 1.3 kg/cm2g; D-2312 HMDA vs TBC)."
+                ),
+                "derivation": (
+                    "Rule: As-Built Process Data Sheet governs mechanical ratings; P&ID governs SIS/instrument "
+                    "loops (2oo3 TXSHH/FXSLL) | Rev Z0->Z1 updated in-place; cross-doc conflicts flagged"
+                ),
+                "impact": (
+                    "Compresses Turnaround LOTO blind-list, Management of Change (MOC), and PHA/HAZOP preparation "
+                    "from 14 days to 18 minutes with 100% conflict capture and zero broken links."
+                ),
+            },
+        ],
         "benchmark_bars": [
             {
                 "label": "Autonomous ADK OKF v0.2 Compiler (Mode A + Mode B)",
@@ -231,73 +391,73 @@ def build_static_data() -> dict[str, Any]:
         ],
         "headwinds": [
             {
-                "title": "Vector CAD P&ID Blindness",
+                "title": "Vector CAD P&ID & Seal Plan Blindness",
                 "badge": "46 DRAWINGS",
                 "val": "0",
                 "unit": "Bytes Text Stream",
                 "baseline": "300 DPI Vision Required",
-                "desc": "AutoCAD-plotted P&IDs (DWG 25-23-0001..0046) contain zero embedded text streams. Standard OCR and chunkers drop stacked instrument loops, nozzle marks, and SIS interlock lines.",
+                "desc": "AutoCAD-plotted P&IDs (DWG 25-23-0001..0046, including API Seal Plans 11/53A & 2/53A) contain zero embedded text streams. Standard OCR drops nozzle marks, control loops, and seal piping.",
                 "fill": 88,
             },
             {
-                "title": "Cross-Document Rating Conflicts",
+                "title": "Siloed Yield, Fouling & Operating Windows",
+                "badge": "SOP VS P&ID",
+                "val": "80.0",
+                "unit": "mol% AMS Target",
+                "baseline": "DCP 300-700 wt ppm",
+                "desc": "Licensor operating manuals (125-145 deg C dehydrator window, Calorimeter X-2308 7.2 deg C/wt% CHP, 1-3 mo fouling rules) sit disconnected from P&ID tags and vendor datasheets.",
+                "fill": 84,
+            },
+            {
+                "title": "Cross-Document Rating & Flow Conflicts",
                 "badge": "21 CONFLICTS",
                 "val": "21",
                 "unit": "Active Discrepancies",
                 "baseline": "Datasheet vs. P&ID",
-                "desc": "As-Built Process Data Sheets (e.g., PS-D2304 Rev Z1: 11.0 kg/cm2g; PS-V2301: 21,000 mm T/T) conflict with P&ID-era figures (12.16 kg/cm2g; 7,550 mm T/T), creating severe HAZOP blindspots.",
-                "fill": 78,
-            },
-            {
-                "title": "Exothermic Peroxide Runaway",
-                "badge": "CHP 83 WT%",
-                "val": "75.0",
-                "unit": "deg C Onset Limit",
-                "baseline": "dH = -250 kJ/mol",
-                "desc": "Cumene Hydroperoxide (CHP) decomposition in Unit 23 CDN is autocatalytic. Missing a single 2oo3 SIS trip initiator (TXSHH/FXSLL) or gravity-drainage head note risks vessel rupture.",
-                "fill": 94,
+                "desc": "As-Built Data Sheets (PS-P2302: 2,020 m3/h; PS-V2301: 21,000 mm T/T; PS-D2304: 11.0 kg/cm2g) conflict with P&ID figures (3,020 m3/hr; 7,550 mm; 12.16 kg/cm2g) across reliability, MOC, and HAZOP.",
+                "fill": 92,
             },
         ],
         "levers": [
             {
                 "tag": "LEVER 01 // MANUAL SME INDEXING",
                 "title": "Spreadsheet Tag Takeoffs",
-                "desc": "4-6 weeks per plant unit to manually cross-check 55 datasheets against 46 P&IDs before HAZOP revalidation.",
+                "desc": "4-6 weeks per plant unit to manually cross-check 55 datasheets, 46 P&IDs, and SOP manuals for yield, turnaround, or HAZOP.",
                 "status": "EXHAUSTED",
                 "active": False,
             },
             {
                 "tag": "LEVER 02 // LEGACY OCR PIPELINES",
                 "title": "Static Document Chunking",
-                "desc": "Splits multi-sheet vessel sketches and loses nozzle-to-line topology and redundant stacked instrument bubbles.",
+                "desc": "Splits multi-sheet vessel sketches, pump seal plans (DWG 0001K), and operating window tables across disconnected chunks.",
                 "status": "EXHAUSTED",
                 "active": False,
             },
             {
                 "tag": "LEVER 03 // NAIVE VECTOR RAG",
                 "title": "Cosine Similarity Retrieval",
-                "desc": "Silently averages or overwrites conflicting pressure/temperature ratings across Rev Z0 and Rev Z1 documents.",
+                "desc": "Silently averages or overwrites conflicting flow rates (2,020 vs 3,020 m3/h) and pressure ratings across Rev Z0 and Rev Z1.",
                 "status": "EXHAUSTED",
                 "active": False,
             },
             {
                 "tag": "LEVER 04 // ADK OKF v0.2 COMPILER",
                 "title": "Dual-Mode Read-Merge-Upsert",
-                "desc": "Gemini 3.8 Flash (Global) + 8 deterministic ADK tools compile 136 raw PDFs into 130 schema-verified OKF v0.2 concepts.",
+                "desc": "Gemini 3.8 Flash (Global) + 8 deterministic ADK tools compile 136 raw PDFs into 130 schema-verified Process Manufacturing concepts.",
                 "status": "ACTIVE LEVER",
                 "active": True,
             },
         ],
         "outcomes": [
             {
-                "label": "Ingested Raw Engineering Corpus",
+                "label": "Ingested Process Plant Corpus",
                 "val": "136 PDFs",
                 "sub": "55 Data Sheets, 46 Vector P&IDs, 26 SDS/Standards, 8 PFDs, 1 UOP Operating Manual",
             },
             {
                 "label": "Compiled OKF v0.2 Knowledge Bundle",
                 "val": "139 Files",
-                "sub": "130 Golden Domain Concepts + 9 Progressive Disclosure Indexes (100% Schema Valid)",
+                "sub": "130 Golden Concepts (Yield, Fouling, Startup, Equipment, SIS, HAZOP) + 9 Indexes",
             },
             {
                 "label": "Cross-Doc Discrepancy Capture",
@@ -305,29 +465,29 @@ def build_static_data() -> dict[str, Any]:
                 "sub": "100% distinction between Rev Z0->Z1 supersession vs. active Datasheet/P&ID conflicts",
             },
             {
-                "label": "HAZOP & Turnaround Prep Speed",
+                "label": "Yield, Turnaround & HAZOP Speed",
                 "val": "14d -> 18m",
-                "sub": "Zero-broken-link bi-directional traceability from equipment tags to raw PDF sheets",
+                "sub": "Supports Yield Optimization, Fouling Reliability, Cold-Start, LOTO & PHA on GCP",
             },
         ],
         "schematic_nodes": [
             {
                 "id": "r2201",
                 "label": "Oxidation",
-                "title": "Unit 22 — Cumene Oxidation Reactors",
-                "isa95": "UNIT-22 // OXIDATION",
+                "title": "Unit 22 — Cumene Oxidation & Spent Air Control",
+                "isa95": "UNIT-22 // OXIDATION & ACIDITY",
                 "health": "OPTIMAL",
                 "concept_id": "units/oxidation",
-                "raw_pdf": "pfd/14780-8120-20-22-0001_Z1.pdf",
+                "raw_pdf": "operating_manuals/OM-Phenol Unit UOP-2015.pdf",
                 "swarm": "Mode A + Mode B Compiler",
                 "coord": "extracter_orchestrator",
                 "solver": "process_raw_pdf_tool (300 DPI Vision)",
                 "sap_id": "OKF-UNIT-22-OXID",
-                "formula": "Cumene + O2 -> CHP (22.6 wt% in oxidate)\nT_op = 83-105 deg C | P_op = 4.5-6.0 kg/cm2g",
+                "formula": "Cumene + O2 -> CHP (22.6 wt% in oxidate) | Spent Air O2 >= 5 vol%\nPrevents phenol over-oxidation to organic acids (Flash Crude pH 2.3-2.7)",
                 "metrics": [
                     {"k": "Oxidate CHP Conc", "v": "22.6 wt%"},
-                    {"k": "Feed Flow (S229)", "v": "107,664 kg/h"},
-                    {"k": "Source Authority", "v": "PFD 20-22-0001"},
+                    {"k": "Spent Air O2 Floor", "v": ">= 5.0 vol%"},
+                    {"k": "Flash Crude Target", "v": "pH 2.3 - 2.7"},
                     {"k": "OKF Concept", "v": "units/oxidation.md"},
                 ],
             },
@@ -358,15 +518,15 @@ def build_static_data() -> dict[str, Any]:
                 "isa95": "UNIT-23 // CONCENTRATION",
                 "health": "OPTIMAL",
                 "concept_id": "equipment/V-2302",
-                "raw_pdf": "pid/14780-8120-25-23-0005_P&ID CDN UNIT _FLASH COLUMN_Z1.pdf",
+                "raw_pdf": "pfd/14780-8120-20-23-0002_CDN PROCESS FLOW DIAGRAM FLASH COLUMN VAPORIZER _Z1.pdf",
                 "swarm": "Vector CAD P&ID Vision",
                 "coord": "process_raw_pdf_tool",
                 "solver": "Gemini 3.8 Flash 300 DPI Vision",
                 "sap_id": "OKF-EQ-V2302",
-                "formula": "CHP Concentration: 22.6 wt% -> 80-83 wt% Technical CHP\nT_bottoms < 95 deg C (UC-2301 SIS High-Temp Interlock)",
+                "formula": "CHP Concentration: 22.6 wt% -> 80-83 wt% Technical CHP\nAcidity Guard: CWC aqueous pH ~ 14 prevents organic acid carryover (< pH 2.3)",
                 "metrics": [
                     {"k": "Product Conc", "v": "80-83 wt% CHP"},
-                    {"k": "SIS Controller", "v": "UC-2301"},
+                    {"k": "Crude Acidity Window", "v": "pH 2.3 - 2.7"},
                     {"k": "Source P&ID", "v": "DWG 25-23-0005"},
                     {"k": "OKF Concept", "v": "equipment/V-2302.md"},
                 ],
@@ -394,21 +554,21 @@ def build_static_data() -> dict[str, Any]:
             {
                 "id": "d2304",
                 "label": "D-2304",
-                "title": "D-2304 — Decomposer Drum (Loop Reactor)",
-                "isa95": "UNIT-23 // DECOMPOSITION",
+                "title": "D-2304 — Decomposer CSTR & Calorimeter X-2308",
+                "isa95": "UNIT-23 // CLEAVAGE & YIELD",
                 "health": "CRITICAL",
                 "concept_id": "equipment/D-2304",
                 "raw_pdf": "data_sheets/14780-8120-PS-D2304_D-2304 PROCESS DATA SHEET_Z1.pdf",
-                "swarm": "Critical Hazard & Burst Conflict Guard",
+                "swarm": "Yield, Calorimeter & Burst Conflict Guard",
                 "coord": "extracter_orchestrator",
                 "solver": "generate_equipment_okf_tool",
                 "sap_id": "CONFLICT-D2304-X2311",
-                "formula": "CHP -> Phenol + Acetone (dH = -250 kJ/mol, H2SO4 catalyst)\nBURST CONFLICT: Rupture Disc X-2311 P&ID 12.16 kg/cm2g vs. DS Design Press 11.0 kg/cm2g",
+                "formula": "Calorimeter X-2308: dT = 7.2 deg C / wt% CHP (target 7-10 deg C at 1.0-1.5 wt% CHP)\nBURST CONFLICT: Rupture Disc X-2311 P&ID 12.16 kg/cm2g vs. DS Design Press 11.0 kg/cm2g",
                 "metrics": [
-                    {"k": "Inside Diameter", "v": "1,900 mm (4,800 T/T)"},
-                    {"k": "Design Press (DS)", "v": "11.0 kg/cm2g / FV"},
+                    {"k": "Calorimeter X-2308 dT", "v": "7-10 deg C (1-1.5% CHP)"},
+                    {"k": "DCP Selectivity Target", "v": "300 - 700 wt ppm"},
                     {"k": "X-2311 Burst Conflict", "v": "12.16 vs 11.0 kg/cm2g"},
-                    {"k": "Reaction Enthalpy", "v": "-250 kJ/mol CHP"},
+                    {"k": "Acid Catalyst Window", "v": "40 - 60 wt ppm H2SO4"},
                 ],
             },
             {
@@ -434,20 +594,20 @@ def build_static_data() -> dict[str, Any]:
             {
                 "id": "p2302",
                 "label": "P-2302",
-                "title": "P-2302A/B — Decomposer Circulation Pumps",
-                "isa95": "UNIT-23 // DECOMPOSITION",
+                "title": "P-2302A/B — Circulation Pumps & API Plan 11/53A",
+                "isa95": "UNIT-23 // ROTATING RELIABILITY",
                 "health": "WARNING",
                 "concept_id": "equipment/P-2302",
-                "raw_pdf": "data_sheets/14780-8120-PS-P2302_P-2302A_B PROCESS DATA SHEET_Z1.pdf",
-                "swarm": "Hydraulic Capacity Reconciliation",
+                "raw_pdf": "data_sheets/14780-8120-PS-P2302_P-2302 PROCESS DATA SHEET_Z1.pdf",
+                "swarm": "Hydraulic & Seal Plan Reconciliation",
                 "coord": "generate_equipment_okf_tool",
                 "solver": "merge_equipment_entity_with_existing",
                 "sap_id": "CONFLICT-P2302-FLOW",
-                "formula": "Dilution Ratio Control: Q_circ / Q_chp > 25:1\nCONFLICT: DWG 0017 states 3,020 m3/hr vs. PS-P2302 states 2,020 m3/h",
+                "formula": "API Plan 11/53A Dual Pressurized Seal (DWG 0001K) | Dilution Ratio > 25:1\nCONFLICT: DWG 0017 states 3,020 m3/hr vs. PS-P2302 states 2,020 m3/h",
                 "metrics": [
                     {"k": "DS Rated Capacity", "v": "2,020 m3/h"},
-                    {"k": "P&ID Stated Flow", "v": "3,020 m3/hr"},
-                    {"k": "SIS Low-Flow Trip", "v": "FXSLL -> UC-2302"},
+                    {"k": "P&ID Stated Flow", "v": "3,020 m3/hr (Conflict)"},
+                    {"k": "Mechanical Seal Plan", "v": "API Plan 11 / 53A"},
                     {"k": "OKF Concept", "v": "equipment/P-2302.md"},
                 ],
             },
@@ -481,65 +641,65 @@ def build_static_data() -> dict[str, Any]:
                 "raw_pdf": "data_sheets/14780-8120-PS-D2312_D-2312 PROCESS DATA SHEET_Z1.pdf",
                 "swarm": "Chemical Identity Conflict Detector",
                 "coord": "generate_equipment_okf_tool",
-                "solver": "HAZOP Pre-Gate Blocker",
+                "solver": "MOC & HAZOP Pre-Gate Blocker",
                 "sap_id": "CONFLICT-D2312-CHEM",
                 "formula": "CRITICAL CHEMICAL IDENTITY CONFLICT:\nPS-D2312 Rev Z1 Fluid Name = 'DIAMINE(HMDA)' vs. P&ID / SDS TBC / Diamine mapping",
                 "metrics": [
                     {"k": "DS Fluid Name", "v": "DIAMINE(HMDA)"},
                     {"k": "P&ID Service", "v": "Diamine / TBC"},
-                    {"k": "HAZOP Status", "v": "HOLD UNTIL RESOLVED"},
+                    {"k": "MOC / HAZOP Status", "v": "HOLD UNTIL RESOLVED"},
                     {"k": "OKF Concept", "v": "equipment/D-2312.md"},
                 ],
             },
             {
                 "id": "v2401",
                 "label": "Unit 24",
-                "title": "Unit 24 — Crude Acetone & Phenol Distillation",
-                "isa95": "UNIT-24 // DISTILLATION",
+                "title": "Unit 24 & E-2308A/B — Dehydrator, AMS Yield & Fractionation",
+                "isa95": "UNIT-24 // YIELD & FOULING",
                 "health": "OPTIMAL",
-                "concept_id": "units/distillation",
-                "raw_pdf": "pfd/14780-8120-20-24-0001_Z1.pdf",
-                "swarm": "PFD Stream Balance Compiler",
+                "concept_id": "troubleshooting/cdn-poor-ams-yield",
+                "raw_pdf": "operating_manuals/OM-Phenol Unit UOP-2015.pdf",
+                "swarm": "Yield & Fouling Diagnostic Compiler",
                 "coord": "generate_okf_concept_tool",
                 "solver": "merge_markdown_bodies",
-                "sap_id": "OKF-UNIT-24-DIST",
-                "formula": "Decomposed Cleavage Product -> Pure Phenol (99.99%) + Acetone + Recycle Cumene + AMS",
+                "sap_id": "OKF-YIELD-AMS-E2308",
+                "formula": "DCP -> AMS + H2O (T_dehydrator = 125-145 deg C) -> AMS Selectivity >= 80 mole%\nFouling Rule: H2SO4 > 60 wt ppm or T > 145 deg C causes 1-3 mo E-2308A/B polymer plugging",
                 "metrics": [
-                    {"k": "Upstream Feed", "v": "Neutralized CDN Product"},
-                    {"k": "Primary Columns", "v": "Crude Acetone / Phenol"},
-                    {"k": "Source PFD", "v": "20-24-0001 Rev Z1"},
-                    {"k": "OKF Concept", "v": "units/distillation.md"},
+                    {"k": "AMS Selectivity Target", "v": ">= 80.0 mole%"},
+                    {"k": "E-2308A/B Window", "v": "125 - 145 deg C"},
+                    {"k": "Phenol Product Spec", "v": ">= 99.99 wt%"},
+                    {"k": "OKF Concept", "v": "cdn-poor-ams-yield.md"},
                 ],
             },
             {
                 "id": "sis_cdn",
                 "label": "SIS-CDN",
-                "title": "UC-2301 / UC-2302 / UC-2303 — SIS Logic Controllers",
-                "isa95": "IEC-61511 // SAFETY INTERLOCKS",
+                "title": "UC-2301..2303 — Cold-Start Gates & 2oo3 Interlocks",
+                "isa95": "OPS & IEC-61511 // ENVELOPE",
                 "health": "OPTIMAL",
-                "concept_id": "instruments/sis-cdn",
-                "raw_pdf": "pid/14780-8120-25-23-0002_P&ID CDN UNIT _CAUSE AND EFFECT TABLE_Z1.pdf",
-                "swarm": "Cause & Effect Matrix Compiler",
+                "concept_id": "procedures/startup-cdn",
+                "raw_pdf": "operating_manuals/OM-Phenol Unit UOP-2015.pdf",
+                "swarm": "Startup Gate & C&E Matrix Compiler",
                 "coord": "generate_okf_concept_tool",
-                "solver": "SIS Initiator & Trip Verifier",
-                "sap_id": "OKF-SIS-UC2301-03",
-                "formula": "2oo3 Voting (TXSHH / FXSLL) -> Solenoid De-energize -> XV Closure (<2.0s) + Cumene Quench Dump",
+                "solver": "Startup & SIS Trip Verifier",
+                "sap_id": "OKF-OPS-STARTUP-SIS",
+                "formula": "5-Gate Ready-for-Feed-In: 70 deg C | 300 ppm H2SO4 | <2% H2O | 0 kg/h Water | 2x Flush\n2oo3 Voting (TXSHH / FXSLL) -> Solenoid De-energize -> XV Closure + Cumene Quench",
                 "metrics": [
-                    {"k": "Logic Controllers", "v": "UC-2301, 2302, 2303"},
-                    {"k": "Initiator Syntax", "v": "XSHH / XSLL (Dedicated)"},
-                    {"k": "Source Drawing", "v": "DWG 25-23-0002 C&E"},
-                    {"k": "OKF Concept", "v": "instruments/sis-cdn.md"},
+                    {"k": "Startup Feed-In Gates", "v": "5 Gates (70C / 300ppm)"},
+                    {"k": "CSTR Step-Down Rate", "v": "1 deg C per >= 15m"},
+                    {"k": "SIS Logic Controllers", "v": "UC-2301, 2302, 2303"},
+                    {"k": "OKF Concept", "v": "procedures/startup-cdn.md"},
                 ],
             },
             {
                 "id": "hazop_cdn",
                 "label": "HAZOP-CDN",
-                "title": "ePHA / HAZOP Risk Matrix & Node Safeguards",
-                "isa95": "OSHA-1910.119 // PHA",
+                "title": "Turnaround MOC & ePHA Risk Matrix Governance",
+                "isa95": "MOC & OSHA-1910.119 // PHA",
                 "health": "OPTIMAL",
                 "concept_id": "hazop/risk-matrix",
                 "raw_pdf": "standards/SG-(Q-MP)-014_R3.pdf",
-                "swarm": "PHA & LOPA Safeguard Compiler",
+                "swarm": "MOC, LOTO & LOPA Safeguard Compiler",
                 "coord": "generate_okf_concept_tool",
                 "solver": "IPL Credit & Severity Mapper",
                 "sap_id": "OKF-HAZOP-MATRIX",
@@ -555,66 +715,66 @@ def build_static_data() -> dict[str, Any]:
         "personas": [
             {
                 "id": "p1",
-                "code": "PERSONA 01 // PROCESS SAFETY",
-                "initials": "PS",
-                "name": "Lead Process Safety & HAZOP Facilitator",
-                "mandate": "Governing PHA/LOPA revalidation, relief device sizing basis, and exothermic runaway safeguards across Units 21-24.",
-                "jtbd": "Verify every ASME design pressure, PSV/rupture-disc setpoint, and 2oo3 SIS trip initiator across 55 Process Data Sheets and 46 P&IDs before signing off the Unit 23 CDN HAZOP.",
-                "broken": "Spends 3 weeks manually flipping between AutoCAD P&ID PDFs (DWG 0004, 0013) and As-Built Process Data Sheets (PS-V2301, PS-D2304). Transcription errors like E-2307 (1.3 vs 13.0 kg/cm2g) or D-2304 burst pressure (12.16 vs 11.0 kg/cm2g) slip unnoticed into PHA worksheets.",
-                "agentic": "Opens the compiled OKF v0.2 Knowledge Bundle where every cross-document conflict (21 total) and chemical identity mismatch (D-2312 HMDA vs TBC) is pre-flagged with exact PDF sheet citations, cutting HAZOP preparation from 14 days to 18 minutes.",
+                "code": "PERSONA 01 // YIELD & PROCESS OPTIMIZATION",
+                "initials": "PY",
+                "name": "Lead Process & Yield Optimization Engineer",
+                "mandate": "Maximizing AMS co-product selectivity (>= 80 mole%), Phenol purity (>= 99.99 wt%), and DCP conversion (300-700 wt ppm) across Units 22-24.",
+                "jtbd": "Reconcile UOP operating manual windows (E-2308A/B 125-145 deg C, H2SO4 40-60 wt ppm, Calorimeter X-2308 dT = 7.2 deg C/wt% CHP) with P&ID control loops to eliminate AMS yield losses.",
+                "broken": "Spends 16+ hours manually cross-referencing static UOP operating manual PDFs against P&IDs (DWG 0013, 0017) and lab DCP analyses when AMS yield drops below 80 mole%, missing the interaction between E-2308A/B temperature (>145 deg C) and heavy dimer/trimer polymer formation.",
+                "agentic": "Queries compiled OKF v0.2 concepts (troubleshooting/cdn-poor-ams-yield.md and parameters/cdn-operating-windows.md) where Calorimeter X-2308 equations, DCP targets (300-700 wt ppm, max 900 wt ppm), and DCS loops are unified—diagnosing yield excursions in 4 minutes.",
                 "squad": [
-                    {"id": "TOOL-01", "name": "find_raw_documents_tool", "role": "Locates all governing Datasheets, P&IDs, PFDs, and SDS by tag"},
-                    {"id": "TOOL-02", "name": "process_raw_pdf_tool", "role": "Extracts tables + 300 DPI Gemini Vision on vector CAD P&IDs"},
-                    {"id": "TOOL-03", "name": "inspect_existing_okf_concept_tool", "role": "Audits existing OKF state prior to Read-Merge-Upsert"},
-                    {"id": "TOOL-04", "name": "generate_equipment_okf_tool", "role": "Enforces Datasheet vs. P&ID precedence & CONFLICT callouts"},
+                    {"id": "TOOL-01", "name": "find_raw_documents_tool", "role": "Locates UOP Operating Manual, PFDs, and P&IDs for yield & operating windows"},
+                    {"id": "TOOL-02", "name": "process_raw_pdf_tool", "role": "Extracts operating window tables, DCP curves, and Calorimeter X-2308 equations"},
+                    {"id": "TOOL-03", "name": "inspect_existing_okf_concept_tool", "role": "Audits existing parameters/ and troubleshooting/ concepts before upsert"},
+                    {"id": "TOOL-05", "name": "generate_okf_concept_tool", "role": "Compiles cross-linked yield optimization & operating window playbooks"},
                 ],
             },
             {
                 "id": "p2",
-                "code": "PERSONA 02 // TURNAROUND & ISOLATION",
-                "initials": "TA",
-                "name": "Turnaround & LOTO Isolation Planner",
-                "mandate": "Planning zero-energy blinding lists, nitrogen purges, and gravity-drainage paths for major plant turnarounds.",
-                "jtbd": "Compile complete nozzle schedules, connecting line numbers (<size>\"-<fluid>-<unit>-<num>-<class>), and elevation head requirements for every vessel in the CDN section.",
-                "broken": "Reads rasterized P&IDs line-by-line with a highlighter to build blind lists. Misses auxiliary package sub-equipment or gravity-drainage elevation constraints (15,500 mm bottom tangent on V-2301), causing field delays during hydro-testing.",
-                "agentic": "Queries equipment/<TAG>.md and procedures/shutdown-normal.md to retrieve 100% reconciled nozzle schedules, connected stream IDs, and UOP operating manual purge steps with zero broken links.",
+                "code": "PERSONA 02 // FOULING & ASSET RELIABILITY",
+                "initials": "RM",
+                "name": "Rotating & Static Asset Reliability Lead",
+                "mandate": "Eliminating heat-exchanger polymer plugging (E-2308A/B 1-3 mo cycle), flash column acid corrosion (pH 2.3-2.7), and pump hydraulic/seal failures.",
+                "jtbd": "Cross-check mechanical seal piping P&IDs (DWG 0001K API Plan 11/53A & 2/53A), pump curves (P-2302, P-2303), and dehydrator fouling root causes before scheduling maintenance.",
+                "broken": "Discovers during pump overhaul that P&ID DWG 0017 lists P-2302 capacity as 3,020 m3/hr while datasheet PS-P2302 specifies 2,020 m3/h, or that E-2308A/B tube plugging every 1-3 months is driven by unlogged 300 wt ppm H2SO4 startup spikes.",
+                "agentic": "Inspects troubleshooting/cdn-dehydrator-plugging.md, instruments/pump-seal-plans.md, and equipment/P-2302.md where API Plan 11/53A & 2/53A seal specs, hydraulic discrepancies, and fouling triggers are pre-reconciled.",
                 "squad": [
-                    {"id": "TOOL-02", "name": "process_raw_pdf_tool", "role": "Extracts nozzle schedules and piping line numbers from P&IDs"},
-                    {"id": "TOOL-04", "name": "generate_equipment_okf_tool", "role": "Compiles connections, stream balances, and elevation notes"},
-                    {"id": "TOOL-05", "name": "generate_okf_concept_tool", "role": "Synthesizes procedures/ and troubleshooting/ playbooks"},
-                    {"id": "TOOL-06", "name": "build_okf_indexes_and_validate_tool", "role": "Verifies 0 broken cross-links across 139 Markdown files"},
+                    {"id": "TOOL-01", "name": "find_raw_documents_tool", "role": "Matches equipment tags across data_sheets/, pid/ (0001H-K), and manuals"},
+                    {"id": "TOOL-02", "name": "process_raw_pdf_tool", "role": "Parses 300 DPI mechanical seal piping P&IDs and multi-page pump curves"},
+                    {"id": "TOOL-04", "name": "generate_equipment_okf_tool", "role": "Applies Process Data Sheet precedence & flags 2,020 vs 3,020 m3/h conflict"},
+                    {"id": "TOOL-05", "name": "generate_okf_concept_tool", "role": "Synthesizes fouling troubleshooting and API seal plan registers"},
                 ],
             },
             {
                 "id": "p3",
-                "code": "PERSONA 03 // INSTRUMENTATION & SIS",
-                "initials": "IS",
-                "name": "Principal I&C / Safety Instrumented Systems Engineer",
-                "mandate": "Maintaining IEC 61511 SIL loop integrity, Cause & Effect matrices (UC-2301/2302/2303), and transmitter calibration ranges.",
-                "jtbd": "Ensure every dedicated safety transmitter (XSHH/XSLL) is separated from DCS regulatory loops (XAHH/XALL) and reconciled with multi-sheet orifice and control valve datasheets.",
-                "broken": "Stacked instrument bubbles on P&IDs get collapsed into single rows during manual takeoff; multi-sheet control valve and PSV datasheets (PS-0032, PS-0033, PS-0034) sit disconnected from the Cause & Effect drawing (DWG 0002).",
-                "agentic": "Uses Mode B incremental ingestion to merge all 13 instrument registers (instruments/sis-cdn.md, cause-effect-cdn.md, pressure-relief-valves-cdn.md) with corpus-driven links back to every protected vessel.",
+                "code": "PERSONA 03 // PLANT OPERATIONS & STARTUP",
+                "initials": "OP",
+                "name": "Shift Operations Superintendent & Startup Lead",
+                "mandate": "Executing 5-gate cold-start feed-in (70 deg C, 300 ppm H2SO4, <2 wt% H2O), CSTR step-down (70->60 deg C), and normal shutdown purges.",
+                "jtbd": "Verify every 'Ready for Feed In' prerequisite, 36-second Calorimeter X-2308 residence lag, and <=5% acid step boundary across SOPs and P&IDs before introducing CHP feed.",
+                "broken": "Reads 60-page operating manual PDFs alongside rasterized P&IDs during shift handover. Missing the 36-second calorimeter coil lag or stepping CSTR temperature faster than 1 deg C per 15 minutes causes CHP accumulation and off-spec transition slop.",
+                "agentic": "Executes from procedures/startup-cdn.md and procedures/normal-operations-cdn.md with 100% bi-directional links to every DCS control valve (TC-2342, FC-2303), piping line number, and SIS trip threshold.",
                 "squad": [
-                    {"id": "TOOL-03", "name": "inspect_existing_okf_concept_tool", "role": "Reads existing instrument register Markdown tables by Tag"},
-                    {"id": "TOOL-05", "name": "generate_okf_concept_tool", "role": "Performs non-destructive table-row upsert via merge_markdown_bodies"},
-                    {"id": "TOOL-07", "name": "validate_okf_bundle_tool", "role": "Validates YAML frontmatter and bi-directional wiki links"},
-                    {"id": "TOOL-08", "name": "export_bundle_to_gcs_tool", "role": "Publishes verified instrument registers to GCS knowledge bucket"},
+                    {"id": "TOOL-02", "name": "process_raw_pdf_tool", "role": "Extracts sequential startup gates, flush steps, and DCS loop tags"},
+                    {"id": "TOOL-05", "name": "generate_okf_concept_tool", "role": "Compiles procedures/startup-cdn.md and normal-operations-cdn.md"},
+                    {"id": "TOOL-06", "name": "build_okf_indexes_and_validate_tool", "role": "Verifies 0 broken cross-links across all 139 Markdown files"},
+                    {"id": "TOOL-08", "name": "export_bundle_to_gcs_tool", "role": "Publishes verified shift playbooks to GCS knowledge bucket"},
                 ],
             },
             {
                 "id": "p4",
-                "code": "PERSONA 04 // STATIC & ROTATING EQUIPMENT",
-                "initials": "ME",
-                "name": "Lead Mechanical & Reliability Engineer",
-                "mandate": "Verifying ASME vessel thickness, metallurgy (SUS304/316L/Duplex), and pump hydraulic curves (P-2302, P-2303, P-2309).",
-                "jtbd": "Reconcile rated hydraulic power, differential head, and shell metallurgy across As-Built vendor datasheets and P&ID title blocks.",
-                "broken": "Discovers during pump replacement that P&ID DWG 0017 lists P-2302 capacity as 3,020 m3/hr while datasheet PS-P2302 specifies 2,020 m3/h, or that motor kW (37 kW) was confused with hydraulic power (23.8 kW on P-2303AB).",
-                "agentic": "Reviews pre-reconciled equipment/<TAG>.md tables where As-Built Process Data Sheet authority governs mechanical ratings and every P&ID transcription discrepancy is explicitly documented.",
+                "code": "PERSONA 04 // TURNAROUND, MOC & PROCESS SAFETY",
+                "initials": "PS",
+                "name": "Turnaround, MOC & Process Safety (HAZOP) Lead",
+                "mandate": "Governing LOTO isolation blind lists, MOC datasheet-vs-P&ID reconciliation (21 conflicts), 2oo3 SIS interlocks, and PHA/HAZOP revalidation.",
+                "jtbd": "Verify every ASME design pressure, nozzle schedule, elevation head note (15,500 mm on V-2301), and 2oo3 SIS trip initiator across 55 Process Data Sheets and 46 P&IDs.",
+                "broken": "Spends 3 weeks manually flipping between AutoCAD P&IDs and As-Built Process Data Sheets. Discrepancies like E-2307 (1.3 vs 13.0 kg/cm2g), D-2304 burst disc (12.16 vs 11.0 kg/cm2g), or D-2312 chemical identity (HMDA vs TBC) delay turnaround blinding and PHA sign-off.",
+                "agentic": "Opens the compiled OKF v0.2 Knowledge Bundle where all 21 cross-document conflicts, complete nozzle schedules, and 15 GHS SDS profiles are pre-flagged with exact PDF citations—cutting preparation from 14 days to 18 minutes.",
                 "squad": [
-                    {"id": "TOOL-01", "name": "find_raw_documents_tool", "role": "Matches equipment tag across data_sheets/ and pid/"},
-                    {"id": "TOOL-02", "name": "process_raw_pdf_tool", "role": "Parses multi-page mechanical vessel sketches and pump curves"},
-                    {"id": "TOOL-04", "name": "generate_equipment_okf_tool", "role": "Applies Process Data Sheet precedence hierarchy"},
-                    {"id": "TOOL-07", "name": "validate_okf_bundle_tool", "role": "Confirms 100% OKF v0.2 schema compliance"},
+                    {"id": "TOOL-01", "name": "find_raw_documents_tool", "role": "Locates all governing Datasheets, P&IDs, PFDs, and SDS by tag"},
+                    {"id": "TOOL-02", "name": "process_raw_pdf_tool", "role": "Extracts nozzle schedules + 300 DPI Gemini Vision on vector CAD P&IDs"},
+                    {"id": "TOOL-04", "name": "generate_equipment_okf_tool", "role": "Enforces Datasheet vs. P&ID precedence & 21 CONFLICT callouts"},
+                    {"id": "TOOL-07", "name": "validate_okf_bundle_tool", "role": "Confirms 100% OKF v0.2 schema compliance and link integrity"},
                 ],
             },
         ],
@@ -624,13 +784,13 @@ def build_static_data() -> dict[str, Any]:
                 "apqc": "ORCHESTRATOR // ADK",
                 "status": "ONLINE",
                 "name": "extracter_orchestrator (Root ADK Agent)",
-                "process": "Autonomous 6-Step Chemical Engineering Knowledge Compiler",
+                "process": "Autonomous 6-Step Process Manufacturing Knowledge Compiler",
                 "value": "98.6% Recall",
-                "period": "139/139 Live Eval Cases",
-                "stake": "Compiles 136 raw engineering PDFs into 130 cross-linked OKF v0.2 concepts with zero ungrounded speculation.",
-                "owns": "End-to-end orchestration of Mode A (Entity-Centric) and Mode B (File-by-File Incremental) extraction workflows.",
-                "answers": "Process Safety Lead, Turnaround Planner, I&C Engineer, and Plant Engineering Director.",
-                "pl": "Compresses HAZOP & Turnaround engineering document reconciliation from 14 days to 18 minutes while surfacing 21 critical rating conflicts.",
+                "period": "284 Total Eval Cases",
+                "stake": "Compiles 136 raw engineering PDFs into 130 cross-linked OKF v0.2 concepts spanning Yield, Reliability, Startup, MOC, and HAZOP.",
+                "owns": "End-to-end orchestration of Mode A (Entity & Scenario-Centric) and Mode B (File-by-File Incremental) extraction workflows.",
+                "answers": "Yield Optimization Engineer, Reliability Lead, Shift Superintendent, and Turnaround/Process Safety Lead.",
+                "pl": "Compresses Yield root-cause, Turnaround LOTO, and HAZOP document reconciliation from 14 days to 18 minutes while surfacing 21 critical rating conflicts.",
                 "cannot": "Cannot modify, overwrite, or delete any file in reference/raw/ or reference/wiki/ (Rule 14 strict immutability).",
                 "failure": "Halts synthesis if validate_okf_bundle_tool reports schema errors or broken cross-links.",
                 "code_lang": "Python 3.13 // Google ADK + Gemini 3.8 Flash (Global)",
@@ -912,14 +1072,69 @@ def build_static_data() -> dict[str, Any]:
     }
 
 
+def build_static_data(
+    profile: Profile | None = None,
+) -> tuple[dict[str, Any], dict[str, str], Profile]:
+    prof = profile or load_profile()
+    raw_pdfs = collect_raw_pdfs(prof.raw_dir)
+    concepts, nodes, edges = collect_okf_concepts(prof.wiki_dir)
+    conflict_nodes = [c for c in concepts if c["has_conflict"]]
+    md_file_count = (
+        len([p for p in prof.wiki_dir.rglob("*.md") if not p.name.startswith("_")])
+        if prof.wiki_dir.exists()
+        else 0
+    )
+
+    base = _default_phenol_static_data(raw_pdfs, concepts, nodes, edges, conflict_nodes)
+    ctx = {
+        "raw_pdfs": raw_pdfs,
+        "concepts": concepts,
+        "nodes": nodes,
+        "edges": edges,
+        "conflict_nodes": conflict_nodes,
+        "base": base,
+        "md_file_count": md_file_count,
+    }
+    overrides, html_tokens, ui = prof.build(ctx)
+    data = dict(base)
+    data.update(overrides)
+    data["ui"] = ui
+    return data, html_tokens, prof
+
+
+def render_index_html(html_tokens: dict[str, str]) -> str:
+    tpl = TEMPLATE_PATH.read_text(encoding="utf-8")
+    out = tpl
+    for k, v in html_tokens.items():
+        placeholder = "{{" + k + "}}"
+        assert placeholder in out, f"Template missing placeholder {placeholder}"
+        out = out.replace(placeholder, v)
+    leftover = re.findall(r"\{\{[A-Z0-9_]+\}\}", out)
+    assert not leftover, f"Unresolved template tokens in index.html: {leftover}"
+    return out
+
+
 def _replace_once(src: str, old: str, new: str, label: str) -> str:
     cnt = src.count(old)
     assert cnt == 1, f"replace_once({label}) expected 1 occurrence, found {cnt}"
     return src.replace(old, new, 1)
 
 
-def run_build_verification_harness(html: str, css: str, js: str) -> dict[str, int]:
+def run_build_verification_harness(
+    html: str,
+    css: str,
+    js: str,
+    profile: Profile | None = None,
+) -> dict[str, int]:
     """Runs the 5-Group Build-Time Verification Harness on the compiled 4-Screen Cockpit."""
+    if profile is None:
+        if "RIDGEBACK CONCENTRATOR" in html.upper():
+            profile = load_profile("copper-concentrator")
+        elif "PROCESS MANUFACTURING" in html.upper():
+            profile = load_profile("phenol-plant")
+        else:
+            profile = load_profile()
+
     checks_run = 0
 
     def _check(cond: bool, msg: str) -> None:
@@ -966,7 +1181,7 @@ def run_build_verification_harness(html: str, css: str, js: str) -> dict[str, in
         "RED-TEAM CRITIC",
         "GEE-BUG",
         "SCADA JOIN",
-    ]
+    ] + list(profile.harness_forbidden)
     combined = html + "\n" + css + "\n" + js
     for fb in forbidden_strings:
         _check(fb not in combined, f"Forbidden string/token detected: {fb}")
@@ -1032,6 +1247,10 @@ def run_build_verification_harness(html: str, css: str, js: str) -> dict[str, in
         _check(screen_num in html, f"Missing screen badge {screen_num}")
 
     required_visual_ids = [
+        "scenario-switcher-strip",
+        "s1-scenario-spotlight",
+        "btn-scenario-launch-wb",
+        "btn-scenario-launch-twin",
         "s1-visual-blueprint-svg",
         "schematic-particle-canvas",
         "radial-risk-gauge",
@@ -1041,6 +1260,12 @@ def run_build_verification_harness(html: str, css: str, js: str) -> dict[str, in
     ]
     for vid in required_visual_ids:
         _check(vid in html_ids, f"Missing required visual stage ID: {vid}")
+
+    html_upper = html.upper()
+    _check(
+        all(req.upper() in html_upper for req in profile.harness_required),
+        f"Expected explicit {profile.harness_required} framing in index.html",
+    )
 
     _check(
         html.count('class="tech-spec-drawer"') == 4,
@@ -1063,12 +1288,12 @@ def run_build_verification_harness(html: str, css: str, js: str) -> dict[str, in
 
 def main() -> None:
     STATIC_DIR.mkdir(parents=True, exist_ok=True)
-    data = build_static_data()
+    data, html_tokens, profile = build_static_data()
     data_js_path = STATIC_DIR / "data.js"
     data_js_content = "window.OKF_DEMO_DATA = " + json.dumps(data, ensure_ascii=False) + ";\n"
     data_js_path.write_text(data_js_content, encoding="utf-8")
     print(
-        f"Wrote {data_js_path} ({len(data_js_content):,} bytes) | "
+        f"[{profile.name}] Wrote {data_js_path} ({len(data_js_content):,} bytes) | "
         f"{len(data['raw_pdfs'])} PDFs | {len(data['concepts'])} OKF concepts | "
         f"{len(data['graph']['nodes'])} graph nodes | {len(data['graph']['edges'])} graph edges"
     )
@@ -1076,11 +1301,12 @@ def main() -> None:
     index_path = STATIC_DIR / "index.html"
     css_path = STATIC_DIR / "app.css"
     js_path = STATIC_DIR / "app.js"
-    html = index_path.read_text(encoding="utf-8")
+    html = render_index_html(html_tokens)
+    index_path.write_text(html, encoding="utf-8")
     css = css_path.read_text(encoding="utf-8")
     js = js_path.read_text(encoding="utf-8")
 
-    harness_stats = run_build_verification_harness(html, css, js)
+    harness_stats = run_build_verification_harness(html, css, js, profile=profile)
     print(
         f"[BUILD HARNESS PASS] {harness_stats['total_checks']}/{harness_stats['total_checks']} checks | "
         f"{harness_stats['screen_count']} screens | "
@@ -1101,9 +1327,10 @@ def main() -> None:
         "<script>\n" + data_js_content + "\n</script>\n<script>\n" + js + "\n</script>",
         "inline_js",
     )
-    BRAIN_ARTIFACT.parent.mkdir(parents=True, exist_ok=True)
-    BRAIN_ARTIFACT.write_text(standalone, encoding="utf-8")
-    print(f"Wrote standalone HTML artifact: {BRAIN_ARTIFACT} ({len(standalone):,} bytes)")
+    for target_artifact in (BRAIN_ARTIFACT, CURRENT_BRAIN_ARTIFACT):
+        target_artifact.parent.mkdir(parents=True, exist_ok=True)
+        target_artifact.write_text(standalone, encoding="utf-8")
+        print(f"Wrote standalone HTML artifact: {target_artifact} ({len(standalone):,} bytes)")
 
 
 if __name__ == "__main__":

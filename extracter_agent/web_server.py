@@ -326,8 +326,19 @@ def create_web_app() -> FastAPI:
         raw_dir = cfg.reference_raw_dir
         if not raw_dir.is_absolute():
             raw_dir = (REPO_ROOT / raw_dir).resolve()
-        target = (raw_dir / subfolder / filename).resolve()
-        if not target.is_relative_to(raw_dir.resolve()) or not target.is_file():
+
+        candidate_dirs = [
+            raw_dir,
+            (REPO_ROOT / "corpora" / "copper-concentrator" / "raw").resolve(),
+            (REPO_ROOT / "reference" / "raw").resolve(),
+        ]
+        target: Path | None = None
+        for base_dir in candidate_dirs:
+            cand = (base_dir / subfolder / filename).resolve()
+            if cand.is_relative_to(base_dir) and cand.is_file():
+                target = cand
+                break
+        if target is None:
             raise HTTPException(status_code=404, detail="Raw PDF file not found")
 
         safe_name = target.name
@@ -370,16 +381,22 @@ def create_web_app() -> FastAPI:
             raise HTTPException(status_code=400, detail="Invalid concept_id")
         bundle_dir = ensure_bundle_seeded()
         clean_id = concept_id.removesuffix(".md")
+        active_bundle = bundle_dir
+        mining_wiki = REPO_ROOT / "corpora" / "copper-concentrator" / "wiki"
+        if not (bundle_dir / f"{clean_id}.md").is_file() and (
+            mining_wiki / f"{clean_id}.md"
+        ).is_file():
+            active_bundle = mining_wiki
         insp = inspect_existing_okf_concept_tool(
             concept_id=clean_id,
-            output_bundle_dir=str(bundle_dir),
+            output_bundle_dir=str(active_bundle),
         )
         if not insp.get("exists"):
             raise HTTPException(
                 status_code=404,
                 detail=f"OKF concept '{clean_id}' not found",
             )
-        target_md = bundle_dir / f"{clean_id}.md"
+        target_md = active_bundle / f"{clean_id}.md"
         raw_md = target_md.read_text(encoding="utf-8") if target_md.exists() else ""
         conflict_lines = [
             line.strip() for line in raw_md.splitlines() if "CONFLICT" in line
@@ -401,12 +418,30 @@ def create_web_app() -> FastAPI:
             raise HTTPException(status_code=400, detail="Invalid subfolder")
         if ".." in req.pdf_filename:
             raise HTTPException(status_code=400, detail="Invalid pdf_filename")
-        res = process_raw_pdf_tool(
-            pdf_filename=req.pdf_filename,
-            subfolder=req.subfolder,
-            max_pages=req.max_pages,
-            enable_multimodal=req.enable_multimodal,
-        )
+        cfg = get_config()
+        raw_dir = cfg.reference_raw_dir
+        if not raw_dir.is_absolute():
+            raw_dir = (REPO_ROOT / raw_dir).resolve()
+        mining_raw = REPO_ROOT / "corpora" / "copper-concentrator" / "raw"
+        prev_raw = os.environ.get("REFERENCE_RAW_DIR")
+        override_raw = not (raw_dir / req.subfolder / req.pdf_filename).is_file() and (
+            mining_raw / req.subfolder / req.pdf_filename
+        ).is_file()
+        try:
+            if override_raw:
+                os.environ["REFERENCE_RAW_DIR"] = str(mining_raw)
+            res = process_raw_pdf_tool(
+                pdf_filename=req.pdf_filename,
+                subfolder=req.subfolder,
+                max_pages=req.max_pages,
+                enable_multimodal=req.enable_multimodal,
+            )
+        finally:
+            if override_raw:
+                if prev_raw is None:
+                    os.environ.pop("REFERENCE_RAW_DIR", None)
+                else:
+                    os.environ["REFERENCE_RAW_DIR"] = prev_raw
         return res
 
     @app.post("/api/demo/guardrail-check", response_class=JSONResponse)
@@ -447,29 +482,47 @@ def create_web_app() -> FastAPI:
         if ".." in clean_concept_id:
             raise HTTPException(status_code=400, detail="Invalid concept_id")
 
-        # Execute real ADK tools for discovery, PDF parsing, concept inspection, and validation
-        tag_query = clean_concept_id.split("/")[-1]
-        disc = find_raw_documents_tool(query=tag_query)
-        matched_files = disc.get("matches", [])
+        mining_wiki = REPO_ROOT / "corpora" / "copper-concentrator" / "wiki"
+        mining_raw = REPO_ROOT / "corpora" / "copper-concentrator" / "raw"
+        use_mining = not (bundle_dir / f"{clean_concept_id}.md").is_file() and (
+            mining_wiki / f"{clean_concept_id}.md"
+        ).is_file()
+        if use_mining:
+            bundle_dir = mining_wiki
 
-        pdf_sub = req.subfolder if req.subfolder in ALLOWED_RAW_SUBFOLDERS else "data_sheets"
-        pdf_name = req.pdf_filename
-        if matched_files and req.mode == "mode_a":
-            first_match = matched_files[0]
-            pdf_sub = first_match.get("subfolder", pdf_sub)
-            pdf_name = first_match.get("file_name", pdf_name)
+        prev_raw = os.environ.get("REFERENCE_RAW_DIR")
+        try:
+            if use_mining:
+                os.environ["REFERENCE_RAW_DIR"] = str(mining_raw)
+            # Execute real ADK tools for discovery, PDF parsing, concept inspection, and validation
+            tag_query = clean_concept_id.split("/")[-1]
+            disc = find_raw_documents_tool(query=tag_query)
+            matched_files = disc.get("matches", [])
 
-        pdf_res = process_raw_pdf_tool(
-            pdf_filename=pdf_name,
-            subfolder=pdf_sub,
-            max_pages=2,
-            enable_multimodal=False,
-        )
-        insp = inspect_existing_okf_concept_tool(
-            concept_id=clean_concept_id,
-            output_bundle_dir=str(bundle_dir),
-        )
-        val = validate_okf_bundle_tool(bundle_dir=str(bundle_dir))
+            pdf_sub = req.subfolder if req.subfolder in ALLOWED_RAW_SUBFOLDERS else "data_sheets"
+            pdf_name = req.pdf_filename
+            if matched_files and req.mode == "mode_a":
+                first_match = matched_files[0]
+                pdf_sub = first_match.get("subfolder", pdf_sub)
+                pdf_name = first_match.get("file_name", pdf_name)
+
+            pdf_res = process_raw_pdf_tool(
+                pdf_filename=pdf_name,
+                subfolder=pdf_sub,
+                max_pages=2,
+                enable_multimodal=False,
+            )
+            insp = inspect_existing_okf_concept_tool(
+                concept_id=clean_concept_id,
+                output_bundle_dir=str(bundle_dir),
+            )
+            val = validate_okf_bundle_tool(bundle_dir=str(bundle_dir))
+        finally:
+            if use_mining:
+                if prev_raw is None:
+                    os.environ.pop("REFERENCE_RAW_DIR", None)
+                else:
+                    os.environ["REFERENCE_RAW_DIR"] = prev_raw
 
         target_md_path = bundle_dir / f"{clean_concept_id}.md"
         compiled_md = (

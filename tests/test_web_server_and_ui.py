@@ -410,40 +410,98 @@ def test_mining_m3_light_html_structure_and_progressive_disclosure() -> None:
 
 def test_embedded_build_verification_harness() -> None:
     """Verify the 5-Group Build-Time Verification Harness passes 100% (CSS coverage, DOM ID parity, SVG safety)."""
-    from scripts.build_demo_assets import run_build_verification_harness
+    from scripts.build_demo_assets import load_profile, run_build_verification_harness
 
     html = (REPO_ROOT / "extracter_agent" / "static" / "index.html").read_text(encoding="utf-8")
     css = (REPO_ROOT / "extracter_agent" / "static" / "app.css").read_text(encoding="utf-8")
     js = (REPO_ROOT / "extracter_agent" / "static" / "app.js").read_text(encoding="utf-8")
 
-    stats = run_build_verification_harness(html, css, js)
+    prof_name = "copper-concentrator" if "CONCENTRATOR" in html.upper() else "phenol-plant"
+    stats = run_build_verification_harness(html, css, js, profile=load_profile(prof_name))
     assert stats["screen_count"] == 4
     assert stats["total_checks"] >= 50
     assert stats["svg_blocks"] >= 5
 
 
 def test_embedded_demo_data_completeness() -> None:
-    """Verify `data.js` contains all 136 PDFs, 130 OKF concepts, 21 conflicts, and 125 graph nodes."""
+    """Verify `data.js` contains the complete active corpus (Copper Concentrator or Phenol Plant)."""
     data_js_path = REPO_ROOT / "extracter_agent" / "static" / "data.js"
     raw = data_js_path.read_text(encoding="utf-8")
     prefix = "window.OKF_DEMO_DATA = "
     assert raw.startswith(prefix)
     payload = json.loads(raw[len(prefix) :].rstrip().rstrip(";"))
 
-    assert payload["summary"]["total_raw_pdfs"] == 136
-    assert payload["summary"]["total_okf_concepts"] == 130
-    assert payload["summary"]["conflict_concepts_count"] == 21
-    assert payload["summary"]["graph_node_count"] == 125
-    assert payload["summary"]["graph_edge_count"] == 866
-    assert len(payload["raw_pdfs"]) == 136
-    assert len(payload["concepts"]) == 130
-    assert len(payload["conflict_nodes"]) == 21
+    gcs_prefix = payload.get("meta", {}).get("gcs_prefix", "")
+    if "copper-concentrator" in gcs_prefix:
+        assert payload["summary"]["total_raw_pdfs"] == 45
+        assert payload["summary"]["total_okf_concepts"] >= 40
+        assert payload["summary"]["conflict_concepts_count"] >= 10
+        assert payload["summary"]["graph_node_count"] >= 40
+        assert payload["summary"]["graph_edge_count"] >= 100
+        assert len(payload["raw_pdfs"]) == 45
+        assert len(payload["concepts"]) == payload["summary"]["total_okf_concepts"]
+        assert len(payload["conflict_nodes"]) == payload["summary"]["conflict_concepts_count"]
+    else:
+        assert payload["summary"]["total_raw_pdfs"] == 136
+        assert payload["summary"]["total_okf_concepts"] == 130
+        assert payload["summary"]["conflict_concepts_count"] == 21
+        assert payload["summary"]["graph_node_count"] == 125
+        assert payload["summary"]["graph_edge_count"] == 866
+        assert len(payload["raw_pdfs"]) == 136
+        assert len(payload["concepts"]) == 130
+        assert len(payload["conflict_nodes"]) == 21
 
     # Verify zero cross-span label mismatch on conflict nodes
     for node in payload["conflict_nodes"]:
         cid = node["concept_id"]
         short_tag = cid.split("/")[-1]
         assert short_tag in node["title"] or short_tag in cid
+
+
+def test_copper_concentrator_corpus_and_endpoints() -> None:
+    """Verify the 45-PDF synthetic copper concentrator corpus, conflict evaluation, and FastAPI endpoints."""
+    eval_path = REPO_ROOT / "corpora" / "copper-concentrator" / "eval_results.json"
+    assert eval_path.is_file()
+    ev = json.loads(eval_path.read_text(encoding="utf-8"))
+    assert ev["seeded_total"] == 11
+    assert ev.get("seeded_detected", ev.get("seeded_hits", 0)) >= 10
+    assert ev["recall"] >= 0.90
+    assert ev["decoy_flagged_as_conflict"] is False
+
+    # Stream raw copper concentrator PDF
+    pdf_resp = CLIENT.get(
+        "/api/demo/raw-pdf/data_sheets/"
+        "RB-4410-PS-ML3101_SAG MILL PROCESS DATA SHEET_B.pdf"
+    )
+    assert pdf_resp.status_code == 200
+    assert pdf_resp.content.startswith(b"%PDF-")
+
+    # Inspect compiled ML-3101 OKF concept
+    concept_resp = CLIENT.get("/api/demo/okf-concept/equipment/ML-3101")
+    assert concept_resp.status_code == 200
+    c_data = concept_resp.json()
+    assert c_data["status"] == "success"
+    assert c_data["concept_id"] == "equipment/ML-3101"
+    assert c_data["has_conflict"] is True
+    assert any("22,000" in ln or "20,000" in ln or "75" in ln or "85" in ln for ln in c_data["conflict_lines"])
+
+    # Live extraction on ML-3101
+    ext_resp = CLIENT.post(
+        "/api/demo/extract-live",
+        json={
+            "prompt": "Extract ML-3101 SAG mill and reconcile datasheet against P&ID and SIS matrix.",
+            "mode": "mode_a",
+            "concept_id": "equipment/ML-3101",
+            "subfolder": "data_sheets",
+            "pdf_filename": "RB-4410-PS-ML3101_SAG MILL PROCESS DATA SHEET_B.pdf",
+            "invoke_vertex_llm": False,
+        },
+    )
+    assert ext_resp.status_code == 200
+    ext_data = ext_resp.json()
+    assert ext_data["status"] == "success"
+    assert "ML-3101" in ext_data["compiled_markdown"]
+    assert "CONFLICT" in ext_data["compiled_markdown"]
 
 
 def test_rule_14_reference_directory_immutability() -> None:

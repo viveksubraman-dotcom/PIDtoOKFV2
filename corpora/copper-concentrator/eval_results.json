@@ -1,0 +1,905 @@
+{
+ "wiki": "/usr/local/google/home/viveksubraman/extracter-agent/corpora/copper-concentrator/wiki",
+ "seeded_total": 11,
+ "seeded_detected": 10,
+ "recall": 0.909,
+ "decoy_flagged_as_conflict": false,
+ "decoy_evidence": [],
+ "conflict_lines_total": 263,
+ "unmatched_conflict_lines": [
+  {
+   "file": "equipment/CR-2101.md",
+   "line": 129,
+   "text": "- ⚠️ CONFLICT — DESIGN THROUGHPUT: Process Data Sheet RB-4410-PS-CR2101 Rev B specifies 5,500 t/h crusher design throughput, whereas PFD RB-4410-PFD-001 Rev B specifies a nominal operating solids throughput of 2,688 t/h for Stream S-101 — verify with process engineer before HAZOP (instantaneous dump"
+  },
+  {
+   "file": "equipment/CV-2101.md",
+   "line": 107,
+   "text": "- ⚠️ CONFLICT / CAPACITY SURGE NOTE: Conveyor CV-2101 must withstand peak instantaneous surges up to 5,500 t/h from CR-2101 (per RB-4410-PID-21-001 Rev B and RB-4410-PS-CR2101 Rev B) while continuous plant mass balance nominal rate is 2,688 t/h (per RB-4410-PFD-001 Rev B)."
+  },
+  {
+   "file": "equipment/CV-3101.md",
+   "line": 103,
+   "text": "- ⚠️ CONFLICT — SAG Trunnion Bearing Trip Setpoint Tripping CV-3101: RB-4410-STD-CE-001 Rev B specifies CV-3101 trip at TAHH 85 °C (1oo2 voting), whereas RB-4410-PS-0034 Rev B and RB-4410-OM-001 Rev 2 document mill bearing trip at TAHH 75 °C without explicit reference to CV-3101 feed trip — verify i"
+  },
+  {
+   "file": "equipment/FC-4301.md",
+   "line": 81,
+   "text": "| Final Concentrate Solids Mass Rate | 51 (⚠️ CONFLICT: Stream S-431 specifies 51 t/h solids in RB-4410-PFD-002 Rev B and RB-4410-PFD-003 Rev B, whereas Drawing RB-4410-PFD-000 Rev B specifies 50.6 t/h solids (26.0% Cu grade). Sizing of thickener TH-5101 and filter press FP-5101 accommodates 51 t/h."
+  },
+  {
+   "file": "equipment/FC-4301.md",
+   "line": 127,
+   "text": "- ⚠️ CONFLICT — CONCENTRATE PRODUCTION CAPACITY: RB-4410-PFD-002 Rev B (Stream S-431) specifies 51 t/h solids (149 m3/h slurry @ 28 wt% solids), whereas RB-4410-PFD-000 Rev B specifies 50.6 t/h solids — verify with engineer before HAZOP to ensure TH-5101 thickener drive torque and FP-5101 filter pre"
+  },
+  {
+   "file": "equipment/FC-4301.md",
+   "line": 130,
+   "text": "- ⚠️ CONFLICT — CONCENTRATE PRODUCTION CAPACITY: RB-4410-PFD-002 Rev B and RB-4410-PFD-003 Rev B (Stream S-431) specify 51 t/h solids (149 m3/h slurry @ 28 wt% solids), whereas RB-4410-PFD-000 Rev B specifies 50.6 t/h solids — verify with engineer before HAZOP to ensure TH-5101 thickener drive torqu"
+  },
+  {
+   "file": "equipment/FC-4301.md",
+   "line": 131,
+   "text": "- ⚠️ CONFLICT — CONCENTRATE PRODUCTION CAPACITY: RB-4410-PFD-002 Rev B and RB-4410-PFD-003 Rev B (Stream S-431) specify 51 t/h solids (149 m3/h slurry @ 28 wt% solids), whereas RB-4410-PFD-000 Rev B specifies 50.6 t/h solids (26.0% Cu grade) — verify with engineer before HAZOP to ensure TH-5101 thic"
+  },
+  {
+   "file": "equipment/FP-5101.md",
+   "line": 107,
+   "text": "| Feed Solids Mass Rate | 51 (⚠️ CONFLICT) (Stream S-511 specifies 51 t/h solids in RB-4410-PFD-003 Rev B, whereas Drawing RB-4410-PFD-000 Rev B specifies 50.6 t/h solids (26.0% Cu grade). Sizing and batch chamber cycle times must accommodate 51 t/h solids.) | t/h | RB-4410-PFD-003 Rev B |"
+  },
+  {
+   "file": "equipment/FP-5101.md",
+   "line": 117,
+   "text": "| Connected Feed Pump | PP-5101A (PP-5101A/B, 210 m3/h rated, 28 m TDH, 75 kW) (Concentrate thickener underflow pump PP-5101A/B transfer rating; Process Data Sheet RB-4410-PS-PP5101 Rev B specifies 210 m³/h (increased from 180 m³/h in Rev A after filter trade-off, superseding Rev A); ⚠️ CONFLICT: 21"
+  },
+  {
+   "file": "equipment/FP-5101.md",
+   "line": 159,
+   "text": "- ⚠️ CONFLICT — CONCENTRATE PRODUCTION RATE: Drawing RB-4410-PFD-003 Rev B specifies 51 t/h solids (40 m3/h @ 65 wt% solids), whereas Drawing RB-4410-PFD-000 Rev B specifies 50.6 t/h solids — verify with engineer before HAZOP to ensure filter chamber volume, cycle frequency, and membrane squeeze com"
+  },
+  {
+   "file": "equipment/FP-5101.md",
+   "line": 164,
+   "text": "- ⚠️ CONFLICT — CONCENTRATE FEED PUMP RATED FLOW: Process Data Sheet RB-4410-PS-PP5101 Rev A specifies a rated slurry flow rate of 180 m³/h for PP-5101A/B, whereas Process Flow Diagram RB-4410-PFD-003 Rev B (Stream S-511) specifies a normal operating slurry flow of 40 m³/h (51 t/h solids, 27 t/h wat"
+  },
+  {
+   "file": "equipment/FP-5101.md",
+   "line": 165,
+   "text": "- ⚠️ CONFLICT — CONCENTRATE FEED PUMP RATED FLOW: Process Data Sheet RB-4410-PS-PP5101 Rev B specifies a rated slurry flow rate of 210 m³/h for PP-5101A/B (increased from 180 m³/h in Rev A after filter trade-off; supersedes Rev A), whereas Process Flow Diagram RB-4410-PFD-003 Rev B (Stream S-511) sp"
+  },
+  {
+   "file": "equipment/ML-3101.md",
+   "line": 66,
+   "text": "TAHH 85 °C (controlling standard RB-4410-STD-CE-001 Rev B; ⚠️ CONFLICT vs 75 °C"
+  },
+  {
+   "file": "equipment/ML-3101.md",
+   "line": 84,
+   "text": "TAHH 85 °C (controlling standard RB-4410-STD-CE-001 Rev B; ⚠️ CONFLICT vs 75 °C"
+  },
+  {
+   "file": "equipment/ML-3101.md",
+   "line": 165,
+   "text": "conflict 180 bar(g) on PID-31-002)"
+  },
+  {
+   "file": "equipment/ML-3101.md",
+   "line": 178,
+   "text": "trips ML-3101 GMD and stops feed conveyor CV-3101 on TAHH 85 °C (⚠️ CONFLICT"
+  },
+  {
+   "file": "equipment/ML-3101.md",
+   "line": 190,
+   "text": "trips ML-3101 GMD and stops feed conveyor CV-3101 on TAHH 85 °C (⚠️ CONFLICT"
+  },
+  {
+   "file": "equipment/ML-3101.md",
+   "line": 243,
+   "text": "| SAG Trunnion Bearing Temperature Trip High-High (TAHH) | 75 (PS-0034 / OM-001) / 85 (STD-CE-001) (⚠️ CONFLICT: RB-4410-PS-0034 Rev B and RB-4410-OM-001 Rev 2 specify TAHH 75 °C, whereas RB-4410-STD-CE-001 Rev B specifies TAHH 85 °C (1oo2 voting). Mandatory HAZOP recommendation ACT-HAZOP-31-04 mand"
+  },
+  {
+   "file": "equipment/ML-3101.md",
+   "line": 378,
+   "text": "- ⚠️ CONFLICT — Installed Power: RB-4410-PS-ML3101 Rev B specifies 22000 kW, whereas RB-4410-PS-ML3101 Rev B / RB-4410-PID-00-002 Rev B specifies 22,000 kW — verify with engineer before HAZOP"
+  },
+  {
+   "file": "equipment/ML-3101.md",
+   "line": 405,
+   "text": "- ⚠️ CONFLICT — SAG Trunnion Bearing Temperature Trip High-High (TAHH): RB-4410-PS-0034 Rev B specifies 75 °C, whereas RB-4410-STD-HAZOP-001 Rev 1, RB-4410-PS-0034 Rev B, RB-4410-STD-CE-001 Rev B, RB-4410-OM-001 Rev 2 specifies 75 (PS-0034 / OM-001) / 85 (STD-CE-001) °C — verify with engineer before"
+  },
+  {
+   "file": "equipment/PP-3105A.md",
+   "line": 52,
+   "text": "setpoint_or_range: SET 180 bar(g) (⚠️ CONFLICT vs 160 bar(g) in PS-0032 and 170"
+  },
+  {
+   "file": "equipment/PP-3105B.md",
+   "line": 52,
+   "text": "setpoint_or_range: SET 180 bar(g) (⚠️ CONFLICT vs 160 bar(g) in PS-0032 and 170"
+  },
+  {
+   "file": "equipment/PP-4511A.md",
+   "line": 85,
+   "text": "- ⚠️ CONFLICT — FROTHER REAGENT CHEMISTRY & ELECTRICAL APPARATUS: P&ID RB-4410-PID-45-001 Rev B specifies Polyglycol ether frother (DF-250 type), whereas Process Data Sheet RB-4410-PS-TK4511 Rev B specifies MIBC (flash point 41 °C, Class 3 flammable liquid). If MIBC is used, pump motor, local juncti"
+  },
+  {
+   "file": "equipment/PP-5101A.md",
+   "line": 128,
+   "text": "- ⚠️ CONFLICT — RATED FLOW / OPERATING FLOW: Process Data Sheet RB-4410-PS-PP5101 Rev B specifies a rated slurry flow of 210 m³/h (increased from 180 m³/h in Rev A after filter trade-off; supersedes Rev A), whereas Process Flow Diagram RB-4410-PFD-003 Rev B (Stream S-511) specifies a normal operatin"
+  },
+  {
+   "file": "equipment/PP-5101A.md",
+   "line": 129,
+   "text": "- ⚠️ CONFLICT — SLURRY SPECIFIC GRAVITY: Process Data Sheet RB-4410-PS-PP5101 Rev B specifies Slurry SG 2.0, whereas Drawing RB-4410-PFD-003 Rev B specifies SG 1.966 (at 65.0 wt% solids) — verify slurry rheological characterization and Bingham plastic yield stress before HAZOP closure."
+  },
+  {
+   "file": "equipment/PP-6101A.md",
+   "line": 45,
+   "text": "(note: P&ID RB-4410-PID-61-001 Rev B displays conflicting 4.0 bar(g) casing design"
+  },
+  {
+   "file": "equipment/PP-6101A.md",
+   "line": 233,
+   "text": "- ⚠️ CONFLICT — Design Slurry Volumetric Flow: RB-4410-PFD-003 Rev B specifies 2,576 m3/h, whereas RB-4410-PFD-003 Rev B / RB-4410-PS-PP6101 Rev B specifies 2,576 (Operating slurry volumetric flow rate through 3-stage series pumping train) m3/h — verify with engineer before HAZOP"
+  },
+  {
+   "file": "equipment/PP-6101A.md",
+   "line": 234,
+   "text": "- ⚠️ CONFLICT — Slurry Specific Gravity: RB-4410-PFD-003 Rev B specifies 1.652, whereas RB-4410-PFD-003 Rev B / RB-4410-PS-PP6101 Rev B specifies 1.652 (Specific gravity of thickened tailings slurry at 62.0 wt% solids) — verify with engineer before HAZOP"
+  },
+  {
+   "file": "equipment/PP-6101A.md",
+   "line": 235,
+   "text": "- ⚠️ CONFLICT — Pump Configuration: RB-4410-PFD-003 Rev B specifies 3 series pumps, whereas RB-4410-PFD-003 Rev B / RB-4410-PS-PP6101 Rev B specifies 3 series pumps (PP-6101A/B/C) (3 centrifugal slurry pumps arranged in series to develop dynamic head for 6.2 km transfer) — verify with engineer befor"
+  },
+  {
+   "file": "equipment/PP-6101A.md",
+   "line": 236,
+   "text": "- ⚠️ CONFLICT — Pipeline Transfer Distance: RB-4410-PFD-003 Rev B specifies 6.2 km, whereas RB-4410-PFD-003 Rev B / RB-4410-PS-PP6101 Rev B specifies 6.2 (Total overland pipeline transfer length from concentrator to Tailings Storage Facility (TSF)) km — verify with engineer before HAZOP"
+  },
+  {
+   "file": "equipment/PP-6101A.md",
+   "line": 237,
+   "text": "- ⚠️ CONFLICT — Disposal Destination: RB-4410-PFD-003 Rev B specifies Tailings Storage Facility, whereas RB-4410-PFD-003 Rev B / RB-4410-PS-PP6101 Rev B specifies Tailings Storage Facility (TSF) (Target disposal facility receiving thickened tailings) — verify with engineer before HAZOP"
+  },
+  {
+   "file": "equipment/PP-6101A.md",
+   "line": 238,
+   "text": "- ⚠️ CONFLICT — Pumping Station Configuration: RB-4410-PFD-003 Rev B specifies 3 series stages (PP-6101A lead stage), whereas RB-4410-PS-PP6101 Rev B specifies 3 series stages (PP-6101A/B/C) — verify with engineer before HAZOP"
+  },
+  {
+   "file": "equipment/PP-6101A.md",
+   "line": 239,
+   "text": "- ⚠️ CONFLICT — Stage-3 Discharge Operating Pressure Window: RB-4410-PS-0032 Rev B specifies <36 (Trip PAHH at 38) bar(g), whereas RB-4410-PS-0032 Rev B / RB-4410-PS-PP6101 Rev B specifies 34 normal (<36 PAH, 38 PAHH trip, 40 casing design) bar(g) — verify with engineer before HAZOP"
+  },
+  {
+   "file": "equipment/TH-5101.md",
+   "line": 109,
+   "text": "| Feed Solids Mass Rate | 51 (⚠️ CONFLICT) (Stream S-431 specifies 51 t/h solids in RB-4410-PFD-003 Rev B and RB-4410-PFD-002 Rev B, whereas Drawing RB-4410-PFD-000 Rev B specifies 50.6 t/h solids (26.0% Cu grade). The 0.4 t/h variance reflects integer mass closure in PFD-002/003.) | t/h | RB-4410-P"
+  },
+  {
+   "file": "equipment/TH-5101.md",
+   "line": 168,
+   "text": "- ⚠️ CONFLICT — CONCENTRATE PRODUCTION CAPACITY: Drawing RB-4410-PFD-003 Rev B and RB-4410-PFD-002 Rev B (Stream S-431 and S-511) specify 51 t/h solids, whereas Drawing RB-4410-PFD-000 Rev B specifies 50.6 t/h solids (26.0% Cu grade) — verify with engineer before HAZOP to ensure thickener rake drive"
+  },
+  {
+   "file": "equipment/TH-5101.md",
+   "line": 172,
+   "text": "- ⚠️ CONFLICT — CONCENTRATE UNDERFLOW PUMP RATED CAPACITY: Process Data Sheet RB-4410-PS-PP5101 Rev A specifies a rated slurry flow of 180 m³/h for PP-5101A/B, whereas Drawing RB-4410-PFD-003 Rev B (Stream S-511) specifies an operating underflow slurry flow of 40 m³/h (51 t/h solids, 27 t/h water at"
+  },
+  {
+   "file": "equipment/TH-5101.md",
+   "line": 173,
+   "text": "- ⚠️ CONFLICT — CONCENTRATE UNDERFLOW PUMP RATED CAPACITY: Process Data Sheet RB-4410-PS-PP5101 Rev B specifies a rated slurry flow of 210 m³/h for PP-5101A/B (increased from 180 m³/h in Rev A after filter trade-off; supersedes Rev A), whereas Drawing RB-4410-PFD-003 Rev B (Stream S-511) specifies a"
+  },
+  {
+   "file": "equipment/TH-5101.md",
+   "line": 183,
+   "text": "- ⚠️ CONFLICT — Underflow Solids Concentration: RB-4410-PFD-003 Rev B specifies 65.0 % w/w, whereas RB-4410-OM-001 Rev 2 specifies 65 % solids w/w — verify with engineer before HAZOP"
+  },
+  {
+   "file": "equipment/TH-6101.md",
+   "line": 192,
+   "text": "- ⚠️ CONFLICT — Underflow Solids Concentration: RB-4410-PFD-003 Rev B, RB-4410-PS-TH6101 Rev B; RB-4410-PID-61-001 Rev B, RB-4410-PS-TH6101 Rev B, RB-4410-PFD-003 Rev B specifies 62.0 % w/w, whereas RB-4410-OM-001 Rev 2 specifies 62 % solids w/w — verify with engineer before HAZOP"
+  },
+  {
+   "file": "equipment/TK-4501.md",
+   "line": 195,
+   "text": "- ⚠️ CONFLICT — Connected Equipment (Downstream): RB-4410-PS-TK4501 Rev B specifies TK-4502, whereas RB-4410-PID-45-001 Rev B, RB-4410-PS-TK4501 Rev B specifies TK-4502 (Downstream PAX chemical dosing vessel) — verify with engineer before HAZOP"
+  },
+  {
+   "file": "equipment/TK-4501.md",
+   "line": 196,
+   "text": "- ⚠️ CONFLICT — Connected Equipment (Ventilation): RB-4410-PS-TK4501 Rev B specifies FN-4501, whereas RB-4410-PID-45-001 Rev B (Note 1), RB-4410-PS-TK4501 Rev B specifies FN-4501 (Enclosed reagent room continuous extraction fan) — verify with engineer before HAZOP"
+  },
+  {
+   "file": "equipment/TK-4511.md",
+   "line": 170,
+   "text": "- ⚠️ CONFLICT — HAZARDOUS AREA CLASSIFICATION: Process Data Sheet RB-4410-PS-TK4511 Rev B designates the tank installation as Zone 2 (flammable liquid, Class 3), whereas preliminary general safety notes referenced Class I Div 1 / Zone 1 — verify electrical equipment ratings with safety/electrical en"
+  },
+  {
+   "file": "equipment/TK-4511.md",
+   "line": 179,
+   "text": "- ⚠️ CONFLICT — Hazardous Area Classification: RB-4410-PS-TK4511 Rev B specifies Zone 2, whereas RB-4410-PID-45-001 Rev B (Note 2), RB-4410-PS-TK4511 Rev B specifies Per RB-4410-STD-HAC-001 (Zone 2 for MIBC service) — verify with engineer before HAZOP"
+  },
+  {
+   "file": "equipment/TK-4521.md",
+   "line": 151,
+   "text": "- ⚠️ CONFLICT — Connected Equipment (Downstream): RB-4410-PS-TK4521 Rev B, RB-4410-PFD-002 Rev B specifies TK-4101, whereas RB-4410-PID-45-001 Rev B, RB-4410-PS-TK4521 Rev B specifies TK-4101 (Flotation conditioning tank receiving lime dosing) — verify with engineer before HAZOP"
+  },
+  {
+   "file": "hazards/anionic-polyacrylamide-flocculant.md",
+   "line": 122,
+   "text": "| **Multi-Reagent Firefighting Conflict** | Use of water jets in Area 45 during fire involving adjacent xanthate (TK-4501) | Scatter of burning xanthate; rapid hydrolysis producing explosive, toxic carbon disulfide ($CS_2$) gas | Dry chemical, CO2, or foam extinguishers; strict directive: do not use"
+  },
+  {
+   "file": "hazards/comminution-slurry-hazards.md",
+   "line": 48,
+   "text": "- conflict"
+  },
+  {
+   "file": "hazards/comminution-slurry-hazards.md",
+   "line": 80,
+   "text": "- feed-density-conflict"
+  },
+  {
+   "file": "hazards/comminution-slurry-hazards.md",
+   "line": 562,
+   "text": "conflict: true"
+  },
+  {
+   "file": "hazards/comminution-slurry-hazards.md",
+   "line": 563,
+   "text": "psv_3105_conflict:"
+  },
+  {
+   "file": "hazards/comminution-slurry-hazards.md",
+   "line": 576,
+   "text": "conflict_frother:"
+  },
+  {
+   "file": "hazards/comminution-slurry-hazards.md",
+   "line": 584,
+   "text": "conflict_thickener_diameter:"
+  },
+  {
+   "file": "hazards/comminution-slurry-hazards.md",
+   "line": 590,
+   "text": "conflict_casing_design_pressure:"
+  },
+  {
+   "file": "hazards/comminution-slurry-hazards.md",
+   "line": 602,
+   "text": "conflict_cyclone_density:"
+  },
+  {
+   "file": "hazards/comminution-slurry-hazards.md",
+   "line": 628,
+   "text": "conflict_sif_3101_trip_temperature:"
+  },
+  {
+   "file": "hazards/comminution-slurry-hazards.md",
+   "line": 757,
+   "text": "| **MIBC Frother Vapor Ignition & Flammability** | TK-4511 (Frother Storage Tank), Area 45 | Elevated ambient temperature, static discharge during road tanker unloading, or open hot work (flash point 41 °C) [^23] | Flash fire, tank explosion, toxic smoke generation, thermal radiation exposure in Are"
+  },
+  {
+   "file": "hazards/comminution-slurry-hazards.md",
+   "line": 780,
+   "text": "| **Cyclone Roping & Downstream Grade Loss** | CY-3201 (Hydrocyclones) | Cyclone feed slurry density > 65 % solids w/w (⚠️ CONFLICT) or apex choking | Discharge transitions from spray to rope; coarse oversize (+150 µm) carries over to rougher cells, collapsing recovery | Nuclear density gauge DT-320"
+  },
+  {
+   "file": "hazards/comminution-slurry-hazards.md",
+   "line": 840,
+   "text": "- **Stage-3 Pump Casing Mechanical Design Pressure:** 40 bar(g) per `RB-4410-PS-PP6101 Rev B` (⚠️ CONFLICT: marked **4.0 bar(g)** on `RB-4410-PID-61-001 Rev B`)."
+  },
+  {
+   "file": "hazards/comminution-slurry-hazards.md",
+   "line": 875,
+   "text": "- **MIBC Frother Storage & Flammability Boundaries (TK-4511):** 30 m³ atmospheric storage tank in Area 45 storing pure methyl isobutyl carbinol (MIBC) frother; flash point 41 °C (Class 3 flammable liquid); hazardous area designated as Zone 2 per `RB-4410-PS-TK4511 Rev B` [^23]. ⚠️ CONFLICT: Process "
+  },
+  {
+   "file": "hazards/comminution-slurry-hazards.md",
+   "line": 903,
+   "text": "- **Concentrate Thickener Underflow Pump Operating Envelope (PP-5101A/B):** 1 duty + 1 standby configuration; rated slurry flow 180 m³/h per pump (⚠️ CONFLICT vs 40 m³/h operating flow in PFD-003 Stream S-511); total dynamic head 28 m; installed motor power 75 kW; slurry SG 2.0 per `RB-4410-PS-PP510"
+  },
+  {
+   "file": "hazards/comminution-slurry-hazards.md",
+   "line": 920,
+   "text": "| **Methyl Isobutyl Carbinol (MIBC)** | $(CH_3)_2CHCH_2CH(OH)CH_3$ (Frother) | 20 g/t dry ore ($53.8\\text{ kg/h}$); pure storage in 30 m³ tank TK-4511 [^3] [^23] | Class 3 flammable liquid (FP 41°C); explosive vapor accumulation; acute mucous membrane and eye irritant [^3] [^23] | Zone 2 electrical "
+  },
+  {
+   "file": "hazards/mibc.md",
+   "line": 12,
+   "text": "- conflict"
+  },
+  {
+   "file": "hazards/mibc.md",
+   "line": 60,
+   "text": "conflict_reagent:"
+  },
+  {
+   "file": "hazards/mibc.md",
+   "line": 116,
+   "text": "| **Reagent Mismatch & Unrated Equipment** | Procuring/loading MIBC when P&ID specifies polyglycol ether (DF-250) (⚠️ CONFLICT) | Electrical apparatus in bund not rated for Class 3 flammable vapor, resulting in spark ignition | Reconcile P&ID RB-4410-PID-45-001 with SDS and PS-TK4511 per HAZOP recom"
+  },
+  {
+   "file": "hazards/mibc.md",
+   "line": 144,
+   "text": "## Cross-Document Conflict Register"
+  },
+  {
+   "file": "hazards/polyglycol-ether-frother.md",
+   "line": 13,
+   "text": "- conflict"
+  },
+  {
+   "file": "hazards/polyglycol-ether-frother.md",
+   "line": 81,
+   "text": "conflict_reagent:"
+  },
+  {
+   "file": "hazards/polyglycol-ether-frother.md",
+   "line": 106,
+   "text": "| **Associated Equipment on P&ID** | Frother Storage Tank `TK-4511` (P&ID label only; ⚠️ CONFLICT) | RB-4410-PID-45-001 Rev B |"
+  },
+  {
+   "file": "hazards/polyglycol-ether-frother.md",
+   "line": 115,
+   "text": "| **Multi-Reagent Firefighting Conflict** | Directing water jets toward burning xanthate during reagent storage fire | Scatter of burning chemical; rapid decomposition into toxic, flammable CS2 gas | Strict firefighting rule: Do not use water jet on burning xanthate in Area 45 |"
+  },
+  {
+   "file": "hazards/polyglycol-ether-frother.md",
+   "line": 135,
+   "text": "## Cross-Document Conflict & Resolution Register"
+  },
+  {
+   "file": "instruments/pressure-instrumentation-and-relief-valves.md",
+   "line": 271,
+   "text": "trip_setpoint: TAHH 85 degC (⚠️ CONFLICT vs 75 °C in PS-0034 / OM-001)"
+  },
+  {
+   "file": "instruments/pressure-instrumentation-and-relief-valves.md",
+   "line": 306,
+   "text": "psv_3105_conflict:"
+  },
+  {
+   "file": "instruments/pressure-instrumentation-and-relief-valves.md",
+   "line": 311,
+   "text": "conflict: false"
+  },
+  {
+   "file": "instruments/pressure-instrumentation-and-relief-valves.md",
+   "line": 331,
+   "text": "conflict_thickener_diameter:"
+  },
+  {
+   "file": "instruments/pressure-instrumentation-and-relief-valves.md",
+   "line": 341,
+   "text": "conflict_casing_design_pressure:"
+  },
+  {
+   "file": "instruments/pressure-instrumentation-and-relief-valves.md",
+   "line": 353,
+   "text": "conflict_sif_3101_trip_temperature:"
+  },
+  {
+   "file": "instruments/pressure-instrumentation-and-relief-valves.md",
+   "line": 413,
+   "text": "| **TT-3102** | SAG mill non-drive-end trunnion bearing temperature | Temperature Transmitter (Pt100 RTD) | 0–150 °C | TAH 70 °C / TAHH 85 °C (STD-CE-001) / 75 °C (PS-0034) (RB-4410-PS-0034 Rev B, RB-4410-PID-31-001 Rev B, RB-4410-OM-001 Rev 2: TAH 70 °C / TAHH 75 °C) | SIF-3101 (SIL 1, 1oo2 voting)"
+  },
+  {
+   "file": "instruments/pressure-instrumentation-and-relief-valves.md",
+   "line": 568,
+   "text": "- **Stage-3 Pump Casing Design Pressure Discrepancy:** 40 bar(g) per `RB-4410-PS-PP6101 Rev B` vs conflicting **4.0 bar(g)** marked on `RB-4410-PID-61-001 Rev B` (apparent typographical error)."
+  },
+  {
+   "file": "parameters/concentrator-design-basis.md",
+   "line": 37,
+   "text": "- conflict"
+  },
+  {
+   "file": "parameters/concentrator-design-basis.md",
+   "line": 494,
+   "text": "conflict: false"
+  },
+  {
+   "file": "parameters/concentrator-design-basis.md",
+   "line": 495,
+   "text": "psv_3105_conflict:"
+  },
+  {
+   "file": "parameters/concentrator-design-basis.md",
+   "line": 509,
+   "text": "cyclone_feed_pump_rated_flow_conflict:"
+  },
+  {
+   "file": "parameters/concentrator-design-basis.md",
+   "line": 518,
+   "text": "conflict_frother:"
+  },
+  {
+   "file": "parameters/concentrator-design-basis.md",
+   "line": 525,
+   "text": "conflict_thickener_diameter:"
+  },
+  {
+   "file": "parameters/concentrator-design-basis.md",
+   "line": 534,
+   "text": "conflict_casing_design_pressure:"
+  },
+  {
+   "file": "parameters/concentrator-design-basis.md",
+   "line": 543,
+   "text": "conflict_cyclone_density:"
+  },
+  {
+   "file": "parameters/concentrator-design-basis.md",
+   "line": 546,
+   "text": "conflict_sif_3101_trip_temperature:"
+  },
+  {
+   "file": "parameters/concentrator-design-basis.md",
+   "line": 553,
+   "text": "trip_setpoint: TAHH 85 degC (⚠️ CONFLICT vs 75 °C in PS-0034 / OM-001)"
+  },
+  {
+   "file": "parameters/concentrator-design-basis.md",
+   "line": 664,
+   "text": "| **Plant Service & Scope** | — | Alternative frother (not specified for TK-4511) | — | Evaluated alternative | ⚠️ CONFLICT: Marked on P&ID RB-4410-PID-45-001 Rev B but excluded from baseline TK-4511 by SDS, PS-TK4511, and OM-001 | SDS_37286-64-9_polyglycol-ether-frother.pdf |"
+  },
+  {
+   "file": "parameters/concentrator-design-basis.md",
+   "line": 707,
+   "text": "| **Crusher Peak Mechanical Throughput** | $\\dot{M}_{\\text{crush,max}}$ | 5,500 | t/h | ⚠️ CONFLICT: Peak surge rating vs 2,688 t/h nominal | Primary gyratory crusher mechanical envelope (Gyratory 60 x 113) | RB-4410-PS-CR2101 Rev B |"
+  },
+  {
+   "file": "parameters/concentrator-design-basis.md",
+   "line": 710,
+   "text": "| **Primary Crusher Motor Power** | $P_{\\text{crush}}$ | 1,200 (PS-CR2101) / 1,000 (PID-00-002) | kW | ⚠️ CONFLICT: 1,200 kW in PS-CR2101 vs 1,000 kW in PID-00-002 | Installed drive capacity for 60 x 113 gyratory mechanism; verify with electrical load list | RB-4410-PS-CR2101 Rev B, RB-4410-PID-00-0"
+  },
+  {
+   "file": "parameters/concentrator-design-basis.md",
+   "line": 727,
+   "text": "| **Final Concentrate Solids Rate** | $\\dot{M}_{\\text{conc}}$ | 51 (PFD-002/003) / 50.6 (PFD-000) | t/h | ⚠️ CONFLICT: 51 t/h vs 50.6 t/h | Sizing basis for concentrate thickener TH-5101 and pressure filters FP-5101 | RB-4410-PFD-000 Rev B, RB-4410-PFD-002 Rev B, RB-4410-PFD-003 Rev B |"
+  },
+  {
+   "file": "parameters/concentrator-design-basis.md",
+   "line": 817,
+   "text": "| **Concentrate Underflow Pump Rated Flow** | $\\dot{V}_{\\text{pp5101,rated}}$ | 210 (PS-PP5101) / 40 (PFD-003) | m³/h | ⚠️ CONFLICT: 210 m³/h rated vs 40 m³/h operating | Sizing envelope for PP-5101A/B duty/standby slurry pumps [^4] [^18] | RB-4410-PS-PP5101 Rev B [^18], RB-4410-PFD-003 Rev B [^4] |"
+  },
+  {
+   "file": "parameters/concentrator-design-basis.md",
+   "line": 820,
+   "text": "| **Concentrate Underflow Pump Slurry SG** | $SG_{\\text{pp5101}}$ | 2.0 (PS-PP5101) / 1.966 (PFD-003) | — | ⚠️ CONFLICT: SG 2.0 vs 1.966 | Slurry density design basis for pump motor sizing [^4] [^18] | RB-4410-PS-PP5101 Rev B [^18], RB-4410-PFD-003 Rev B [^4] |"
+  },
+  {
+   "file": "parameters/concentrator-design-basis.md",
+   "line": 822,
+   "text": "| **Concentrate Thickener Diameter** | $D_{\\text{th5101}}$ | 25 (P&ID) / 30 (PDS) | m | ⚠️ CONFLICT: 25 m in PID-51-001 vs 30 m in PS-TH5101 (RB-4410-PS-TH5101 Rev B [^20]: Tank diameter) | Thickener settling area and rise rate envelope (RB-4410-PS-TH5101 Rev B [^20]: Mechanical envelope sized for 5"
+  },
+  {
+   "file": "parameters/concentrator-design-basis.md",
+   "line": 840,
+   "text": "| **Frother Reagent Dosage** | $D_{\\text{froth}}$ | 20 | g/t | Reagent rate per RB-4410-OM-001 (Note 4) | Stabilizes bubbly froth (⚠️ CONFLICT: DF-250 vs MIBC) ($53.8\\text{ kg/h}$) | RB-4410-PFD-002 Rev B, RB-4410-PID-45-001 Rev B (Note 4) |"
+  },
+  {
+   "file": "parameters/concentrator-design-basis.md",
+   "line": 851,
+   "text": "| **Cyclone Feed Density (Design)** | $C_{\\text{feed}}$ | 65 (OM-001) / 60.0 (PFD/PDS) | % w/w | ⚠️ CONFLICT: 65% in OM-001 vs 60% in PFD/PDS | High density coarsens overflow and reduces rougher recovery | RB-4410-OM-001 Rev 2, RB-4410-PFD-001 Rev B, RB-4410-PS-CY3201 Rev B |"
+  },
+  {
+   "file": "parameters/concentrator-design-basis.md",
+   "line": 926,
+   "text": "| **Hazardous Area Classification** | — | Zone 2 (flammable liquid, Class 3) | — | IEC/AS/NZS 60079 Zone 2 | ⚠️ CONFLICT: Zone 2 per PS-TK4511 Rev B vs earlier generic Class I Div 1 / Zone 1 references [^23] | RB-4410-PS-TK4511 Rev B [^23] |"
+  },
+  {
+   "file": "sources/rb-4410-pfd-000.md",
+   "line": 226,
+   "text": "- **Trip Set Point:** `TAHH 85 °C` (⚠️ CONFLICT: listed as `TAHH 75 °C` in `RB-4410-PS-0034 Rev B` and `RB-4410-OM-001 Rev 2`)."
+  },
+  {
+   "file": "sources/rb-4410-pfd-000.md",
+   "line": 259,
+   "text": "## Cross-Document Conflicts & Engineering Observations"
+  },
+  {
+   "file": "sources/rb-4410-pfd-000.md",
+   "line": 260,
+   "text": "1. **⚠️ CONFLICT — SAG Trunnion Bearing High-High Trip (SIF-3101):**"
+  },
+  {
+   "file": "sources/sds-108-11-2-mibc.md",
+   "line": 11,
+   "text": "- conflict"
+  },
+  {
+   "file": "sources/sds-108-11-2-mibc.md",
+   "line": 44,
+   "text": "conflict_reagent:"
+  },
+  {
+   "file": "sources/sds-37286-64-9-polyglycol-ether-frother.md",
+   "line": 12,
+   "text": "- conflict"
+  },
+  {
+   "file": "sources/sds-37286-64-9-polyglycol-ether-frother.md",
+   "line": 40,
+   "text": "conflict_reagent:"
+  },
+  {
+   "file": "units/copper-concentrator.md",
+   "line": 373,
+   "text": "psv_3105_conflict:"
+  },
+  {
+   "file": "units/copper-concentrator.md",
+   "line": 386,
+   "text": "conflict: false"
+  },
+  {
+   "file": "units/copper-concentrator.md",
+   "line": 403,
+   "text": "cyclone_feed_pump_rated_flow_conflict:"
+  },
+  {
+   "file": "units/copper-concentrator.md",
+   "line": 419,
+   "text": "conflict_frother:"
+  },
+  {
+   "file": "units/copper-concentrator.md",
+   "line": 429,
+   "text": "conflict_thickener_diameter:"
+  },
+  {
+   "file": "units/copper-concentrator.md",
+   "line": 435,
+   "text": "conflict_casing_design_pressure:"
+  },
+  {
+   "file": "units/copper-concentrator.md",
+   "line": 448,
+   "text": "conflict_cyclone_density:"
+  },
+  {
+   "file": "units/crushing-and-grinding.md",
+   "line": 6,
+   "text": "& lube system (PID-31-002, SIF-3102, PSV-3105 conflict), and Ball Mill & Cyclone"
+  },
+  {
+   "file": "units/crushing-and-grinding.md",
+   "line": 239,
+   "text": "sag_gmd_power_kw_conflict:"
+  },
+  {
+   "file": "units/crushing-and-grinding.md",
+   "line": 249,
+   "text": "conflict: false"
+  },
+  {
+   "file": "units/crushing-and-grinding.md",
+   "line": 250,
+   "text": "psv_3105_conflict:"
+  },
+  {
+   "file": "units/crushing-and-grinding.md",
+   "line": 260,
+   "text": "cyclone_feed_pump_rated_flow_conflict:"
+  },
+  {
+   "file": "units/crushing-and-grinding.md",
+   "line": 265,
+   "text": "conflict_cyclone_density:"
+  },
+  {
+   "file": "units/crushing-and-grinding.md",
+   "line": 295,
+   "text": "> - **PRIMARY CRUSHER THROUGHPUT CONFLICT (⚠️ CONFLICT):** Process Data Sheet `RB-4410-PS-CR2101 Rev B` and P&ID `RB-4410-PID-21-001 Rev B` specify a primary crusher mechanical design throughput / ROM ore maximum feed rate of **5,500 t/h** (Gyratory 60 x 113, 1,200 kW, CSS 165 mm), whereas `RB-4410-"
+  },
+  {
+   "file": "units/crushing-and-grinding.md",
+   "line": 302,
+   "text": "> - **PRIMARY CRUSHER THROUGHPUT CONFLICT (⚠️ CONFLICT):** Process Data Sheet `RB-4410-PS-CR2101 Rev B` specifies a primary crusher mechanical design throughput of **5,500 t/h** (Gyratory 60 x 113, 1,200 kW), whereas `RB-4410-PFD-001 Rev B` (Stream S-101) specifies a nominal continuous operating sol"
+  },
+  {
+   "file": "units/crushing-and-grinding.md",
+   "line": 320,
+   "text": "- **Cyclone Feed Density Target:** 65 % solids w/w monitored by `DT-3201` via sump dilution water (⚠️ CONFLICT vs 60.0% in datasheets)."
+  }
+ ],
+ "results": [
+  {
+   "id": "C01",
+   "tag": "ML-3101",
+   "parameter": "Installed power",
+   "class": "Rating mismatch",
+   "true": "22,000 kW",
+   "conflict": "20,000 kW",
+   "true_doc": "DS-ML-3101",
+   "conflict_doc": "PID-31-001",
+   "detected": true,
+   "evidence": [
+    {
+     "file": "equipment/ML-3101.md",
+     "line": 226,
+     "text": "Primary autogenous/semi-autogenous grinding (SAG) mill processing primary crushed ore (Stream S-301) and recycled crushed pebbles (Stream S-305) in wet primary comminution; discharges via trommel screen to vibrating screen SC-3101 and cyclone feed pump PP-3201A. Sized at 12.2 m (40 ft) diameter by 6"
+    },
+    {
+     "file": "equipment/ML-3101.md",
+     "line": 248,
+     "text": "| Installed Power | 22,000 (Continuous drive rating fed by 33 kV cycloconverter (22,000 kW per PS-ML3101 / PID-00-002; ⚠️ CONFLICT vs 20,000 kW in PID-31-001 Rev B)) | kW | RB-4410-PS-ML3101 Rev B; RB-4410-PS-ML3101 Rev B / RB-4410-PID-00-002 Rev B; RB-4410-PS-ML3101 Rev B, RB-4410-PID-00-002 Rev B "
+    },
+    {
+     "file": "equipment/ML-3101.md",
+     "line": 271,
+     "text": "| Installed Motor Power (P&ID) | 20,000 kW GMD (⚠️ CONFLICT: Drawing RB-4410-PID-31-001 Rev B specifies 20,000 kW GMD, whereas Process Data Sheet RB-4410-PS-ML3101 Rev B and Mechanical Equipment List RB-4410-PID-00-002 Rev B specify 22,000 kW — verify with electrical engineer before HAZOP) | kW | RB"
+    }
+   ]
+  },
+  {
+   "id": "C02",
+   "tag": "PP-3201A",
+   "parameter": "Rated flow",
+   "class": "Sizing mismatch",
+   "true": "5,539 m3/h",
+   "conflict": "4,650 m3/h",
+   "true_doc": "PFD-001",
+   "conflict_doc": "DS-PP-3201",
+   "detected": true,
+   "evidence": [
+    {
+     "file": "equipment/PP-3201A.md",
+     "line": 101,
+     "text": "| Design Volumetric Flow Rate | 5539 (Volumetric slurry throughput per operating duty pump per RB-4410-PFD-001 Rev B; ⚠️ CONFLICT vs 4,650 m³/h rated flow in RB-4410-PS-PP3201 Rev B) | m3/h | RB-4410-PFD-001 Rev B |"
+    },
+    {
+     "file": "equipment/PP-3201A.md",
+     "line": 108,
+     "text": "| Rated Slurry Flow | 4650 (Process Data Sheet RB-4410-PS-PP3201 Rev B; ⚠️ CONFLICT: RB-4410-PFD-001 Rev B Stream S-322 specifies 5,539 m³/h operating slurry throughput per duty pump) | m3/h | RB-4410-PS-PP3201 Rev B |"
+    },
+    {
+     "file": "equipment/PP-3201A.md",
+     "line": 118,
+     "text": "| Rated Slurry Flow Rate (P&ID & PFD) | 5539 (each @ SG 1.618) (⚠️ CONFLICT: P&ID RB-4410-PID-32-001 Rev B explicitly specifies rated pump throughput of 5,539 m3/h each @ SG 1.618 matching PFD-001 Rev B Stream S-322, whereas Process Data Sheet RB-4410-PS-PP3201 Rev B specifies 4,650 m3/h rated flow "
+    }
+   ]
+  },
+  {
+   "id": "C03",
+   "tag": "CY-3201",
+   "parameter": "Feed density",
+   "class": "Operating basis mismatch",
+   "true": "60.0 % solids w/w",
+   "conflict": "65 % solids w/w",
+   "true_doc": "PFD-001",
+   "conflict_doc": "OM-RB-001",
+   "detected": true,
+   "evidence": [
+    {
+     "file": "equipment/CY-3201.md",
+     "line": 29,
+     "text": "250-300%, and feed density of 65% solids w/w (flagged as a conflict vs 60.0% solids"
+    },
+    {
+     "file": "equipment/CY-3201.md",
+     "line": 113,
+     "text": "Closed-circuit classification hydrocyclone cluster separating combined SAG and ball mill slurry into coarse underflow (Stream S-323) recycled to ball mill ML-3201 and fine overflow (Stream S-324) sent by gravity to flotation conditioning tank TK-4101 and rougher flotation cells FC-4101. Configured a"
+    },
+    {
+     "file": "equipment/CY-3201.md",
+     "line": 141,
+     "text": "| Cyclone Feed Density (Design) | 65 (⚠️ CONFLICT vs 60.0% in PS-CY3201 / PFD-001) (⚠️ CONFLICT: Operating Manual RB-4410-OM-001 Rev 2 specifies design feed density as 65 % solids w/w, whereas PS-CY3201 Rev B, PFD-001 Rev B, and PID-32-001 Rev B specify 60.0 % solids w/w (SG 1.618)) | % solids w/w |"
+    }
+   ]
+  },
+  {
+   "id": "C04",
+   "tag": "TT-3101",
+   "parameter": "TAHH trip setpoint",
+   "class": "SIS setpoint mismatch",
+   "true": "75 degC",
+   "conflict": "85 degC",
+   "true_doc": "DS-INST-TEMP",
+   "conflict_doc": "CE-31-001",
+   "detected": true,
+   "evidence": [
+    {
+     "file": "equipment/ML-3101.md",
+     "line": 226,
+     "text": "Primary autogenous/semi-autogenous grinding (SAG) mill processing primary crushed ore (Stream S-301) and recycled crushed pebbles (Stream S-305) in wet primary comminution; discharges via trommel screen to vibrating screen SC-3101 and cyclone feed pump PP-3201A. Sized at 12.2 m (40 ft) diameter by 6"
+    },
+    {
+     "file": "equipment/ML-3101.md",
+     "line": 292,
+     "text": "| SAG Trunnion Bearing High-High Trip Setpoint (SIF-3101) | 85 (⚠️ CONFLICT vs 75 °C in PS-0034 / OM-001) (Controlling IEC 61511 standard RB-4410-STD-CE-001 Rev B specifies SIF-3101 executive trip setpoint as TAHH 85 °C with 1oo2 voting on TT-3101/TT-3102; ⚠️ CONFLICT: RB-4410-PS-0034 Rev B and RB-4"
+    },
+    {
+     "file": "equipment/ML-3101.md",
+     "line": 339,
+     "text": "| [PSV-3105](/instruments/pressure-instrumentation-and-relief-valves.md) | SAG HP lift pump discharge relief | Process Instrument | HP lift pump common discharge header | SET 160 bar(g) (corroborated by RB-4410-OM-001 Rev 2 Sec 12; conflict 180 bar(g) on PID-31-002) | Mechanical relief returning to "
+    }
+   ]
+  },
+  {
+   "id": "C05",
+   "tag": "PP-6101A",
+   "parameter": "Casing design pressure (stage 3)",
+   "class": "Decimal / unit error",
+   "true": "40 bar(g)",
+   "conflict": "4.0 bar(g)",
+   "true_doc": "DS-PP-6101",
+   "conflict_doc": "PID-61-001",
+   "detected": true,
+   "evidence": [
+    {
+     "file": "equipment/PP-6101A.md",
+     "line": 149,
+     "text": "Heavy-duty centrifugal slurry booster pump operating as lead pump in a 3-stage series pumping station (PP-6101A/B/C) to transport 2,576 m3/h of thickened tailings underflow (Stream S-621 at 2,637 t/h dry solids, 62.0 wt% solids, SG 1.652) across a 6.2 km overland pipeline to the Tailings Storage Fac"
+    },
+    {
+     "file": "equipment/PP-6101A.md",
+     "line": 168,
+     "text": "| Stage-3 Casing Design Pressure | 40 (PS-PP6101) / 4.0 (PID-61-001 conflict) (⚠️ CONFLICT: Drawing RB-4410-PID-61-001 Rev B displays 4.0 bar(g) (typographical decimal error against 34 bar(g) normal discharge and 38 bar(g) PAHH trip), whereas Process Data Sheet RB-4410-PS-PP6101 Rev B specifies 40 b"
+    },
+    {
+     "file": "equipment/PP-6101A.md",
+     "line": 203,
+     "text": "| Stage-3 Discharge Operating Pressure Window | 34 normal (<36 PAH, 38 PAHH trip, 40 casing design / 4.0 P&ID conflict) | bar(g) | RB-4410-PS-0032 Rev B; RB-4410-PS-0032 Rev B / RB-4410-PS-PP6101 Rev B; RB-4410-PS-PP6101 Rev B / RB-4410-PS-0032 Rev B; RB-4410-PID-61-001 Rev B, RB-4410-PS-0032 Rev B,"
+    }
+   ]
+  },
+  {
+   "id": "C06",
+   "tag": "TK-4511",
+   "parameter": "Reagent",
+   "class": "Chemical identity mismatch",
+   "true": "MIBC (methyl isobutyl carbinol)",
+   "conflict": "Polyglycol ether frother (DF-250 type)",
+   "true_doc": "DS-TK-4511",
+   "conflict_doc": "PID-45-001",
+   "detected": true,
+   "evidence": [
+    {
+     "file": "equipment/PP-4511A.md",
+     "line": 56,
+     "text": "| Fluid Handled | Polyglycol ether frother (DF-250 type) / MIBC (⚠️ CONFLICT) (⚠️ CONFLICT: RB-4410-PID-45-001 Rev B specifies Polyglycol ether frother (DF-250 type), whereas RB-4410-PS-TK4511 Rev B specifies MIBC (methyl isobutyl carbinol)) | — | RB-4410-PID-45-001 Rev B / RB-4410-PS-TK4511 Rev B |"
+    },
+    {
+     "file": "equipment/TK-4511.md",
+     "line": 113,
+     "text": "| Reagent Stored | Polyglycol ether frother (DF-250 type) / MIBC (⚠️ CONFLICT) (⚠️ CONFLICT: RB-4410-PID-45-001 Rev B specifies Polyglycol ether frother (DF-250 type), whereas RB-4410-PS-TK4511 Rev B, RB-4410-OM-001 Rev 2, and SDS_108-11-2_mibc.pdf specify MIBC (flash point 41 °C, Zone 2). Mandatory"
+    },
+    {
+     "file": "equipment/TK-4511.md",
+     "line": 123,
+     "text": "| Reagent Chemical Identification | MIBC (baseline design, CAS 108-11-2) / Polyglycol ether frother DF-250 (alternative frother, not specified for TK-4511 per SDS_37286-64-9_polyglycol-ether-frother.pdf) (⚠️ CONFLICT) (methyl isobutyl carbinol) (Class 3 flammable aliphatic alcohol frother, CAS 108-1"
+    }
+   ]
+  },
+  {
+   "id": "C07",
+   "tag": "TH-5101",
+   "parameter": "Diameter",
+   "class": "Dimension mismatch",
+   "true": "30 m",
+   "conflict": "25 m",
+   "true_doc": "DS-TH-5101",
+   "conflict_doc": "PID-51-001",
+   "detected": true,
+   "evidence": [
+    {
+     "file": "equipment/TH-5101.md",
+     "line": 122,
+     "text": "| Thickener Diameter | 25 (P&ID) / 30 (PDS) (⚠️ CONFLICT: Piping & Instrumentation Diagram RB-4410-PID-51-001 Rev B specifies 25 m diameter, whereas Process Data Sheet RB-4410-PS-TH5101 Rev B and Drawing Register RB-4410-PID-00-001 Rev B specify 30 m diameter — verify settling area and rise rate bef"
+    },
+    {
+     "file": "equipment/TH-5101.md",
+     "line": 177,
+     "text": "- ⚠️ CONFLICT — THICKENER TH-5101 DIAMETER: Piping & Instrumentation Diagram RB-4410-PID-51-001 Rev B specifies thickener diameter as 25 m, whereas Process Data Sheet RB-4410-PS-TH5101 Rev B and Master Drawing Register RB-4410-PID-00-001 Rev B specify 30 m diameter — verify settling area, rise rate,"
+    },
+    {
+     "file": "equipment/TH-5101.md",
+     "line": 181,
+     "text": "- ⚠️ CONFLICT — Thickener Diameter: RB-4410-PS-TH5101 Rev B specifies 30 m, whereas RB-4410-PID-51-001 Rev B, RB-4410-PS-TH5101 Rev B specifies 25 (P&ID) / 30 (PDS) m — verify with engineer before HAZOP"
+    }
+   ]
+  },
+  {
+   "id": "C08",
+   "tag": "CR-2101",
+   "parameter": "Installed power",
+   "class": "Register mismatch",
+   "true": "1,200 kW",
+   "conflict": "1,000 kW",
+   "true_doc": "DS-CR-2101",
+   "conflict_doc": "EL-001",
+   "detected": true,
+   "evidence": [
+    {
+     "file": "equipment/CR-2101.md",
+     "line": 82,
+     "text": "| Crusher Mechanical Design Throughput | 5,500 (⚠️ CONFLICT vs PFD S-101 2,688 t/h nominal) (RB-4410-PID-21-001 Rev B and Process Data Sheet RB-4410-PS-CR2101 Rev B specify 5,500 t/h ROM ore max throughput, whereas PFD RB-4410-PFD-001 Rev B stream S-101 specifies nominal operating dry solids through"
+    },
+    {
+     "file": "equipment/CR-2101.md",
+     "line": 84,
+     "text": "| Installed Power | 1,200 (PID-21-001 & PS-CR2101) / 1,000 (PID-00-002) (⚠️ CONFLICT) (RB-4410-PID-21-001 Rev B and Process Data Sheet RB-4410-PS-CR2101 Rev B specify 1,200 kW installed power, whereas Mechanical Equipment List RB-4410-PID-00-002 Rev B specifies 1,000 kW installed / motor power.) | k"
+    },
+    {
+     "file": "equipment/CR-2101.md",
+     "line": 132,
+     "text": "- ⚠️ CONFLICT — INSTALLED MOTOR POWER: Process Data Sheet RB-4410-PS-CR2101 Rev B specifies 1,200 kW installed power, whereas Mechanical Equipment List RB-4410-PID-00-002 Rev B specifies 1,000 kW installed / motor power — verify electrical load list and vendor drive sizing before HAZOP."
+    }
+   ]
+  },
+  {
+   "id": "C09",
+   "tag": "TK-4501",
+   "parameter": "CS2 gas detection (AT-4501)",
+   "class": "Missing safeguard",
+   "true": "Required: AT-4501 alarm 10 % LEL, interlock to FN-4501",
+   "conflict": "Not shown on P&ID",
+   "true_doc": "HAZOP-001",
+   "conflict_doc": "PID-45-001",
+   "detected": false,
+   "evidence": []
+  },
+  {
+   "id": "C10",
+   "tag": "PSV-3105",
+   "parameter": "Set pressure",
+   "class": "Relief above design pressure",
+   "true": "160 bar(g)",
+   "conflict": "180 bar(g)",
+   "true_doc": "DS-INST-PRES",
+   "conflict_doc": "PID-31-002",
+   "detected": true,
+   "evidence": [
+    {
+     "file": "equipment/ML-3101.md",
+     "line": 238,
+     "text": "| SAG HP Lift Pump Relief Valve Set Pressure (PSV-3105) | 160 (PS-0032 / OM-001) / 180 (PID-31-002 conflict) (⚠️ CONFLICT: Drawing RB-4410-PID-31-002 Rev B specifies SET 180 bar(g), exceeding system design pressure 170 bar(g) and contradicting drawing Note 1, whereas Process Data Sheet RB-4410-PS-00"
+    },
+    {
+     "file": "equipment/ML-3101.md",
+     "line": 339,
+     "text": "| [PSV-3105](/instruments/pressure-instrumentation-and-relief-valves.md) | SAG HP lift pump discharge relief | Process Instrument | HP lift pump common discharge header | SET 160 bar(g) (corroborated by RB-4410-OM-001 Rev 2 Sec 12; conflict 180 bar(g) on PID-31-002) | Mechanical relief returning to "
+    },
+    {
+     "file": "equipment/ML-3101.md",
+     "line": 386,
+     "text": "- ⚠️ CONFLICT — PSV-3105 Relief Valve Set Pressure vs System Design Pressure: Drawing RB-4410-PID-31-002 Rev B specifies PSV-3105 set pressure as 180 bar(g) (which also contradicts drawing Note 1 stating set pressure shall not exceed system design pressure of 170 bar(g)), whereas Process Data Sheet "
+    }
+   ]
+  },
+  {
+   "id": "C11",
+   "tag": "ML-3201",
+   "parameter": "Installed power",
+   "class": "Intra-document sheet mismatch",
+   "true": "22,000 kW",
+   "conflict": "20,500 kW",
+   "true_doc": "DS-ML-3201 (Sheet 1)",
+   "conflict_doc": "DS-ML-3201 (Sheet 3)",
+   "detected": true,
+   "evidence": [
+    {
+     "file": "hazards/comminution-slurry-hazards.md",
+     "line": 869,
+     "text": "- **Concentrate Thickener Underflow Pump Operating Envelope (PP-5101A/B):** 1 duty + 1 standby configuration; rated slurry flow 210 m³/h per pump (⚠️ CONFLICT vs 40 m³/h operating flow in PFD-003 Stream S-511); total dynamic head 28 m; installed motor power 75 kW per `RB-4410-PS-PP5101 Rev B` [^18]."
+    },
+    {
+     "file": "hazards/comminution-slurry-hazards.md",
+     "line": 870,
+     "text": "- **Cyclone Feed Pump Operating Boundaries (PP-3201A/B/C):** 2 duty + 1 standby configuration; rated slurry flow 4,650 m³/h per pump (⚠️ CONFLICT vs 5,539 m³/h operating flow in PFD-001 Stream S-322); total dynamic head 32 m; installed electric motor 1,600 kW; casing mechanical design pressure 10 ba"
+    },
+    {
+     "file": "hazards/comminution-slurry-hazards.md",
+     "line": 879,
+     "text": "- **Concentrate Thickener Underflow Pump Operating Envelope (PP-5101A/B):** 1 duty + 1 standby configuration; rated slurry flow 210 m³/h per pump (⚠️ CONFLICT vs 40 m³/h operating flow in PFD-003 Stream S-511); total dynamic head 28 m; installed motor power 75 kW; slurry SG 2.0 per `RB-4410-PS-PP510"
+    }
+   ]
+  }
+ ]
+}
